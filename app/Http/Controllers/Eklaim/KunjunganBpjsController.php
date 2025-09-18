@@ -1,0 +1,276 @@
+<?php
+
+namespace App\Http\Controllers\Eklaim;
+
+use App\Http\Controllers\Controller;
+use App\Models\SIMRS\KunjunganBPJS;
+use App\Models\Eklaim\PengajuanKlaim;
+use App\Helpers\InacbgHelper;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Inertia\Inertia;
+
+class KunjunganBpjsController extends Controller
+{
+    public function index(Request $request)
+    {
+        $perPage = (int) $request->get('per_page', 10);
+        $search = $request->get('search', '');
+        $status = $request->get('status', '');
+        $ruangan = $request->get('ruangan', '');
+        $dateType = $request->get('date_type', 'masuk');
+        $startDate = $request->get('start_date', '');
+        $endDate = $request->get('end_date', '');
+
+        // Build the base query with all filters using raw SQL
+        $whereConditions = [];
+        $queryParams = [];
+
+        // Base conditions
+        $whereConditions[] = "k.batalSEP = 0";
+        $whereConditions[] = "r.JENIS_KUNJUNGAN IN (1, 2, 3)";
+        $whereConditions[] = "r.JENIS = 5";
+
+        // Search filter
+        if (!empty($search)) {
+            $whereConditions[] = "(k.noSEP LIKE ? OR ps.NAMA LIKE ?)";
+            $queryParams[] = "%{$search}%";
+            $queryParams[] = "%{$search}%";
+        }
+
+        // Status filter
+        if (!empty($status) && $status !== 'all') {
+            if ($status === 'active') {
+                $whereConditions[] = "k.klaimStatus = 0";  // 0 = belum diklaim (aktif, bisa diajukan)
+            } elseif ($status === 'completed') {
+                $whereConditions[] = "k.klaimStatus = 1";  // 1 = sudah diklaim (selesai)
+            }
+        }
+
+        // Ruangan filter
+        if (!empty($ruangan) && $ruangan !== 'all') {
+            $whereConditions[] = "kr.RUANGAN = ?";
+            $queryParams[] = $ruangan;
+        }
+
+        // Date range filter
+        if (!empty($startDate) || !empty($endDate)) {
+            $dateColumn = $dateType === 'keluar' ? 'kr.KELUAR' : 'kr.MASUK';
+            
+            if (!empty($startDate)) {
+                $whereConditions[] = "DATE({$dateColumn}) >= ?";
+                $queryParams[] = $startDate;
+            }
+            if (!empty($endDate)) {
+                $whereConditions[] = "DATE({$dateColumn}) <= ?";
+                $queryParams[] = $endDate;
+            }
+        }
+
+        $whereClause = implode(' AND ', $whereConditions);
+
+        // Get filtered noSEP list with order column
+        $dateColumn = $dateType === 'keluar' ? 'kr.KELUAR' : 'kr.MASUK';
+        $validSEPs = DB::connection('bpjs')->select("
+            SELECT DISTINCT k.noSEP, k.tglSEP, {$dateColumn} as orderDate
+            FROM bpjs.kunjungan k
+            JOIN pendaftaran.penjamin p ON k.noSEP = p.NOMOR
+            JOIN pendaftaran.pendaftaran pd ON p.NOPEN = pd.NOMOR  
+            JOIN pendaftaran.kunjungan kr ON pd.NOMOR = kr.NOPEN
+            JOIN master.ruangan r ON kr.RUANGAN = r.ID
+            JOIN master.pasien ps ON pd.NORM = ps.NORM
+            WHERE {$whereClause}
+            ORDER BY {$dateColumn} DESC
+        ", $queryParams);
+        
+        $validSEPNumbers = collect($validSEPs)->pluck('noSEP')->toArray();
+        
+        // Get paginated results using Eloquent with the filtered noSEP list
+        // Maintain the order from raw query by ordering by the position in the array
+        $sepOrder = array_flip($validSEPNumbers);
+        
+        $query = KunjunganBPJS::query()
+            ->with([
+                'penjamin.pendaftaran.pasien',
+                'penjamin.pendaftaran.kunjungan_rs.ruangan'
+            ])
+            ->whereIn('noSEP', $validSEPNumbers)
+            ->orderByRaw("FIELD(noSEP, '" . implode("','", $validSEPNumbers) . "')");
+        
+        $kunjungan = $query->paginate($perPage);
+        
+        // Append query parameters to pagination links
+        $kunjungan->appends($request->query());
+        
+        // Get list of ruangan for filter dropdown
+        $ruangan_list = \App\Models\SIMRS\Ruangan::whereIn('JENIS_KUNJUNGAN', [1, 2, 3])
+            ->where('JENIS', 5)
+            ->orderBy('DESKRIPSI')
+            ->get(['ID', 'DESKRIPSI', 'JENIS_KUNJUNGAN']);
+        
+        return Inertia::render('eklaim/kunjungan/index', [
+            'kunjungan' => $kunjungan,
+            'ruangan_list' => $ruangan_list,
+            'filters' => [
+                'search' => $search,
+                'perPage' => $perPage,
+                'status' => $status,
+                'ruangan' => $ruangan,
+                'date_type' => $dateType,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+            ]
+        ]);
+    }
+
+    public function pengajuanKlaim(Request $request)
+    {
+        try {
+            // Ambil data kunjungan untuk informasi tambahan
+            $kunjungan = KunjunganBPJS::with([
+                'penjamin.pendaftaran.pasien',
+                'penjamin.pendaftaran.kunjungan_rs.ruangan'
+            ])->where('noSEP', $request->get('nomor_sep'))->first();
+
+            // Siapkan data untuk INACBG
+            $metadata = [
+                'method' => 'new_claim'
+            ];
+
+            $data = [
+                'metadata' => $metadata,
+                'data' => [
+                    'nomor_kartu' => $request->get('nomor_kartu'),
+                    'nomor_sep' => $request->get('nomor_sep'),
+                    'nomor_rm' => $request->get('nomor_rm'),
+                    'nama_pasien' => $request->get('nama_pasien'),
+                    'tgl_lahir' => $request->get('tgl_lahir'), // TIMESTAMP
+                    'gender' => $request->get('gender'), // 1 = LAKI-LAKI, 2 = PEREMPUAN
+                    'tanggal_masuk' => $request->get('tanggal_masuk'),
+                    'tanggal_keluar' => $request->get('tanggal_keluar'),
+                    'ruangan' => $request->get('ruangan'),
+                ]
+            ];
+
+            // Siapkan data untuk disimpan ke database
+            $pengajuanData = [
+                'nomor_sep' => $request->get('nomor_sep'),
+                'tanggal_pengajuan' => now()->toDateString(),
+                'norm' => $request->get('nomor_rm'),
+                'nomor_kartu' => $request->get('nomor_kartu'),
+                'nama_pasien' => $request->get('nama_pasien'),
+                'gender' => $request->get('gender'),
+                'tgl_lahir' => $request->get('tgl_lahir'),
+                'tanggal_masuk' => $request->get('tanggal_masuk'),
+                'tanggal_keluar' => $request->get('tanggal_keluar'),
+                'ruangan' => $request->get('ruangan'),
+                'jenis_kunjungan' => $request->get('jenis_kunjungan'),
+                'status_pengiriman' => PengajuanKlaim::STATUS_DEFAULT,
+            ];
+
+            // Fallback ke data kunjungan jika parameter tidak ada
+            if ($kunjungan && $kunjungan->penjamin && $kunjungan->penjamin->pendaftaran) {
+                $kunjunganRs = $kunjungan->penjamin->pendaftaran->kunjungan_rs;
+                if ($kunjunganRs && count($kunjunganRs) > 0) {
+                    $firstKunjungan = $kunjunganRs->first();
+                    
+                    // Gunakan data dari kunjungan jika tidak ada di request
+                    if (!$request->get('tanggal_masuk') && $firstKunjungan->MASUK) {
+                        $pengajuanData['tanggal_masuk'] = date('Y-m-d', strtotime($firstKunjungan->MASUK));
+                    }
+                    
+                    if (!$request->get('tanggal_keluar') && $firstKunjungan->KELUAR) {
+                        $pengajuanData['tanggal_keluar'] = date('Y-m-d', strtotime($firstKunjungan->KELUAR));
+                    }
+                    
+                    // Ambil nama ruangan jika tidak ada di request
+                    if (!$request->get('ruangan')) {
+                        $ruanganNames = $kunjunganRs->map(function($kr) {
+                            return $kr->ruangan ? $kr->ruangan->DESKRIPSI : null;
+                        })->filter()->unique()->implode(', ');
+                        
+                        $pengajuanData['ruangan'] = $ruanganNames;
+                    }
+                }
+            }
+
+            $response = InacbgHelper::hitApi('/new_claim', $data, 'POST');
+
+            Log::info('Response INACBG', [
+                'status_code' => $response['status_code'],
+                'response' => $response['response']
+            ]);
+
+            if ($response['status_code'] === 200) {
+                $responseData = $response['response'];
+                
+                if (isset($responseData['metadata']['code']) && $responseData['metadata']['code'] == 200) {
+                    $claimData = $responseData['response'];
+                    
+                    // Update status kunjungan
+                    if ($kunjungan) {
+                        $kunjungan->klaimStatus = 1; // Set sebagai sudah diklaim
+                        $kunjungan->save();
+                    }
+
+                    // Simpan data pengajuan dengan status 0 (default)
+                    $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_DEFAULT;
+                    $pengajuanData['response_message'] = $responseData['metadata']['message'];
+                    $pengajuanData['response_data'] = $responseData;
+                    
+                    PengajuanKlaim::create($pengajuanData);
+
+                    Log::info('INACBG Claim Success', [
+                        'noSEP' => $request->get('nomor_sep'),
+                        'metadata' => $responseData['metadata'],
+                        'claim_data' => $claimData
+                    ]);
+
+                    return redirect()->route('eklaim.kunjungan.index')->with('success', 
+                        'Klaim berhasil diajukan ke INACBG. ' . $responseData['metadata']['message']);
+                } else {
+                    $errorCode = $responseData['metadata']['code'] ?? 'Unknown';
+                    $errorMessage = $responseData['metadata']['message'] ?? 'Unknown error from INACBG';
+                    
+                    // Simpan data pengajuan dengan status 0 (default)
+                    $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_DEFAULT;
+                    $pengajuanData['response_message'] = $errorMessage;
+                    $pengajuanData['response_data'] = $responseData;
+                    
+                    PengajuanKlaim::create($pengajuanData);
+                    
+                    Log::error('INACBG API Error', [
+                        'code' => $errorCode,
+                        'message' => $errorMessage,
+                        'noSEP' => $request->get('nomor_sep'),
+                        'full_response' => $responseData
+                    ]);
+                    
+                    return redirect()->route('eklaim.kunjungan.index')->with('error', 
+                        'Gagal mengajukan klaim (Code: ' . $errorCode . '): ' . $errorMessage);
+                }
+            } else {
+                // Simpan data pengajuan dengan status 0 (default)
+                $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_DEFAULT;
+                $pengajuanData['response_message'] = 'HTTP Error: ' . $response['status_code'];
+                $pengajuanData['response_data'] = $response;
+                
+                PengajuanKlaim::create($pengajuanData);
+                
+                return redirect()->route('eklaim.kunjungan.index')->with('error', 
+                    'HTTP Error: ' . $response['status_code']);
+            }
+
+        } catch (\Exception $e) {
+            // Simpan data pengajuan dengan status 0 (default)
+            $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_DEFAULT;
+            $pengajuanData['response_message'] = 'Exception: ' . $e->getMessage();
+            $pengajuanData['response_data'] = ['exception' => $e->getMessage(), 'trace' => $e->getTraceAsString()];
+            
+            PengajuanKlaim::create($pengajuanData);
+
+            return redirect()->route('eklaim.kunjungan.index')->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+        }
+    }
+}

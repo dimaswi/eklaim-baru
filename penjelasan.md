@@ -1,0 +1,4 @@
+1. untuk connection database selain app digunakan hanya untuk mengambil data, dan juga semua model yang ada pada direktori models/SIMRS merupakan data dari SIMRS dan tidak boleh ada CRUD pada direktori ini.
+2. saya ingin anda menyimpan data pada form yang ada pada frontend pages/medicalrecord. dimana semua field pada form akan disimpan ke model baru yang ada pada direktori models/Eklaim.
+3. buatkan model dan migrasi baru dan masukan direktori models/Eklaim untuk menyimpan data dari form yang ada pada pages/medicalrecord.
+4. saya ingin semua form pada pages/medicalrecord disimpan pada model baru yang ada pada direktori models/Eklaim. saya tidak ingin terlewat satu fieldpun.

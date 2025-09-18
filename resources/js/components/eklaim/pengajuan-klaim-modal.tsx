@@ -1,0 +1,280 @@
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Send, User, Calendar, CreditCard, FileText, UserCheck, Info } from "lucide-react";
+import { router } from "@inertiajs/react";
+import { format } from "path";
+
+interface PengajuanKlaimData {
+    nomor_kartu: string;
+    nomor_sep: string;
+    nomor_rm: string;
+    nama_pasien: string;
+    tgl_lahir: string;
+    gender: string;
+    tanggal_masuk?: string;
+    tanggal_keluar?: string;
+    ruangan?: string;
+    jenis_kunjungan?: number; // 1 = Rawat Inap, 2 = Rawat Jalan, 3 = Gawat Darurat
+}
+
+interface PengajuanKlaimModalProps {
+    data: PengajuanKlaimData;
+    disabled?: boolean;
+}
+
+export default function PengajuanKlaimModal({ data, disabled = false }: PengajuanKlaimModalProps) {
+    const [open, setOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    const formatDate = (dateString: string) => {
+        if (!dateString || dateString === '0000-00-00') return '-';
+        try {
+            return new Date(dateString).toLocaleDateString('id-ID', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        } catch (error) {
+            return '-';
+        }
+    };
+
+    const formatGender = (gender: string) => {
+        
+        if (!gender) return '-';
+        
+        const genderStr = gender.toString().toUpperCase();
+        
+        if (genderStr === 'L' || genderStr === '1' || genderStr === 'LAKI-LAKI' || genderStr === 'MALE') {
+            return 'Laki-laki';
+        }
+        if (genderStr === 'P' || genderStr === '2' || genderStr === 'PEREMPUAN' || genderStr === 'FEMALE') {
+            return 'Perempuan';
+        }
+        
+        return gender || '-';
+    };
+
+    const formatJenisKunjungan = (jenis: number | undefined) => {
+        switch (jenis) {
+            case 3:
+                return 'Rawat Inap';
+            case 1:
+                return 'Rawat Jalan';
+            case 2:
+                return 'Gawat Darurat';
+            default:
+                return '-';
+        }
+    }
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+
+        try {
+            router.post('/eklaim/kunjungan/pengajuan-klaim', {
+                nomor_kartu: data.nomor_kartu,
+                nomor_sep: data.nomor_sep,
+                nomor_rm: data.nomor_rm,
+                nama_pasien: data.nama_pasien,
+                tgl_lahir: data.tgl_lahir,
+                gender: data.gender,
+                tanggal_masuk: data.tanggal_masuk,
+                tanggal_keluar: data.tanggal_keluar,
+                ruangan: data.ruangan,
+                jenis_kunjungan: formatJenisKunjungan(data.jenis_kunjungan),
+            }, {
+                onSuccess: () => {
+                    setOpen(false);
+                    setLoading(false);
+                },
+                onError: () => {
+                    setLoading(false);
+                }
+            });
+        } catch (error) {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={disabled}
+                    className={disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-green-50"}
+                >
+                    <Send className={`h-4 w-4 ${disabled ? 'text-red-400' : 'text-green-400'}`} />
+                    {disabled ? 'Selesai' : 'Ajukan'}
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="!max-w-7xl !top-[25%] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <Send className="h-5 w-5 text-green-500" />
+                        Pengajuan Klaim BPJS
+                    </DialogTitle>
+                </DialogHeader>
+
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                                <User className="h-5 w-5" />
+                                Data Pasien
+                            </CardTitle>
+                            <CardDescription>
+                                Informasi pasien yang akan diajukan klaim
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="flex items-center gap-2">
+                                        <CreditCard className="h-4 w-4" />
+                                        Nomor Kartu BPJS
+                                    </Label>
+                                    <Input
+                                        value={data.nomor_kartu || '-'}
+                                        readOnly
+                                        className="bg-gray-50"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="flex items-center gap-2">
+                                        <FileText className="h-4 w-4" />
+                                        Nomor SEP
+                                    </Label>
+                                    <Input
+                                        value={data.nomor_sep || '-'}
+                                        readOnly
+                                        className="bg-gray-50"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="flex items-center gap-2">
+                                        <FileText className="h-4 w-4" />
+                                        Nomor Rekam Medis
+                                    </Label>
+                                    <Input
+                                        value={data.nomor_rm || '-'}
+                                        readOnly
+                                        className="bg-gray-50"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="flex items-center gap-2">
+                                        <User className="h-4 w-4" />
+                                        Nama Pasien
+                                    </Label>
+                                    <Input
+                                        value={data.nama_pasien || '-'}
+                                        readOnly
+                                        className="bg-gray-50"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="flex items-center gap-2">
+                                        <Calendar className="h-4 w-4" />
+                                        Tanggal Lahir
+                                    </Label>
+                                    <Input
+                                        value={formatDate(data.tgl_lahir)}
+                                        readOnly
+                                        className="bg-gray-50"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="flex items-center gap-2">
+                                        <UserCheck className="h-4 w-4" />
+                                        Jenis Kelamin
+                                    </Label>
+                                    <div className="flex items-center h-10">
+                                        <Badge variant="outline" className="px-3 py-1">
+                                            {formatGender(data.gender)}
+                                        </Badge>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="flex items-center gap-2">
+                                        <Calendar className="h-4 w-4" />
+                                        Tanggal Masuk
+                                    </Label>
+                                    <Input
+                                        value={formatDate(data.tanggal_masuk || '')}
+                                        readOnly
+                                        className="bg-gray-50"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="flex items-center gap-2">
+                                        <Calendar className="h-4 w-4" />
+                                        Tanggal Keluar
+                                    </Label>
+                                    <Input
+                                        value={formatDate(data.tanggal_keluar || '')}
+                                        readOnly
+                                        className="bg-gray-50"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="flex items-center gap-2">
+                                        <FileText className="h-4 w-4" />
+                                        Ruangan
+                                    </Label>
+                                    <Input
+                                        value={data.ruangan || '-'}
+                                        readOnly
+                                        className="bg-gray-50"
+                                    />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <div className="flex items-center justify-between pt-4 border-t">
+                        <div className="text-sm flex items-center text-red-500">
+                            <Info className="h-4 w-4 mr-2" />
+                            Pastikan semua data sudah benar sebelum mengajukan klaim
+                        </div>
+                        <div className="flex gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setOpen(false)}
+                                disabled={loading}
+                            >
+                                Batal
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={loading}
+                                className="bg-green-600 hover:bg-green-700"
+                            >
+                                {loading ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                        Mengajukan...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Send className="h-4 w-4 mr-2" />
+                                        Ajukan Klaim
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
