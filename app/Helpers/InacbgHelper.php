@@ -94,9 +94,6 @@ class InacbgHelper
         curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
         // request dengan curl
         $response = curl_exec($ch);
-
-        dd($response);
-
         $first = strpos($response, "\n") + 1;
         $last = strrpos($response, "\n") - 1;
         $response = substr(

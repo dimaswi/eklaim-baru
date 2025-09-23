@@ -1,6 +1,16 @@
 import DiagnosisModal from '@/components/eklaim/DiagnosisModal';
 import ProcedureModal from '@/components/eklaim/ProcedureModal';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import AppLayout from '@/layouts/app-layout';
 import { BreadcrumbItem, SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -43,6 +53,7 @@ interface Props extends SharedData {
         [key: string]: any;
     };
     existingKlaim?: any;
+    existingDataKlaim?: any;
     resumeMedis?: {
         diagnosa: any[];
         procedure: any[];
@@ -54,11 +65,18 @@ interface Props extends SharedData {
 }
 
 export default function Index() {
-    const { referenceData, pengajuanKlaim, resumeMedisData, pengkajianAwalData, kunjunganbpjsData, dataTagihan } = usePage<Props>().props;
+    const { referenceData, pengajuanKlaim, resumeMedisData, pengkajianAwalData, kunjunganbpjsData, dataTagihan, existingDataKlaim } = usePage<Props>().props;
     console.log(dataTagihan);
     const [formData, setFormData] = useState<{ [key: string]: any }>({});
     const [isLoading, setIsLoading] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
+
+    // Alert dialog states
+    const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false);
+    const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false);
+    const [isConfirmSubmitOpen, setIsConfirmSubmitOpen] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
+    const [errorMessage, setErrorMessage] = useState('');
 
     const [isDiagnosisModalOpen, setIsDiagnosisModalOpen] = useState(false);
     const [isProcedureModalOpen, setIsProcedureModalOpen] = useState(false);
@@ -225,6 +243,159 @@ export default function Index() {
         updateNestedField('tarif_rs', 'bmhp', dataTagihan?.BMHP || '');
         updateNestedField('tarif_rs', 'sewa_alat', dataTagihan?.SEWA_ALAT || '');
     }, [pengajuanKlaim, resumeMedisData, pengkajianAwalData, kunjunganbpjsData, dataTagihan]);
+
+    // Load existing data klaim if exists
+    useEffect(() => {
+        if (existingDataKlaim) {
+            console.log('=== LOADING EXISTING DATA FROM DATABASE ===');
+            console.log('Raw existingDataKlaim:', existingDataKlaim);
+            console.log('Available fields in database:', Object.keys(existingDataKlaim));
+            
+            // Load all basic fields from database
+            Object.keys(existingDataKlaim).forEach(key => {
+                if (existingDataKlaim[key] !== null && existingDataKlaim[key] !== undefined && key !== 'id') {
+                    console.log(`Loading field ${key}:`, existingDataKlaim[key]);
+                    updateField(key, existingDataKlaim[key]);
+                }
+            });
+
+            // Load nested field: tarif_rs (if stored as JSON in database)
+            if (existingDataKlaim.tarif_rs && typeof existingDataKlaim.tarif_rs === 'object') {
+                console.log('Loading tarif_rs nested data:', existingDataKlaim.tarif_rs);
+                Object.keys(existingDataKlaim.tarif_rs).forEach(tariffKey => {
+                    updateNestedField('tarif_rs', tariffKey, existingDataKlaim.tarif_rs[tariffKey]);
+                });
+            }
+
+            // Load nested field: apgar (if stored as JSON in database)
+            if (existingDataKlaim.apgar && typeof existingDataKlaim.apgar === 'object') {
+                console.log('Loading apgar nested data:', existingDataKlaim.apgar);
+                Object.keys(existingDataKlaim.apgar).forEach(apgarKey => {
+                    updateNestedField('apgar', apgarKey, existingDataKlaim.apgar[apgarKey]);
+                });
+            }
+
+            // Load nested field: ventilator (if stored as JSON in database)
+            if (existingDataKlaim.ventilator && typeof existingDataKlaim.ventilator === 'object') {
+                console.log('Loading ventilator nested data:', existingDataKlaim.ventilator);
+                Object.keys(existingDataKlaim.ventilator).forEach(ventilatorKey => {
+                    updateNestedField('ventilator', ventilatorKey, existingDataKlaim.ventilator[ventilatorKey]);
+                });
+            }
+
+            // Load nested field: upgrade_class (if stored as JSON in database)
+            if (existingDataKlaim.upgrade_class && typeof existingDataKlaim.upgrade_class === 'object') {
+                console.log('Loading upgrade_class nested data:', existingDataKlaim.upgrade_class);
+                Object.keys(existingDataKlaim.upgrade_class).forEach(upgradeKey => {
+                    updateNestedField('upgrade_class', upgradeKey, existingDataKlaim.upgrade_class[upgradeKey]);
+                });
+            }
+
+            // Load diagnosa and procedures if exist in database
+            if (existingDataKlaim.diagnosa_sekunder && Array.isArray(existingDataKlaim.diagnosa_sekunder)) {
+                console.log('Loading diagnosa_sekunder:', existingDataKlaim.diagnosa_sekunder);
+                const diagnosesForUI = existingDataKlaim.diagnosa_sekunder.map((diag: any) => ({
+                    name: diag.name || diag.diagnosa || '',
+                    code: diag.code || diag.kode || ''
+                }));
+                setSelectedDiagnoses(diagnosesForUI);
+                // Also set the string format
+                const diagnosaCodes = diagnosesForUI.map((d: { code: string; name: string }) => d.code).join('#');
+                updateField('diagnosa', diagnosaCodes);
+            }
+
+            if (existingDataKlaim.tindakan_sekunder && Array.isArray(existingDataKlaim.tindakan_sekunder)) {
+                console.log('Loading tindakan_sekunder:', existingDataKlaim.tindakan_sekunder);
+                const proceduresForUI = existingDataKlaim.tindakan_sekunder.map((proc: any) => ({
+                    name: proc.name || proc.tindakan || '',
+                    code: proc.code || proc.kode || ''
+                }));
+                setSelectedProcedures(proceduresForUI);
+                // Also set the string format
+                const procedureCodes = proceduresForUI.map((p: { code: string; name: string }) => p.code).join('#');
+                updateField('procedure', procedureCodes);
+            }
+
+            // Set for inagrouper if data exists
+            if (existingDataKlaim.diagnosa_inagrouper) {
+                console.log('Loading diagnosa_inagrouper:', existingDataKlaim.diagnosa_inagrouper);
+                const diagnosaCodes = existingDataKlaim.diagnosa_inagrouper.split('#').filter((code: string) => code.trim() !== '');
+                const diagnosesForUI = diagnosaCodes.map((code: string) => ({
+                    name: `Diagnosa ${code}`,
+                    code: code
+                }));
+                setSelectedInagrouperDiagnoses(diagnosesForUI);
+            } else if (selectedDiagnoses.length > 0) {
+                setSelectedInagrouperDiagnoses([...selectedDiagnoses]);
+            }
+
+            if (existingDataKlaim.procedure_inagrouper) {
+                console.log('Loading procedure_inagrouper:', existingDataKlaim.procedure_inagrouper);
+                const procedureCodes = existingDataKlaim.procedure_inagrouper.split('#').filter((code: string) => code.trim() !== '');
+                const proceduresForUI = procedureCodes.map((code: string) => ({
+                    name: `Procedure ${code}`,
+                    code: code
+                }));
+                setSelectedInagrouperProcedures(proceduresForUI);
+            } else if (selectedProcedures.length > 0) {
+                setSelectedInagrouperProcedures([...selectedProcedures]);
+            }
+
+            // Special handling for date fields to ensure correct format
+            if (existingDataKlaim.tanggal_masuk) {
+                console.log('Loading tanggal_masuk:', existingDataKlaim.tanggal_masuk);
+                updateField('tgl_masuk', toDatetimeLocal(existingDataKlaim.tanggal_masuk));
+            }
+            if (existingDataKlaim.tanggal_keluar) {
+                console.log('Loading tanggal_keluar:', existingDataKlaim.tanggal_keluar);
+                updateField('tgl_pulang', toDatetimeLocal(existingDataKlaim.tanggal_keluar));
+            }
+
+            // Special handling for currency/numeric fields with proper formatting
+            const currencyFields = [
+                'akomodasi', 'asuhan_keperawatan', 'bahan_medis_habis_pakai', 
+                'kamar_operasi', 'konsultasi', 'obat', 'pelayanan_darah', 
+                'penunjang', 'prosedur_bedah', 'prosedur_non_bedah', 
+                'rehabilitasi', 'sewa_alat', 'visite', 'icu', 'iccu', 
+                'alat_kesehatan', 'transport_pasien', 'lain_lain', 'tarif_poli_eks'
+            ];
+
+            currencyFields.forEach(field => {
+                if (existingDataKlaim[field] && existingDataKlaim[field] !== '0') {
+                    console.log(`Loading currency field ${field}:`, existingDataKlaim[field]);
+                    updateField(field, existingDataKlaim[field].toString());
+                }
+            });
+
+            // Load boolean fields properly
+            const booleanFields = [
+                'case_death', 'upgrade_class_ind', 'add_payment_pct', 
+                'birth_weight_extreme', 'fetal_reduction', 'admission_weight',
+                'chronic_dialysis', 'acute_dialysis', 'ventilator_support',
+                'chemotherapy', 'is_covid19_suspect', 'is_covid19_probable',
+                'is_covid19_confirmed', 'is_persalinan'
+            ];
+
+            booleanFields.forEach(field => {
+                if (existingDataKlaim[field] !== null && existingDataKlaim[field] !== undefined) {
+                    console.log(`Loading boolean field ${field}:`, existingDataKlaim[field]);
+                    updateField(field, existingDataKlaim[field] ? '1' : '0');
+                }
+            });
+
+            console.log('=== DATABASE LOADING COMPLETED ===');
+            console.log('Current formData after loading:', formData);
+            console.log('Form data field count:', Object.keys(formData).length);
+            
+            // Debug specific important fields
+            const importantFields = ['sistole', 'diastole', 'nama_dokter', 'jenis_rawat', 'discharge_status'];
+            importantFields.forEach(field => {
+                console.log(`Important field ${field}:`, formData[field] || 'NOT SET');
+            });
+            
+            toast.success('Data yang sudah tersimpan berhasil dimuat dari database');
+        }
+    }, [existingDataKlaim]);
 
     // Function untuk load diagnosa dan procedure
     const loadDiagnosaProcedure = (data: any) => {
@@ -536,23 +707,65 @@ export default function Index() {
     const handleSaveProgress = async () => {
         try {
             setIsLoading(true);
+            
+            // Count total fields being saved
+            const fieldCount = Object.keys(formData).length;
+            const filledFields = Object.keys(formData).filter(key => 
+                formData[key] !== null && 
+                formData[key] !== undefined && 
+                formData[key] !== ''
+            ).length;
+            
+            // Log data being sent for debugging
+            console.log('=== SAVE PROGRESS DEBUG ===');
+            console.log('Total form fields:', fieldCount);
+            console.log('Filled fields:', filledFields);
+            console.log('Form data keys:', Object.keys(formData));
+            console.log('Sample form data:', Object.fromEntries(
+                Object.entries(formData).slice(0, 10)
+            ));
+            
+            // Log specific nested structures
+            console.log('Tarif RS data:', formData.tarif_rs);
+            console.log('APGAR data:', formData.apgar);
+            console.log('Ventilator data:', formData.ventilator);
+            
             await router.post(
-                `/eklaim/klaim/${pengajuanKlaim.id}/save-progress`,
-                {
-                    data: formData,
-                },
+                `/eklaim/klaim/${pengajuanKlaim.id}/store-progress`,
+                formData,
                 {
                     preserveState: true,
-                    onSuccess: () => {
+                    onSuccess: (response) => {
+                        console.log('Save success response:', response);
+                        
+                        // Show detailed success dialog
+                        setIsSuccessDialogOpen(true);
+                        setSuccessMessage(`Data berhasil disimpan!\n\nTotal field: ${fieldCount}\nField terisi: ${filledFields}\nStatus: Draft`);
+                        
                         toast.success('Progress berhasil disimpan');
                     },
-                    onError: () => {
+                    onError: (errors) => {
+                        console.error('Save progress errors:', errors);
+                        console.log('Error details:', JSON.stringify(errors, null, 2));
+                        
+                        // Show detailed error dialog
+                        setIsErrorDialogOpen(true);
+                        const errorMessages = Object.entries(errors).map(([key, value]) => 
+                            `${key}: ${Array.isArray(value) ? value.join(', ') : value}`
+                        ).join('\n');
+                        setErrorMessage(`Gagal menyimpan beberapa field:\n\n${errorMessages}`);
+                        
                         toast.error('Gagal menyimpan progress');
                     },
                 },
             );
         } catch (error) {
             console.error('Error saving progress:', error);
+            
+            // Show generic error dialog
+            setIsErrorDialogOpen(true);
+            setErrorMessage(`Terjadi kesalahan:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
+            
             toast.error('Terjadi kesalahan saat menyimpan');
         } finally {
             setIsLoading(false);
@@ -560,25 +773,47 @@ export default function Index() {
     };
 
     const handleSubmitKlaim = async () => {
+        // Show shadcn confirmation dialog instead of browser confirm
+        setIsConfirmSubmitOpen(true);
+    };
+
+    const handleConfirmSubmit = async () => {
         try {
             setIsLoading(true);
+            setIsConfirmSubmitOpen(false);
+            
             await router.post(
                 `/eklaim/klaim/${pengajuanKlaim.id}/submit`,
-                {
-                    data: formData,
-                },
+                formData,
                 {
                     onSuccess: () => {
-                        toast.success('Klaim berhasil disubmit ke BPJS');
-                        router.visit('/eklaim/pengajuan');
+                        setIsSuccessDialogOpen(true);
+                        setSuccessMessage('Klaim berhasil disubmit ke INACBG!\n\nData telah dikirim dan tidak dapat diubah lagi.');
+                        
+                        // Redirect after showing success message
+                        setTimeout(() => {
+                            router.visit('/eklaim/pengajuan');
+                        }, 2000);
                     },
-                    onError: () => {
+                    onError: (errors) => {
+                        console.error('Submit klaim errors:', errors);
+                        
+                        setIsErrorDialogOpen(true);
+                        const errorMessages = Object.entries(errors).map(([key, value]) => 
+                            `${key}: ${Array.isArray(value) ? value.join(', ') : value}`
+                        ).join('\n');
+                        setErrorMessage(`Gagal submit klaim ke INACBG:\n\n${errorMessages}`);
+                        
                         toast.error('Gagal submit klaim');
                     },
                 },
             );
         } catch (error) {
             console.error('Error submitting klaim:', error);
+            
+            setIsErrorDialogOpen(true);
+            setErrorMessage(`Terjadi kesalahan saat submit klaim:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
+            
             toast.error('Terjadi kesalahan saat submit');
         } finally {
             setIsLoading(false);
@@ -2095,6 +2330,98 @@ export default function Index() {
                 onSelectProcedure={handleSelectInagrouperProcedure}
                 onRemoveProcedure={handleRemoveInagrouperProcedure}
             />
+
+            {/* Confirmation Alert Dialog for Submit */}
+            <AlertDialog open={isConfirmSubmitOpen} onOpenChange={setIsConfirmSubmitOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-amber-600">⚠️ Konfirmasi Submit Klaim</AlertDialogTitle>
+                        <AlertDialogDescription className="whitespace-pre-line">
+                            <strong>PERINGATAN!</strong>
+                            
+                            Pastikan semua data sudah benar dan lengkap sebelum submit klaim ke INACBG.
+                            
+                            Apakah Anda yakin ingin melanjutkan submit klaim ini?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setIsConfirmSubmitOpen(false)}>
+                            Batal
+                        </AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmSubmit} className="bg-red-600 hover:bg-red-700">
+                            Ya, Submit Klaim
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Success Alert Dialog */}
+            <AlertDialog open={isSuccessDialogOpen} onOpenChange={setIsSuccessDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-green-600">✅ Data Berhasil Disimpan</AlertDialogTitle>
+                        <AlertDialogDescription className="whitespace-pre-line">
+                            {successMessage}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogAction onClick={() => setIsSuccessDialogOpen(false)}>
+                            OK
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Error Alert Dialog */}
+            <AlertDialog open={isErrorDialogOpen} onOpenChange={setIsErrorDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-red-600">❌ Error Penyimpanan Data</AlertDialogTitle>
+                        <AlertDialogDescription className="whitespace-pre-line">
+                            {errorMessage}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setIsErrorDialogOpen(false)}>
+                            Tutup
+                        </AlertDialogCancel>
+                        <AlertDialogAction onClick={() => {
+                            setIsErrorDialogOpen(false);
+                            
+                            // Create detailed debug info
+                            const debugInfo = {
+                                formDataKeys: Object.keys(formData),
+                                formDataCount: Object.keys(formData).length,
+                                filledFields: Object.keys(formData).filter(key => 
+                                    formData[key] !== null && 
+                                    formData[key] !== undefined && 
+                                    formData[key] !== ''
+                                ),
+                                nestedStructures: {
+                                    tarif_rs: formData.tarif_rs,
+                                    apgar: formData.apgar,
+                                    ventilator: formData.ventilator,
+                                    upgrade_class: formData.upgrade_class
+                                },
+                                sampleData: Object.fromEntries(
+                                    Object.entries(formData).slice(0, 20)
+                                )
+                            };
+                            
+                            console.log('=== COMPREHENSIVE DEBUG INFO ===');
+                            console.log('Debug Info:', debugInfo);
+                            console.log('Full Form Data:', formData);
+                            
+                            // Copy debug info to clipboard
+                            navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2))
+                                .then(() => toast.success('Debug info copied to clipboard'))
+                                .catch(() => toast.error('Failed to copy debug info'));
+                        }}>
+                            Debug Info & Copy
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AppLayout>
     );
 }

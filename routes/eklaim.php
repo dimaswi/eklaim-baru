@@ -37,8 +37,11 @@ Route::middleware('auth')->group(function () {
 //Pengajuan Klaim Ke Inacbg
 Route::middleware('auth')->group(function () {
     Route::get('/eklaim/klaim/{pengajuanKlaim}', [KlaimController::class, 'index'])->name('eklaim.klaim.index');
-    Route::post('/eklaim/klaim/{pengajuanKlaim}/save-progress', [KlaimController::class, 'saveProgress'])->name('eklaim.klaim.save-progress');
+    Route::post('/eklaim/klaim/{pengajuanKlaim}/store-progress', [KlaimController::class, 'storeProgress'])->name('eklaim.klaim.store-progress');
     Route::post('/eklaim/klaim/{pengajuanKlaim}/submit', [KlaimController::class, 'submitKlaim'])->name('eklaim.klaim.submit');
+    
+    // Debug route for testing data storage
+    Route::get('/eklaim/debug/test-storage/{pengajuanKlaim}', [KlaimController::class, 'testStorage'])->name('eklaim.debug.test-storage');
 });
 
 

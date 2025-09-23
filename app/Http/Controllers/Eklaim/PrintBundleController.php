@@ -22,216 +22,384 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use setasign\Fpdi\Fpdi;
 use setasign\Fpdi\PdfParser\StreamReader;
 use App\Helpers\QRCodeHelper;
+use Illuminate\Support\Facades\Log;
 
 class PrintBundleController extends Controller
 {
     public function index($pengajuanId)
     {
-        // Get pengajuan klaim data
-        $pengajuanKlaim = PengajuanKlaim::findOrFail($pengajuanId);
-        
-        // Get all related medical records data
-        $medicalRecords = $this->getAllMedicalRecords($pengajuanId);
-        
-        return Inertia::render('eklaim/print-bundle/index', [
-            'pengajuanKlaim' => $pengajuanKlaim,
-            'medicalRecords' => $medicalRecords,
-        ]);
+        try {
+            // Get pengajuan klaim data
+            $pengajuanKlaim = PengajuanKlaim::findOrFail($pengajuanId);
+            
+            // Get all related medical records data
+            $medicalRecords = $this->getAllMedicalRecords($pengajuanId);
+            
+            return Inertia::render('eklaim/print-bundle/index', [
+                'pengajuanKlaim' => $pengajuanKlaim,
+                'medicalRecords' => $medicalRecords,
+                'csrf_token' => csrf_token(), // Add CSRF token
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Print Bundle Index Error: ' . $e->getMessage());
+            return redirect()->route('eklaim.pengajuan.index')
+                ->with('error', 'Terjadi kesalahan saat memuat data print bundle');
+        }
     }
     
     private function getAllMedicalRecords($pengajuanId)
     {
-        // Get laboratorium data - each row is one record
-        $labData = HasilLaboratorium::where('pengajuan_klaim_id', $pengajuanId)->get();
-        
-        // Get radiologi data - each row is one record
-        $radioData = HasilRadiologi::where('pengajuan_klaim_id', $pengajuanId)->get();
-        
-        return [
-            // Laboratorium Data - Count based on database rows, not JSON tindakan_medis_data
-            'laboratorium' => [
-                'title' => 'Hasil Laboratorium',
-                'icon' => '🧪',
-                'type' => 'multiple',
-                'data' => $labData,
-                'records' => $labData, // Each database row is a record
-                'count' => $labData->count(),
-                'available' => $labData->count() > 0,
-            ],
+        try {
+            // Get laboratorium data - each row is one record
+            $labData = HasilLaboratorium::where('pengajuan_klaim_id', $pengajuanId)->get();
             
-            // Radiologi Data - Count based on database rows
-            'radiologi' => [
-                'title' => 'Hasil Radiologi',
-                'icon' => '📸',
-                'type' => 'multiple',
-                'data' => $radioData,
-                'records' => $radioData, // Each database row is a record
-                'count' => $radioData->count(),
-                'available' => $radioData->count() > 0,
-            ],
+            // Get radiologi data - each row is one record
+            $radioData = HasilRadiologi::where('pengajuan_klaim_id', $pengajuanId)->get();
             
-            // Resume Medis - Unified for all types (Rawat Inap, Rawat Jalan, UGD)
-            'resume_medis' => [
-                'title' => 'Resume Medis',
-                'icon' => '📋',
-                'type' => 'multiple',
-                'data' => $this->getResumeMedisData($pengajuanId),
-                'records' => $this->getResumeMedisData($pengajuanId),
-                'count' => $this->getResumeMedisData($pengajuanId)->count(),
-                'available' => $this->getResumeMedisData($pengajuanId)->count() > 0,
-            ],
-            
-            // CPPT - Rawat Inap - Multiple records per pengajuan
-            'rawat_inap_cppt' => [
-                'title' => 'CPPT Rawat Inap',
-                'icon' => '📝',
-                'type' => 'multiple',
-                'data' => RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->orderBy('tanggal', 'asc')->get(),
-                'records' => RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->orderBy('tanggal', 'asc')->get(),
-                'count' => RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->count(),
-                'available' => RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->exists(),
-            ],
-            
-            // Pengkajian Awal - Unified untuk semua jenis (Rawat Inap, Rawat Jalan, UGD) - MULTIPLE RECORDS
-            'pengkajian_awal' => [
-                'title' => 'Pengkajian Awal Keperawatan',
-                'icon' => '📋',
-                'type' => 'multiple',
-                'data' => $this->getPengkajianAwalData($pengajuanId),
-                'count' => $this->getPengkajianAwalData($pengajuanId)->count(),
-                'available' => $this->getPengkajianAwalData($pengajuanId)->count() > 0,
-            ],
-            
-            // Triage UGD - Single record per pengajuan
-            'ugd_triage' => [
-                'title' => 'Triage UGD',
-                'icon' => '🔴',
-                'type' => 'single',
-                'data' => UGDTriage::where('pengajuan_klaim_id', $pengajuanId)->first(),
-                'count' => UGDTriage::where('pengajuan_klaim_id', $pengajuanId)->exists() ? 1 : 0,
-                'available' => UGDTriage::where('pengajuan_klaim_id', $pengajuanId)->exists(),
-            ],
-            
-            // Balance Cairan - Rawat Inap - Multiple records per pengajuan
-            'rawat_inap_balance' => [
-                'title' => 'Balance Cairan Rawat Inap',
-                'icon' => '💧',
-                'type' => 'multiple',
-                'data' => RawatInapBalanceCairan::where('pengajuan_klaim_id', $pengajuanId)->orderBy('tanggal', 'asc')->orderBy('waktu_pemeriksaan', 'asc')->get(),
-                'records' => RawatInapBalanceCairan::where('pengajuan_klaim_id', $pengajuanId)->orderBy('tanggal', 'asc')->orderBy('waktu_pemeriksaan', 'asc')->get(),
-                'count' => RawatInapBalanceCairan::where('pengajuan_klaim_id', $pengajuanId)->count(),
-                'available' => RawatInapBalanceCairan::where('pengajuan_klaim_id', $pengajuanId)->exists(),
-            ],
-            
-            // Tagihan - Single record per pengajuan
-            'tagihan' => [
-                'title' => 'Tagihan',
-                'icon' => '💰',
-                'type' => 'single',
-                'data' => Tagihan::where('pengajuan_klaim_id', $pengajuanId)->first(),
-                'count' => Tagihan::where('pengajuan_klaim_id', $pengajuanId)->exists() ? 1 : 0,
-                'available' => Tagihan::where('pengajuan_klaim_id', $pengajuanId)->exists(),
-            ],
-        ];
+            return [
+                // Laboratorium Data - Count based on database rows, not JSON tindakan_medis_data
+                'laboratorium' => [
+                    'title' => 'Hasil Laboratorium',
+                    'icon' => '🧪',
+                    'type' => 'multiple',
+                    'data' => $labData,
+                    'records' => $labData, // Each database row is a record
+                    'count' => $labData->count(),
+                    'available' => $labData->count() > 0,
+                ],
+                
+                // Radiologi Data - Count based on database rows
+                'radiologi' => [
+                    'title' => 'Hasil Radiologi',
+                    'icon' => '📸',
+                    'type' => 'multiple',
+                    'data' => $radioData,
+                    'records' => $radioData, // Each database row is a record
+                    'count' => $radioData->count(),
+                    'available' => $radioData->count() > 0,
+                ],
+                
+                // Resume Medis - Unified for all types (Rawat Inap, Rawat Jalan, UGD)
+                'resume_medis' => [
+                    'title' => 'Resume Medis',
+                    'icon' => '📋',
+                    'type' => 'multiple',
+                    'data' => $this->getResumeMedisData($pengajuanId),
+                    'records' => $this->getResumeMedisData($pengajuanId),
+                    'count' => $this->getResumeMedisData($pengajuanId)->count(),
+                    'available' => $this->getResumeMedisData($pengajuanId)->count() > 0,
+                ],
+                
+                // CPPT - Rawat Inap - Multiple records per pengajuan
+                'rawat_inap_cppt' => [
+                    'title' => 'CPPT Rawat Inap',
+                    'icon' => '📝',
+                    'type' => 'multiple',
+                    'data' => RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->orderBy('tanggal', 'asc')->get(),
+                    'records' => RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->orderBy('tanggal', 'asc')->get(),
+                    'count' => RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->count(),
+                    'available' => RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->exists(),
+                ],
+                
+                // Pengkajian Awal - Unified untuk semua jenis (Rawat Inap, Rawat Jalan, UGD) - MULTIPLE RECORDS
+                'pengkajian_awal' => [
+                    'title' => 'Pengkajian Awal Keperawatan',
+                    'icon' => '📋',
+                    'type' => 'multiple',
+                    'data' => $this->getPengkajianAwalData($pengajuanId),
+                    'count' => $this->getPengkajianAwalData($pengajuanId)->count(),
+                    'available' => $this->getPengkajianAwalData($pengajuanId)->count() > 0,
+                ],
+                
+                // Triage UGD - Single record per pengajuan
+                'ugd_triage' => [
+                    'title' => 'Triage UGD',
+                    'icon' => '🔴',
+                    'type' => 'single',
+                    'data' => UGDTriage::where('pengajuan_klaim_id', $pengajuanId)->first(),
+                    'count' => UGDTriage::where('pengajuan_klaim_id', $pengajuanId)->exists() ? 1 : 0,
+                    'available' => UGDTriage::where('pengajuan_klaim_id', $pengajuanId)->exists(),
+                ],
+                
+                // Balance Cairan - Rawat Inap - Multiple records per pengajuan
+                'rawat_inap_balance' => [
+                    'title' => 'Balance Cairan Rawat Inap',
+                    'icon' => '💧',
+                    'type' => 'multiple',
+                    'data' => RawatInapBalanceCairan::where('pengajuan_klaim_id', $pengajuanId)->orderBy('tanggal', 'asc')->orderBy('waktu_pemeriksaan', 'asc')->get(),
+                    'records' => RawatInapBalanceCairan::where('pengajuan_klaim_id', $pengajuanId)->orderBy('tanggal', 'asc')->orderBy('waktu_pemeriksaan', 'asc')->get(),
+                    'count' => RawatInapBalanceCairan::where('pengajuan_klaim_id', $pengajuanId)->count(),
+                    'available' => RawatInapBalanceCairan::where('pengajuan_klaim_id', $pengajuanId)->exists(),
+                ],
+                
+                // Tagihan - Single record per pengajuan
+                'tagihan' => [
+                    'title' => 'Tagihan',
+                    'icon' => '💰',
+                    'type' => 'single',
+                    'data' => Tagihan::where('pengajuan_klaim_id', $pengajuanId)->first(),
+                    'count' => Tagihan::where('pengajuan_klaim_id', $pengajuanId)->exists() ? 1 : 0,
+                    'available' => Tagihan::where('pengajuan_klaim_id', $pengajuanId)->exists(),
+                ],
+            ];
+        } catch (\Exception $e) {
+            Log::error('Get Medical Records Error: ' . $e->getMessage());
+            return [];
+        }
     }
     
     public function generatePreview(Request $request, $pengajuanId)
     {
-        $documentType = $request->get('type');
-        $selectedRecords = $request->input('selected_records', []);
-        $pengajuanKlaim = PengajuanKlaim::findOrFail($pengajuanId);
-        
-        // If no document type specified (GET request), find first available document
-        if (!$documentType) {
-            $availableDocuments = $this->getAllMedicalRecords($pengajuanId);
+        try {
+            Log::info('Generate Preview Request', [
+                'pengajuan_id' => $pengajuanId,
+                'document_type' => $request->get('type'),
+                'method' => $request->method(),
+                'session_id' => session()->getId(),
+                'has_session' => session()->isStarted(),
+            ]);
+
+            $documentType = $request->get('type');
+            $selectedRecords = $request->input('selected_records', []);
+            $pengajuanKlaim = PengajuanKlaim::findOrFail($pengajuanId);
             
-            foreach ($availableDocuments as $type => $doc) {
-                if ($doc['available']) {
-                    $documentType = $type;
-                    break;
+            // If no document type specified (GET request), find first available document
+            if (!$documentType) {
+                $availableDocuments = $this->getAllMedicalRecords($pengajuanId);
+                
+                foreach ($availableDocuments as $type => $doc) {
+                    if ($doc['available']) {
+                        $documentType = $type;
+                        break;
+                    }
+                }
+                
+                if (!$documentType) {
+                    return redirect()->route('eklaim.print-bundle.index', $pengajuanId)
+                        ->with('error', 'Tidak ada dokumen yang tersedia untuk preview');
                 }
             }
             
-            if (!$documentType) {
-                return redirect()->route('eklaim.print-bundle.index', $pengajuanId)
-                    ->with('error', 'Tidak ada dokumen yang tersedia untuk preview');
-            }
-        }
-        
-        // Get data based on document type
-        $data = $this->getDocumentData($documentType, $pengajuanId);
-        
-        // Get base64 encoded logo
-        $logoBase64 = $this->getLogoBase64();
-        
-        // Get QR codes for signatures (if available)
-        $defaultDokter = $pengajuanKlaim->nama_dpjp ?? 'dr. ILHAM MUNANIDAR, Sp.PD';
-        $dokterQR = QRCodeHelper::generateDataURL($defaultDokter);
-        $keluargaQR = QRCodeHelper::generateDataURL('Keluarga Pasien');
-        
-        // Additional QR codes for Triage UGD and other documents
-        $perawatQR = null;
-        $dokterTriageQR = null;
-        
-        // Get dokter/petugas from the actual data if available
-        if ($data && $data->count() > 0) {
-            $firstItem = $data->first();
-            
-            // Use dokter from data if available, otherwise use default
-            if (!empty($firstItem->dokter)) {
-                $dokterQR = QRCodeHelper::generateDataURL($firstItem->dokter);
+            // Validate document type
+            if (!$this->isValidDocumentType($documentType)) {
+                Log::error('Invalid document type', ['type' => $documentType]);
+                return response()->json(['error' => 'Invalid document type'], 400);
             }
             
-            // Generate perawat QR if petugas data is available
-            if (!empty($firstItem->petugas)) {
-                $perawatQR = QRCodeHelper::generateDataURL($firstItem->petugas);
+            // Get data based on document type
+            $data = $this->getDocumentData($documentType, $pengajuanId);
+            
+            if (!$data || $data->isEmpty()) {
+                Log::warning('No data found', ['type' => $documentType, 'pengajuan_id' => $pengajuanId]);
+                return response()->json(['error' => 'No data found for this document type'], 404);
             }
+            
+            // Get base64 encoded logo
+            $logoBase64 = $this->getLogoBase64();
+            
+            // Get QR codes for signatures (if available)
+            $qrData = $this->generateQRCodes($pengajuanKlaim, $data, $documentType);
+            
+            Log::info('Preview generated successfully', [
+                'document_type' => $documentType,
+                'data_count' => $data->count(),
+                'has_logo' => !is_null($logoBase64)
+            ]);
+            
+            // Return HTML preview using same Blade template as PDF
+            return view("pdf.templates.{$documentType}", array_merge([
+                'pengajuanKlaim' => $pengajuanKlaim,
+                'data' => $data,
+                'selectedRecords' => $selectedRecords,
+                'logoBase64' => $logoBase64,
+            ], $qrData));
+            
+        } catch (\Exception $e) {
+            Log::error('Generate Preview Error: ' . $e->getMessage(), [
+                'pengajuan_id' => $pengajuanId,
+                'document_type' => $request->get('type'),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'error' => 'Terjadi kesalahan saat generate preview: ' . $e->getMessage()
+            ], 500);
         }
-        
-        // Special handling for UGD triage
-        if ($documentType === 'ugd_triage' && $data && $data->count() > 0) {
-            $triageData = $data->first();
-            if ($triageData && $triageData->petugas) {
-                $perawatQR = QRCodeHelper::generateDataURL($triageData->petugas);
-            }
-            if ($triageData && $triageData->dokter) {
-                $dokterTriageQR = QRCodeHelper::generateDataURL($triageData->dokter);
-            }
-        }
-        
-        // Return HTML preview using same Blade template as PDF
-        return view("pdf.templates.{$documentType}", [
-            'pengajuanKlaim' => $pengajuanKlaim,
-            'data' => $data,
-            'selectedRecords' => $selectedRecords,
-            'logoBase64' => $logoBase64,
-            'dokterQR' => $dokterQR,
-            'keluargaQR' => $keluargaQR,
-            'perawatQR' => $perawatQR,
-            'dokterTriageQR' => $dokterTriageQR,
-        ]);
     }
     
     public function generatePDF(Request $request, $pengajuanId)
     {
-        $documentType = $request->get('type');
-        $selectedRecords = $request->input('selected_records', []);
-        $pengajuanKlaim = PengajuanKlaim::findOrFail($pengajuanId);
+        try {
+            Log::info('Generate PDF Request', [
+                'pengajuan_id' => $pengajuanId,
+                'document_type' => $request->get('type'),
+                'method' => $request->method(),
+                'session_id' => session()->getId(),
+            ]);
+
+            $documentType = $request->get('type');
+            $selectedRecords = $request->input('selected_records', []);
+            $pengajuanKlaim = PengajuanKlaim::findOrFail($pengajuanId);
+            
+            // Validate document type
+            if (!$this->isValidDocumentType($documentType)) {
+                Log::error('Invalid document type for PDF', ['type' => $documentType]);
+                return response()->json(['error' => 'Invalid document type'], 400);
+            }
+            
+            // Get data based on document type
+            $data = $this->getDocumentData($documentType, $pengajuanId);
+            
+            if (!$data || $data->isEmpty()) {
+                Log::warning('No data found for PDF', ['type' => $documentType, 'pengajuan_id' => $pengajuanId]);
+                return response()->json(['error' => 'No data found for this document type'], 404);
+            }
+            
+            // Get base64 encoded logo
+            $logoBase64 = $this->getLogoBase64();
+            
+            // Get QR codes for signatures
+            $qrData = $this->generateQRCodes($pengajuanKlaim, $data, $documentType);
+            
+            Log::info('PDF generation started', [
+                'document_type' => $documentType,
+                'data_count' => $data->count()
+            ]);
+            
+            // Generate PDF using DomPDF with same Blade template
+            $pdf = Pdf::loadView("pdf.templates.{$documentType}", array_merge([
+                'pengajuanKlaim' => $pengajuanKlaim,
+                'data' => $data,
+                'selectedRecords' => $selectedRecords,
+                'logoBase64' => $logoBase64,
+            ], $qrData))->setPaper('a4', 'portrait');
+            
+            Log::info('PDF generated successfully', ['document_type' => $documentType]);
+            
+            return response($pdf->output(), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="' . $documentType . '-' . $pengajuanId . '.pdf"'
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Generate PDF Error: ' . $e->getMessage(), [
+                'pengajuan_id' => $pengajuanId,
+                'document_type' => $request->get('type'),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'error' => 'Terjadi kesalahan saat generate PDF: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    public function generateBundle(Request $request, $pengajuanId)
+    {
+        try {
+            $selectedTypes = $request->input('document_types', []);
+            $selectedRecords = $request->input('selected_records', []); 
+            $pengajuanKlaim = PengajuanKlaim::findOrFail($pengajuanId);
+            
+            if (empty($selectedTypes)) {
+                return response()->json(['error' => 'No documents selected'], 400);
+            }
+            
+            // Validate all document types
+            foreach ($selectedTypes as $type) {
+                if (!$this->isValidDocumentType($type)) {
+                    return response()->json(['error' => "Invalid document type: {$type}"], 400);
+                }
+            }
+            
+            // Generate combined PDF using exact same templates as individual PDFs
+            return response()->streamDownload(function() use ($selectedTypes, $selectedRecords, $pengajuanId, $pengajuanKlaim) {
+                
+                $combinedHtml = '';
+                
+                foreach ($selectedTypes as $index => $type) {
+                    try {
+                        $data = $this->getDocumentData($type, $pengajuanId);
+                        
+                        if (!$data || $data->isEmpty()) {
+                            continue; // Skip if no data
+                        }
+                        
+                        // Get base64 encoded logo
+                        $logoBase64 = $this->getLogoBase64();
+                        
+                        // Generate QR codes for this document type
+                        $qrData = $this->generateQRCodes($pengajuanKlaim, $data, $type);
+                        
+                        // Render the exact same Blade template used for individual PDFs
+                        $documentHtml = view("pdf.templates.{$type}", array_merge([
+                            'pengajuanKlaim' => $pengajuanKlaim,
+                            'data' => $data,
+                            'selectedRecords' => $selectedRecords,
+                            'logoBase64' => $logoBase64,
+                        ], $qrData))->render();
+                        
+                        $combinedHtml .= $documentHtml;
+                        
+                        // Add page break between documents (except for the last one)
+                        if ($index < count($selectedTypes) - 1) {
+                            $combinedHtml .= '<div style="page-break-after: always;"></div>';
+                        }
+                        
+                    } catch (\Exception $e) {
+                        Log::error("Bundle Generation Error for type {$type}: " . $e->getMessage());
+                        continue; // Skip this document and continue with others
+                    }
+                }
+                
+                if (empty($combinedHtml)) {
+                    throw new \Exception('No documents could be generated');
+                }
+                
+                // Generate single PDF from combined templates
+                $pdf = Pdf::loadHTML($combinedHtml)->setPaper('a4', 'portrait');
+                echo $pdf->output();
+                
+            }, 'medical-records-' . $pengajuanKlaim->nomor_sep . '-' . date('Y-m-d-H-i-s') . '.pdf');
+            
+        } catch (\Exception $e) {
+            Log::error('Generate Bundle Error: ' . $e->getMessage(), [
+                'pengajuan_id' => $pengajuanId,
+                'selected_types' => $request->input('document_types', []),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'error' => 'Terjadi kesalahan saat generate bundle: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    private function isValidDocumentType($type)
+    {
+        $validTypes = [
+            'laboratorium', 'radiologi', 'resume_medis', 'pengkajian_awal',
+            'rawat_inap_resume', 'rawat_jalan_resume', 'ugd_resume',
+            'rawat_inap_cppt', 'rawat_inap_pengkajian', 'rawat_jalan_pengkajian',
+            'ugd_pengkajian', 'ugd_triage', 'rawat_inap_balance', 'tagihan'
+        ];
         
-        // Get data based on document type
-        $data = $this->getDocumentData($documentType, $pengajuanId);
-        
-        // Get base64 encoded logo
-        $logoBase64 = $this->getLogoBase64();
-        
-        // Get QR codes for signatures (if available)
+        return in_array($type, $validTypes);
+    }
+    
+    private function generateQRCodes($pengajuanKlaim, $data, $documentType)
+    {
         $defaultDokter = $pengajuanKlaim->nama_dpjp ?? 'dr. ILHAM MUNANIDAR, Sp.PD';
-        $dokterQR = QRCodeHelper::generateDataURL($defaultDokter);
-        $keluargaQR = QRCodeHelper::generateDataURL('Keluarga Pasien');
-        
-        // Additional QR codes for Triage UGD and other documents
-        $perawatQR = null;
-        $dokterTriageQR = null;
+        $qrData = [
+            'dokterQR' => QRCodeHelper::generateDataURL($defaultDokter),
+            'keluargaQR' => QRCodeHelper::generateDataURL('Keluarga Pasien'),
+            'perawatQR' => null,
+            'dokterTriageQR' => null,
+        ];
         
         // Get dokter/petugas from the actual data if available
         if ($data && $data->count() > 0) {
@@ -239,12 +407,12 @@ class PrintBundleController extends Controller
             
             // Use dokter from data if available, otherwise use default
             if (!empty($firstItem->dokter)) {
-                $dokterQR = QRCodeHelper::generateDataURL($firstItem->dokter);
+                $qrData['dokterQR'] = QRCodeHelper::generateDataURL($firstItem->dokter);
             }
             
             // Generate perawat QR if petugas data is available
             if (!empty($firstItem->petugas)) {
-                $perawatQR = QRCodeHelper::generateDataURL($firstItem->petugas);
+                $qrData['perawatQR'] = QRCodeHelper::generateDataURL($firstItem->petugas);
             }
         }
         
@@ -252,105 +420,14 @@ class PrintBundleController extends Controller
         if ($documentType === 'ugd_triage' && $data && $data->count() > 0) {
             $triageData = $data->first();
             if ($triageData && $triageData->petugas) {
-                $perawatQR = QRCodeHelper::generateDataURL($triageData->petugas);
+                $qrData['perawatQR'] = QRCodeHelper::generateDataURL($triageData->petugas);
             }
             if ($triageData && $triageData->dokter) {
-                $dokterTriageQR = QRCodeHelper::generateDataURL($triageData->dokter);
+                $qrData['dokterTriageQR'] = QRCodeHelper::generateDataURL($triageData->dokter);
             }
         }
         
-        // Generate PDF using DomPDF with same Blade template
-        $pdf = Pdf::loadView("pdf.templates.{$documentType}", [
-            'pengajuanKlaim' => $pengajuanKlaim,
-            'data' => $data,
-            'selectedRecords' => $selectedRecords,
-            'logoBase64' => $logoBase64,
-            'dokterQR' => $dokterQR,
-            'keluargaQR' => $keluargaQR,
-            'perawatQR' => $perawatQR,
-            'dokterTriageQR' => $dokterTriageQR,
-        ])->setPaper('a4', 'portrait');
-        
-        return response($pdf->output(), 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="' . $documentType . '-' . $pengajuanId . '.pdf"'
-        ]);
-    }
-    
-    public function generateBundle(Request $request, $pengajuanId)
-    {
-        $selectedTypes = $request->input('document_types', []);
-        $selectedRecords = $request->input('selected_records', []); 
-        $pengajuanKlaim = PengajuanKlaim::findOrFail($pengajuanId);
-        
-        if (empty($selectedTypes)) {
-            return response()->json(['error' => 'No documents selected'], 400);
-        }
-        
-        // Generate combined PDF using exact same templates as individual PDFs
-        return response()->streamDownload(function() use ($selectedTypes, $selectedRecords, $pengajuanId, $pengajuanKlaim) {
-            
-            $combinedHtml = '';
-            
-            foreach ($selectedTypes as $index => $type) {
-                $data = $this->getDocumentData($type, $pengajuanId);
-                
-                // Get base64 encoded logo
-                $logoBase64 = $this->getLogoBase64();
-                
-                // Prepare QR codes for this document type
-                $defaultDokter = $pengajuanKlaim->nama_dpjp ?? 'dr. ILHAM MUNANIDAR, Sp.PD';
-                $dokterQR = QRCodeHelper::generateDataURL($defaultDokter);
-                $keluargaQR = QRCodeHelper::generateDataURL('Keluarga Pasien');
-                $perawatQR = null;
-                $dokterTriageQR = null;
-                
-                // Get dokter/petugas from the actual data if available
-                if ($data && $data->count() > 0) {
-                    $firstItem = $data->first();
-                    
-                    // Use dokter from data if available, otherwise use default
-                    if (!empty($firstItem->dokter)) {
-                        $dokterQR = QRCodeHelper::generateDataURL($firstItem->dokter);
-                    }
-                    
-                    // Generate perawat QR if petugas data is available
-                    if (!empty($firstItem->petugas)) {
-                        $perawatQR = QRCodeHelper::generateDataURL($firstItem->petugas);
-                    }
-                }
-                
-                // Special handling for UGD triage
-                if ($type === 'ugd_triage' && $data && $data->count() > 0) {
-                    $triageData = $data->first();
-                    if ($triageData && $triageData->petugas) {
-                        $perawatQR = QRCodeHelper::generateDataURL($triageData->petugas);
-                    }
-                    if ($triageData && $triageData->dokter) {
-                        $dokterTriageQR = QRCodeHelper::generateDataURL($triageData->dokter);
-                    }
-                }
-                
-                // Render the exact same Blade template used for individual PDFs
-                $documentHtml = view("pdf.templates.{$type}", [
-                    'pengajuanKlaim' => $pengajuanKlaim,
-                    'data' => $data,
-                    'selectedRecords' => $selectedRecords,
-                    'logoBase64' => $logoBase64,
-                    'dokterQR' => $dokterQR,
-                    'keluargaQR' => $keluargaQR,
-                    'perawatQR' => $perawatQR,
-                    'dokterTriageQR' => $dokterTriageQR,
-                ])->render();
-                
-                $combinedHtml .= $documentHtml;
-            }
-            
-            // Generate single PDF from combined templates
-            $pdf = Pdf::loadHTML($combinedHtml)->setPaper('a4', 'portrait');
-            echo $pdf->output();
-            
-        }, 'medical-records-' . $pengajuanKlaim->nomor_sep . '-' . date('Y-m-d-H-i-s') . '.pdf');
+        return $qrData;
     }
     
     private function getDocumentData($type, $pengajuanId)
