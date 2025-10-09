@@ -79,7 +79,7 @@ class InacbgHelper
     {
         $key = env('INACBG_KEY');
         $json_request = json_decode(json_encode($data), true);
-        
+
         $payload = self::inacbg_encrypt($json_request, $key);
         $header = array("Content-Type: application/x-www-form-urlencoded");
         $url = env('INACBG_URL');
@@ -94,6 +94,11 @@ class InacbgHelper
         curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
         // request dengan curl
         $response = curl_exec($ch);
+
+        if ($response === false) {
+            dd(curl_error($ch), curl_errno($ch));
+        }
+
         $first = strpos($response, "\n") + 1;
         $last = strrpos($response, "\n") - 1;
         $response = substr(

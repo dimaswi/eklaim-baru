@@ -1,0 +1,97 @@
+{
+    "metadata": {
+        "code": 200,
+        "message": "Ok"
+    },
+    "response": {
+        "cbg": {
+            "code": "M-1-04-II",
+            "description": "PROSEDUR PADA SENDI TUNGKAI BAWAH (SEDANG)",
+            "tariff": "40388100"
+        },
+        "special_cmg": [
+            {
+                "code": "YY-01-II",
+                "description": "HIP REPLACEMENT / KNEE REPLACEMENT",
+                "tariff": 13099000,
+                "type": "Special Procedure"
+            },
+            {
+                "code": "RR-04-III",
+                "description": "HIP IMPLANT / KNEE IMPLANT",
+                "tariff": 26197900,
+                "type": "Special Prosthesis"
+            }
+        ],
+        "kelas": "kelas_2",
+        "add_payment_amt": 18792000,
+        "inacbg_version": "5.4.5.202007270459",
+        "covid19_data": {
+            "no_kartu_t": "nik",
+            "covid19_status_cd": "1",
+            "covid19_status_nm": "ODP",
+            "episodes": [
+                {
+                    "episode_id": "1",
+                    "episode_class_cd": "1",
+                    "episode_class_nm": "ICU DENGAN VENTILATOR",
+                    "los": "2",
+                    "tariff": "33000000",
+                    "order_no": "10"
+                }
+            ],
+            "pemulasaraan_jenazah": {
+                "pemulasaraan": "0",
+                "kantong": "0",
+                "peti": "0",
+                "plastik": "0",
+                "desinfektan_jenazah": "0",
+                "mobil": "0",
+                "desinfektan_mobil": "0"
+            },
+            "cc_ind": "1",
+            "top_up_rawat_gross": "33000000",
+            "top_up_rawat_factor": "0.7",
+            "top_up_rawat": "23100000",
+            "top_up_jenazah": "0"
+        }
+    },
+    "response_inagrouper": {
+        "mdc_number": "31",
+        "mdc_description": "Multiple Significant Trauma",
+        "drg_code": "3103110",
+        "drg_description": "MST w/ Multiple Wound Debridement w/ No CC"
+    },
+    "special_cmg_option": [
+        {
+            "code": "RR04",
+            "description": "Hip Implant / knee implant",
+            "type": "Special Prosthesis"
+        },
+        {
+            "code": "YY01",
+            "description": "Hip Replacement / knee replacement",
+            "type": "Special Procedure"
+        }
+    ],
+    "tarif_alt": [
+        {
+            "kelas": "kelas_1",
+            "tarif_inacbg": "47119400",
+            "tarif_sp": 13099000,
+            "tarif_sr": 26197900
+        },
+        {
+            "kelas": "kelas_2",
+            "tarif_inacbg": "40388100",
+            "tarif_sp": 13099000,
+            "tarif_sr": 26197900
+        },
+        {
+            "kelas": "kelas_3",
+            "tarif_inacbg": "33656700",
+            "tarif_sp": 13099000,
+            "tarif_sr": 26197900
+        }
+    ]
+}

@@ -195,14 +195,15 @@ class KunjunganBpjsController extends Controller
                 }
             }
 
-            $response = InacbgHelper::hitApi('/new_claim', $data, 'POST');
+            $response = InacbgHelper::hitApi($data, 'POST');
 
             Log::info('Response INACBG', [
-                'status_code' => $response['status_code'],
-                'response' => $response['response']
+                'status_code' => $response['status_code'] ?? 'undefined',
+                'response' => $response['response'] ?? null,
+                'error' => $response['error'] ?? null
             ]);
 
-            if ($response['status_code'] === 200) {
+            if (isset($response['status_code']) && $response['status_code'] === 200) {
                 $responseData = $response['response'];
                 
                 if (isset($responseData['metadata']['code']) && $responseData['metadata']['code'] == 200) {
@@ -251,24 +252,58 @@ class KunjunganBpjsController extends Controller
                         'Gagal mengajukan klaim (Code: ' . $errorCode . '): ' . $errorMessage);
                 }
             } else {
+                // Handle errors from INACBG API or HTTP errors
+                $statusCode = $response['status_code'] ?? 'unknown';
+                $errorMessage = $response['error'] ?? 'Unknown error';
+                
                 // Simpan data pengajuan dengan status 0 (default)
                 $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_DEFAULT;
-                $pengajuanData['response_message'] = 'HTTP Error: ' . $response['status_code'];
+                $pengajuanData['response_message'] = 'Error (Code: ' . $statusCode . '): ' . $errorMessage;
                 $pengajuanData['response_data'] = $response;
                 
                 PengajuanKlaim::create($pengajuanData);
                 
+                Log::error('INACBG Connection Error', [
+                    'status_code' => $statusCode,
+                    'error' => $errorMessage,
+                    'noSEP' => $request->get('nomor_sep'),
+                    'full_response' => $response
+                ]);
+                
                 return redirect()->route('eklaim.kunjungan.index')->with('error', 
-                    'HTTP Error: ' . $response['status_code']);
+                    'Gagal terhubung ke INACBG (Code: ' . $statusCode . '): ' . $errorMessage);
             }
 
         } catch (\Exception $e) {
+            // Ensure $pengajuanData is defined for exception handling
+            if (!isset($pengajuanData)) {
+                $pengajuanData = [
+                    'nomor_sep' => $request->get('nomor_sep'),
+                    'tanggal_pengajuan' => now()->toDateString(),
+                    'norm' => $request->get('nomor_rm'),
+                    'nomor_kartu' => $request->get('nomor_kartu'),
+                    'nama_pasien' => $request->get('nama_pasien'),
+                    'gender' => $request->get('gender'),
+                    'tgl_lahir' => $request->get('tgl_lahir'),
+                    'tanggal_masuk' => $request->get('tanggal_masuk'),
+                    'tanggal_keluar' => $request->get('tanggal_keluar'),
+                    'ruangan' => $request->get('ruangan'),
+                    'jenis_kunjungan' => $request->get('jenis_kunjungan'),
+                ];
+            }
+            
             // Simpan data pengajuan dengan status 0 (default)
             $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_DEFAULT;
             $pengajuanData['response_message'] = 'Exception: ' . $e->getMessage();
             $pengajuanData['response_data'] = ['exception' => $e->getMessage(), 'trace' => $e->getTraceAsString()];
             
             PengajuanKlaim::create($pengajuanData);
+
+            Log::error('Exception in pengajuanKlaim', [
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'noSEP' => $request->get('nomor_sep')
+            ]);
 
             return redirect()->route('eklaim.kunjungan.index')->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }

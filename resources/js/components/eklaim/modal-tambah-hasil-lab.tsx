@@ -40,9 +40,6 @@ export default function ModalTambahHasilLab({ open, onClose, onSubmit, tindakanL
     const [selectedTindakan, setSelectedTindakan] = useState<Tindakan | null>(null);
     const [tanggal, setTanggal] = useState('');
     const [openTindakan, setOpenTindakan] = useState(false);
-
-    console.log('selectedTindakan', selectedTindakan);
-
     // Set tanggal default ketika modal dibuka
     useEffect(() => {
         if (open && !tanggal) {

@@ -39,6 +39,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/eklaim/klaim/{pengajuanKlaim}', [KlaimController::class, 'index'])->name('eklaim.klaim.index');
     Route::post('/eklaim/klaim/{pengajuanKlaim}/store-progress', [KlaimController::class, 'storeProgress'])->name('eklaim.klaim.store-progress');
     Route::post('/eklaim/klaim/{pengajuanKlaim}/submit', [KlaimController::class, 'submitKlaim'])->name('eklaim.klaim.submit');
+    Route::post('/eklaim/klaim/{pengajuanKlaim}/groupper', [KlaimController::class, 'groupper'])->name('eklaim.klaim.groupper');
+    Route::post('/eklaim/klaim/{pengajuanKlaim}/final', [KlaimController::class, 'final'])->name('eklaim.klaim.final');
+    Route::post('/eklaim/klaim/{pengajuanKlaim}/reedit', [KlaimController::class, 'reedit'])->name('eklaim.klaim.reedit');
+    Route::post('/eklaim/klaim/{pengajuanKlaim}/kirim-inacbg', [KlaimController::class, 'kirimInacbg'])->name('eklaim.klaim.kirim-inacbg');
     
     // Debug route for testing data storage
     Route::get('/eklaim/debug/test-storage/{pengajuanKlaim}', [KlaimController::class, 'testStorage'])->name('eklaim.debug.test-storage');

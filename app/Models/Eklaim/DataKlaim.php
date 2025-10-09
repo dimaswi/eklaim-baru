@@ -199,7 +199,34 @@ class DataKlaim extends Model
         'submitted_at',
         'approved_at',
         'rejection_reason',
+                // Additional metadata
         'metadata',
+        
+        // Fields from JSON dokumentasi 
+        'coder_nik',
+        'episodes',
+        'akses_naat',
+        'isoman_ind',
+        'dializer_single_use',
+        'kantong_darah',
+        'alteplase_ind',
+        'kantong_jenazah',
+        'peti_jenazah',
+        'plastik_erat',
+        'desinfektan_jenazah',
+        'mobil_jenazah',
+        'desinfektan_mobil_jenazah',
+        'terapi_konvalesen',
+        'adl_sub_acute',
+        'adl_chronic',
+        'icu_indikator',
+        'icu_los',
+        'covid19_cc_ind',
+        'covid19_rs_darurat_ind',
+        'covid19_co_insidense_ind',
+        'covid19_penunjang_pengurang',
+        'nomor_kartu_t',
+        'kode_tarif',
     ];
 
     protected $casts = [

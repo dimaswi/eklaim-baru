@@ -21,7 +21,8 @@ class UserController extends Controller
             ->with(['role'])
             ->when($search, function ($query, $search) {
                 return $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('nip', 'like', "%{$search}%");
+                    ->orWhere('nip', 'like', "%{$search}%")
+                    ->orWhere('nik', 'like', "%{$search}%");
             })
             ->orderBy('created_at', 'asc')
             ->paginate($perPage)
@@ -50,6 +51,7 @@ class UserController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'nip' => 'required|string|max:20|unique:users',
+            'nik' => 'nullable|string|max:16|unique:users',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'role_id' => 'nullable|exists:roles,id',
         ], [
@@ -60,6 +62,9 @@ class UserController extends Controller
             'nip.string' => 'NIP harus berupa teks',
             'nip.max' => 'NIP maksimal 20 karakter',
             'nip.unique' => 'NIP sudah digunakan',
+            'nik.string' => 'NIK harus berupa teks',
+            'nik.max' => 'NIK maksimal 16 karakter',
+            'nik.unique' => 'NIK sudah digunakan',
             'password.required' => 'Password wajib diisi',
             'password.confirmed' => 'Konfirmasi password tidak cocok',
             'role_id.exists' => 'Role tidak valid',
@@ -68,6 +73,7 @@ class UserController extends Controller
         User::create([
             'name' => $request->name,
             'nip' => $request->nip,
+            'nik' => $request->nik,
             'password' => Hash::make($request->password),
             'role_id' => $request->role_id === '0' ? null : $request->role_id,
         ]);
@@ -90,6 +96,7 @@ class UserController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'nip' => 'required|string|max:20|unique:users,nip,' . $user->id,
+            'nik' => 'nullable|string|max:16|unique:users,nik,' . $user->id,
             'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
             'role_id' => 'nullable|exists:roles,id',
         ], [
@@ -100,6 +107,9 @@ class UserController extends Controller
             'nip.string' => 'NIP harus berupa teks',
             'nip.max' => 'NIP maksimal 20 karakter',
             'nip.unique' => 'NIP sudah digunakan',
+            'nik.string' => 'NIK harus berupa teks',
+            'nik.max' => 'NIK maksimal 16 karakter',
+            'nik.unique' => 'NIK sudah digunakan',
             'password.confirmed' => 'Konfirmasi password tidak cocok',
             'role_id.exists' => 'Role tidak valid',
         ]);
@@ -107,6 +117,7 @@ class UserController extends Controller
         $user->update([
             'name' => $request->name,
             'nip' => $request->nip,
+            'nik' => $request->nik,
             'password' => $request->filled('password') ? Hash::make($request->password) : $user->password,
             'role_id' => $request->role_id === '0' ? null : $request->role_id,
         ]);

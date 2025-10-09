@@ -193,7 +193,6 @@ export default function TriagePage() {
 
             toast.success('Data berhasil dimuat');
         } catch (error) {
-            console.log(error);
             toast.error('Gagal memuat data');
         } finally {
             setLoading(null);

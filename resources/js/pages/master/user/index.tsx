@@ -30,6 +30,7 @@ interface User {
     id: number;
     name: string;
     nip: string;
+    nik: string;
     role_id: number | null;
     role?: Role;
     created_at: string;
@@ -161,7 +162,7 @@ export default function Users() {
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 type="text"
-                                placeholder="Cari nama atau NIP..."
+                                placeholder="Cari nama, NIP, atau NIK..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 className="pl-10 pr-10 w-64"
@@ -199,6 +200,7 @@ export default function Users() {
                                 <TableHead className="w-[50px]">No.</TableHead>
                                 <TableHead>Name</TableHead>
                                 <TableHead>NIP</TableHead>
+                                <TableHead>NIK</TableHead>
                                 <TableHead>Role</TableHead>
                                 <TableHead></TableHead>
                             </TableRow>
@@ -212,6 +214,7 @@ export default function Users() {
                                         </TableCell>
                                         <TableCell>{user.name}</TableCell>
                                         <TableCell>{user.nip}</TableCell>
+                                        <TableCell>{user.nik || '-'}</TableCell>
                                         <TableCell>
                                             {user.role ? (
                                                 <Badge variant="secondary" className="bg-blue-100 text-blue-800">

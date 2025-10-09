@@ -59,10 +59,8 @@ export default function DiagnosisModal({
     };
 
     const handleSelectDiagnosis = (diagnosis: Diagnosa) => {
-        const isAlreadySelected = selectedDiagnosa.some(d => d.code === diagnosis.code);
-        if (!isAlreadySelected) {
-            onSelectDiagnosis(diagnosis);
-        }
+        // Allow selecting the same diagnosis multiple times for counting
+        onSelectDiagnosis(diagnosis);
     };
 
     const handleRemoveDiagnosis = (code: string) => {
@@ -130,12 +128,11 @@ export default function DiagnosisModal({
                                                 <td className="p-2 border-b text-center">
                                                     <Button
                                                         size="sm"
-                                                        variant={selectedDiagnosa.some(d => d.code === diagnosis.code) ? "secondary" : "outline"}
+                                                        variant="outline"
                                                         onClick={() => handleSelectDiagnosis(diagnosis)}
-                                                        disabled={selectedDiagnosa.some(d => d.code === diagnosis.code)}
                                                         className="text-xs"
                                                     >
-                                                        {selectedDiagnosa.some(d => d.code === diagnosis.code) ? 'Dipilih' : 'Pilih'}
+                                                        {selectedDiagnosa.some(d => d.code === diagnosis.code) ? `Pilih Lagi (${selectedDiagnosa.filter(d => d.code === diagnosis.code).length})` : 'Pilih'}
                                                     </Button>
                                                 </td>
                                             </tr>
@@ -157,20 +154,34 @@ export default function DiagnosisModal({
                         <div className="border-t pt-4">
                             <p className="font-semibold mb-2">Diagnosis Dipilih ({selectedDiagnosa.length}):</p>
                             <div className="flex flex-wrap gap-2">
-                                {selectedDiagnosa.map((diagnosis) => (
+                                {/* Group diagnoses by code and show count */}
+                                {Object.entries(
+                                    selectedDiagnosa.reduce((acc, diagnosis) => {
+                                        if (!acc[diagnosis.code]) {
+                                            acc[diagnosis.code] = { ...diagnosis, count: 0 };
+                                        }
+                                        acc[diagnosis.code].count++;
+                                        return acc;
+                                    }, {} as Record<string, Diagnosa & { count: number }>)
+                                ).map(([code, diagnosisWithCount]) => (
                                     <Badge
-                                        key={diagnosis.code}
+                                        key={code}
                                         variant="default"
                                         className="text-xs px-3 py-1"
                                     >
-                                        {diagnosis.code} - {diagnosis.name}
+                                        {diagnosisWithCount.code} - {diagnosisWithCount.name}
+                                        {diagnosisWithCount.count > 1 && (
+                                            <span className="ml-1 bg-white text-blue-600 px-1 rounded-full text-xs font-bold">
+                                                {diagnosisWithCount.count}
+                                            </span>
+                                        )}
                                         <button
                                             type="button"
                                             className="ml-2 h-3 w-3 cursor-pointer hover:text-red-500 inline-flex items-center justify-center"
                                             onClick={(e) => {
                                                 e.preventDefault();
                                                 e.stopPropagation();
-                                                handleRemoveDiagnosis(diagnosis.code);
+                                                handleRemoveDiagnosis(diagnosisWithCount.code);
                                             }}
                                         >
                                             <X className="h-3 w-3" />

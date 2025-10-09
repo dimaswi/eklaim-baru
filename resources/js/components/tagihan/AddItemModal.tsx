@@ -181,7 +181,6 @@ export default function AddItemModal({ tindakan = [], obat = [], onAddItem, chil
                                 <Select 
                                     value={itemType} 
                                     onValueChange={(value) => {
-                                        console.log('Selected value:', value); // Debug log
                                         setItemType(value as 'tindakan' | 'obat');
                                         setSelectedItem(null);
                                         setSearchTerm('');

@@ -12,6 +12,7 @@ use App\Models\SIMRS\PemeriksaanFisik;
 use App\Models\SIMRS\Pendaftaran;
 use App\Models\SIMRS\ResumeMedis;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class RawatJalanResumeMedisController extends Controller
@@ -96,6 +97,23 @@ class RawatJalanResumeMedisController extends Controller
 
     public function store(Request $request)
     {
+        // Debug log untuk melihat data yang diterima
+        Log::info('Data yang diterima di backend:', [
+            'tanda_vital_keadaan_umum' => $request->get('tanda_vital_keadaan_umum'),
+            'tanda_vital_kesadaran' => $request->get('tanda_vital_kesadaran'),
+            'tanda_vital_sistolik' => $request->get('tanda_vital_sistolik'),
+            'tanda_vital_distolik' => $request->get('tanda_vital_distolik'),
+            'tanda_vital_frekuensi_nadi' => $request->get('tanda_vital_frekuensi_nadi'),
+            'tanda_vital_frekuensi_nafas' => $request->get('tanda_vital_frekuensi_nafas'),
+            'tanda_vital_suhu' => $request->get('tanda_vital_suhu'),
+            'tanda_vital_saturasi_o2' => $request->get('tanda_vital_saturasi_o2'),
+            'tanda_vital_eye' => $request->get('tanda_vital_eye'),
+            'tanda_vital_motorik' => $request->get('tanda_vital_motorik'),
+            'tanda_vital_verbal' => $request->get('tanda_vital_verbal'),
+            'tanda_vital_gcs' => $request->get('tanda_vital_gcs'),
+            'all_request_data' => $request->all()
+        ]);
+
         $validated = $request->validate([
             'pengajuan_klaim_id' => 'required|exists:pengajuan_klaim,id',
             'kunjungan_nomor' => 'required|string',
@@ -163,7 +181,50 @@ class RawatJalanResumeMedisController extends Controller
             $cleanedData['tanggal_keluar'] = null;
         }
 
-        $resumeMedis = RawatJalanResumeMedis::create($cleanedData);
+        // Debug log setelah validation dan cleaning
+        Log::info('Data setelah validation dan cleaning:', [
+            'tanda_vital_fields' => [
+                'tanda_vital_keadaan_umum' => $cleanedData['tanda_vital_keadaan_umum'] ?? null,
+                'tanda_vital_kesadaran' => $cleanedData['tanda_vital_kesadaran'] ?? null,
+                'tanda_vital_sistolik' => $cleanedData['tanda_vital_sistolik'] ?? null,
+                'tanda_vital_distolik' => $cleanedData['tanda_vital_distolik'] ?? null,
+                'tanda_vital_frekuensi_nadi' => $cleanedData['tanda_vital_frekuensi_nadi'] ?? null,
+                'tanda_vital_frekuensi_nafas' => $cleanedData['tanda_vital_frekuensi_nafas'] ?? null,
+                'tanda_vital_suhu' => $cleanedData['tanda_vital_suhu'] ?? null,
+                'tanda_vital_saturasi_o2' => $cleanedData['tanda_vital_saturasi_o2'] ?? null,
+                'tanda_vital_eye' => $cleanedData['tanda_vital_eye'] ?? null,
+                'tanda_vital_motorik' => $cleanedData['tanda_vital_motorik'] ?? null,
+                'tanda_vital_verbal' => $cleanedData['tanda_vital_verbal'] ?? null,
+                'tanda_vital_gcs' => $cleanedData['tanda_vital_gcs'] ?? null,
+            ]
+        ]);
+
+        // Gunakan updateOrCreate untuk update data jika sudah ada
+        $resumeMedis = RawatJalanResumeMedis::updateOrCreate(
+            [
+                'pengajuan_klaim_id' => $cleanedData['pengajuan_klaim_id'],
+                'kunjungan_nomor' => $cleanedData['kunjungan_nomor']
+            ],
+            $cleanedData
+        );
+
+        Log::info('Data berhasil disimpan:', [
+            'id' => $resumeMedis->id,
+            'tanda_vital_tersimpan' => [
+                'tanda_vital_keadaan_umum' => $resumeMedis->tanda_vital_keadaan_umum,
+                'tanda_vital_kesadaran' => $resumeMedis->tanda_vital_kesadaran,
+                'tanda_vital_sistolik' => $resumeMedis->tanda_vital_sistolik,
+                'tanda_vital_distolik' => $resumeMedis->tanda_vital_distolik,
+                'tanda_vital_frekuensi_nadi' => $resumeMedis->tanda_vital_frekuensi_nadi,
+                'tanda_vital_frekuensi_nafas' => $resumeMedis->tanda_vital_frekuensi_nafas,
+                'tanda_vital_suhu' => $resumeMedis->tanda_vital_suhu,
+                'tanda_vital_saturasi_o2' => $resumeMedis->tanda_vital_saturasi_o2,
+                'tanda_vital_eye' => $resumeMedis->tanda_vital_eye,
+                'tanda_vital_motorik' => $resumeMedis->tanda_vital_motorik,
+                'tanda_vital_verbal' => $resumeMedis->tanda_vital_verbal,
+                'tanda_vital_gcs' => $resumeMedis->tanda_vital_gcs,
+            ]
+        ]);
 
         return redirect()->back()->with('success', 'Data resume medis rawat jalan berhasil disimpan');
     }

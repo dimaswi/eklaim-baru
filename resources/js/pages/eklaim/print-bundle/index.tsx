@@ -17,9 +17,17 @@ import {
     ChevronDown,
     ChevronRight,
     ChevronUp,
-    Loader
+    Loader,
+    GripVertical
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { BreadcrumbItem } from '@/types';
+import { 
+    mergeAndDownloadBundle, 
+    downloadIndividualPDF, 
+    previewPDF, 
+    BundleResponse 
+} from '@/utils/pdfMerger';
 
 interface PengajuanKlaim {
     id: number;
@@ -88,6 +96,8 @@ export default function PrintBundleIndex() {
     const [previewDocument, setPreviewDocument] = useState<PDFDocument | null>(null);
     const [expandedRows, setExpandedRows] = useState<string[]>([]);
     const [loadingStates, setLoadingStates] = useState<{ [key: string]: 'preview' | 'download' | null }>({});
+    const [draggedItem, setDraggedItem] = useState<string | null>(null);
+    const [draggedOverItem, setDraggedOverItem] = useState<string | null>(null);
 
     const toggleExpandRow = (docId: string) => {
         setExpandedRows(prev => 
@@ -164,6 +174,44 @@ export default function PrintBundleIndex() {
         }));
     };
 
+    const handleDragStart = (e: React.DragEvent, docId: string) => {
+        setDraggedItem(docId);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', docId);
+    };
+
+    const handleDragOver = (e: React.DragEvent, docId: string) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setDraggedOverItem(docId);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setDraggedOverItem(null);
+    };
+
+    const handleDrop = (e: React.DragEvent, targetDocId: string) => {
+        e.preventDefault();
+        
+        if (draggedItem && draggedItem !== targetDocId) {
+            const dragIndex = selectionOrder.indexOf(draggedItem);
+            const hoverIndex = selectionOrder.indexOf(targetDocId);
+            
+            if (dragIndex !== -1 && hoverIndex !== -1) {
+                reorderDocument(dragIndex, hoverIndex);
+            }
+        }
+        
+        setDraggedItem(null);
+        setDraggedOverItem(null);
+    };
+
+    const handleDragEnd = () => {
+        setDraggedItem(null);
+        setDraggedOverItem(null);
+    };
+
     const getSelectedDocuments = () => {
         return selectionOrder
             .map(id => documents.find(doc => doc.id === id))
@@ -173,11 +221,26 @@ export default function PrintBundleIndex() {
     const handlePreview = async (doc: PDFDocument) => {
         setLoadingStates(prev => ({ ...prev, [doc.id]: 'preview' }));
         try {
+            console.log('Starting PDF preview', {
+                documentType: doc.type,
+                documentTitle: doc.title
+            });
+
             // Prepare selected records data for this specific document
             const selectedRecordsData: { [key: string]: string[] } = {};
             if (doc.selectedRecords && doc.selectedRecords.length > 0) {
                 selectedRecordsData[doc.type] = doc.selectedRecords;
             }
+
+            // Handle berkas_klaim API data
+            const requestBody = doc.type === 'berkas_klaim' 
+                ? {
+                    metadata: { method: 'claim_print' },
+                    data: { nomor_sep: pengajuanKlaim.nomor_sep },
+                }
+                : {
+                    selected_records: selectedRecordsData,
+                };
 
             const response = await fetch(`/eklaim/print-bundle/${pengajuanKlaim.id}/preview?type=${doc.type}`, {
                 method: 'POST',
@@ -185,33 +248,81 @@ export default function PrintBundleIndex() {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
                 },
-                body: JSON.stringify({
-                    selected_records: selectedRecordsData,
-                }),
+                body: JSON.stringify(requestBody),
             });
-            const htmlContent = await response.text();
-            
-            // Open preview in new window
-            const previewWindow = window.open('', '_blank', 'width=800,height=600');
-            if (previewWindow) {
-                previewWindow.document.write(htmlContent);
-                previewWindow.document.close();
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            // Check if response is JSON (base64 PDF data) or HTML
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                // NEW: Handle base64 PDF response for preview
+                const jsonData = await response.json();
+                
+                if (jsonData.type === 'pdf_base64' && jsonData.data) {
+                    console.log('Received base64 PDF data for preview', {
+                        documentType: doc.type,
+                        dataLength: jsonData.data.length
+                    });
+
+                    // Use PDF merger utility for consistent handling
+                    previewPDF(jsonData.data);
+                    
+                    console.log('PDF preview opened successfully via frontend utility');
+                    return;
+                } else {
+                    throw new Error(jsonData.error || 'Invalid PDF response format');
+                }
+            } else {
+                // Handle HTML response (template preview or fallback)
+                console.log('Handling preview response as HTML (template or fallback mode)');
+                
+                const htmlContent = await response.text();
+                
+                // Open HTML preview in new window
+                const previewWindow = window.open('', '_blank', 'width=800,height=600');
+                if (previewWindow) {
+                    previewWindow.document.write(htmlContent);
+                    previewWindow.document.close();
+                } else {
+                    throw new Error('Popup blocked. Please allow popups for this site.');
+                }
             }
         } catch (error) {
             console.error('Error loading preview:', error);
+            alert(`Error loading preview: ${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
             setLoadingStates(prev => ({ ...prev, [doc.id]: null }));
         }
     };
 
+
+
     const handleDownloadIndividual = async (doc: PDFDocument) => {
         setLoadingStates(prev => ({ ...prev, [doc.id]: 'download' }));
         try {
+            console.log('Starting individual PDF download', {
+                documentType: doc.type,
+                documentTitle: doc.title
+            });
+
             // Prepare selected records data for this specific document
             const selectedRecordsData: { [key: string]: string[] } = {};
             if (doc.selectedRecords && doc.selectedRecords.length > 0) {
                 selectedRecordsData[doc.type] = doc.selectedRecords;
             }
+
+            // Handle berkas_klaim API data
+            const requestBody = doc.type === 'berkas_klaim' 
+                ? {
+                    metadata: { method: 'claim_print' },
+                    data: { nomor_sep: pengajuanKlaim.nomor_sep },
+                }
+                : {
+                    selected_records: selectedRecordsData,
+                };
 
             const response = await fetch(`/eklaim/print-bundle/${pengajuanKlaim.id}/pdf?type=${doc.type}`, {
                 method: 'POST',
@@ -219,23 +330,61 @@ export default function PrintBundleIndex() {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
                 },
-                body: JSON.stringify({
-                    selected_records: selectedRecordsData,
-                }),
+                body: JSON.stringify(requestBody),
             });
-            const blob = await response.blob();
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            // Check if response is JSON (base64 PDF) or binary (fallback)
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                // NEW: Handle base64 PDF response
+                const jsonData = await response.json();
+                
+                if (jsonData.type === 'pdf_base64' && jsonData.data) {
+                    console.log('Received base64 PDF data for individual download', {
+                        documentType: doc.type,
+                        filename: jsonData.filename,
+                        dataLength: jsonData.data.length
+                    });
+
+                    // Use PDF merger utility for consistent handling
+                    downloadIndividualPDF(
+                        jsonData.data, 
+                        jsonData.filename || `${doc.title}-${pengajuanKlaim.nomor_sep}.pdf`
+                    );
+                    
+                    console.log('Individual PDF downloaded successfully via frontend utility');
+                    return;
+                } else {
+                    throw new Error(jsonData.error || 'Invalid PDF response format');
+                }
+            } else {
+                // Fallback: Handle as binary PDF (old approach)
+                console.log('Handling individual PDF response as binary (fallback mode)');
+                
+                const blob = await response.blob();
+                
+                if (blob.size === 0) {
+                    throw new Error('Empty PDF file received');
+                }
+                
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${doc.title}-${pengajuanKlaim.nomor_sep}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }
             
-            // Create download link
-            const url = window.URL.createObjectURL(blob);
-            const a = globalThis.document.createElement('a');
-            a.href = url;
-            a.download = `${doc.title}-${pengajuanKlaim.nomor_sep}.pdf`;
-            globalThis.document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            globalThis.document.body.removeChild(a);
         } catch (error) {
-            console.error('Error downloading PDF:', error);
+            console.error('Error downloading individual PDF:', error);
+            alert(`Error downloading ${doc.title}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
             setLoadingStates(prev => ({ ...prev, [doc.id]: null }));
         }
@@ -246,6 +395,11 @@ export default function PrintBundleIndex() {
         
         setIsGenerating(true);
         try {
+            console.log('Starting frontend PDF bundle generation', {
+                documentCount: selectionOrder.length,
+                selectedDocuments: selectionOrder
+            });
+
             // Prepare selected records data
             const selectedRecordsData: { [key: string]: string[] } = {};
             documents.forEach(doc => {
@@ -254,31 +408,65 @@ export default function PrintBundleIndex() {
                 }
             });
 
+            const requestBody = {
+                document_types: selectionOrder,
+                selected_records: selectedRecordsData,
+            };
+
             const response = await fetch(`/eklaim/print-bundle/${pengajuanKlaim.id}/bundle`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
                 },
-                body: JSON.stringify({
-                    document_types: selectionOrder,
-                    selected_records: selectedRecordsData,
-                }),
+                body: JSON.stringify(requestBody),
             });
             
-            const blob = await response.blob();
-            
-            // Create download link
-            const url = window.URL.createObjectURL(blob);
-            const a = globalThis.document.createElement('a');
-            a.href = url;
-            a.download = `medical-records-${pengajuanKlaim.nomor_sep}-${new Date().toISOString().slice(0, 10)}.pdf`;
-            globalThis.document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            globalThis.document.body.removeChild(a);
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+            }
+
+            // Check if response is JSON (bundle_base64) or binary (fallback)
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                // NEW: Handle bundle response with base64 PDFs for frontend merging
+                const bundleData: BundleResponse = await response.json();
+                
+                console.log('Received bundle data for frontend merging', {
+                    type: bundleData.type,
+                    documentCount: bundleData.documents.length,
+                    bundleFilename: bundleData.bundle_filename
+                });
+
+                if (bundleData.type === 'bundle_base64') {
+                    // Use the PDF merger utility to merge and download
+                    await mergeAndDownloadBundle(bundleData);
+                    
+                    console.log('Bundle merged and downloaded successfully via frontend');
+                    return;
+                } else {
+                    throw new Error('Unexpected response format: expected bundle_base64');
+                }
+            } else {
+                // Fallback: Handle as binary PDF (old approach)
+                console.log('Handling response as binary PDF (fallback mode)');
+                
+                const blob = await response.blob();
+                
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `medical-records-${pengajuanKlaim.nomor_sep}-${new Date().toISOString().slice(0, 10)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }
         } catch (error) {
             console.error('Error generating bundle:', error);
+            alert(`Error generating bundle: ${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
             setIsGenerating(false);
         }
@@ -305,19 +493,28 @@ export default function PrintBundleIndex() {
     const availableDocuments = documents.filter(doc => doc.available);
     const unavailableDocuments = documents.filter(doc => !doc.available);
 
+    const breadcrumbs: BreadcrumbItem[] = [
+            {
+                title: 'Pengajuan Klaim',
+                href: '/eklaim/pengajuan',
+            },
+            {
+                title: `${pengajuanKlaim.nomor_sep}`,
+                href: `/eklaim/pengajuan/${pengajuanKlaim.id}/rm`,
+            },
+            {
+                title: `Print Bundle`,
+                href: `#`,
+            },
+        ];
+
     return (
-        <AppLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Print Bundle - ${pengajuanKlaim.nomor_sep}`} />
             
-            <div className="space-y-6">
-                {/* Header */}
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Medical Records Print Bundle</h1>
-                    <p className="text-gray-600">Select and combine medical documents into a single PDF</p>
-                </div>
-
+            <div className="space-y-6 mx-4">
                 {/* Patient Info Card */}
-                <Card>
+                <Card className='mt-4'>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <User className="h-5 w-5" />
@@ -370,14 +567,14 @@ export default function PrintBundleIndex() {
                 </Card>
 
                 {/* Available Documents - Table Format */}
-                <Card>
+                <Card className='mb-4'>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Package className="h-5 w-5" />
-                            Available Documents ({availableDocuments.length})
+                            Dokumen Tersedia ({availableDocuments.length})
                         </CardTitle>
                         <CardDescription>
-                            Select documents to include in the bundle. Documents will be merged in the order you select them.
+                            Pilih dokumen untuk dimasukkan ke dalam bundel. Dokumen akan digabungkan sesuai urutan yang Anda pilih.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -458,11 +655,21 @@ export default function PrintBundleIndex() {
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-2xl">{doc.icon}</span>
                                                         <div>
-                                                            <div className="font-medium text-gray-900">
+                                                            <div className="font-medium text-gray-900 flex items-center gap-2">
                                                                 {doc.title}
+                                                                {doc.type === 'berkas_klaim' && (
+                                                                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                                                                        INACBG API
+                                                                    </Badge>
+                                                                )}
                                                             </div>
                                                             <div className="text-sm text-gray-500">
                                                                 {doc.type}
+                                                                {doc.type === 'berkas_klaim' && (
+                                                                    <span className="text-xs block text-green-600">
+                                                                        Dari server INACBG • PDF siap download
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                             {doc.hasRecords && doc.selectedRecords && doc.selectedRecords.length > 0 && (
                                                                 <div className="text-xs text-blue-600 mt-1">
@@ -640,10 +847,12 @@ export default function PrintBundleIndex() {
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <FileText className="h-5 w-5" />
-                                Merge Order ({selectionOrder.length} documents)
+                                Gabungkan ({selectionOrder.length} dokumen)
                             </CardTitle>
                             <CardDescription>
-                                Documents will be merged in this order. You can reorder by dragging or remove individual items.
+                                Dokumen akan digabungkan dalam urutan ini. Anda dapat mengubah urutan dengan:
+                                <br />• <strong>Seret baris</strong> - Klik dan seret baris ke posisi yang diinginkan
+                                <br />• <strong>Tombol panah</strong> - Gunakan tombol ↑↓ untuk memindahkan satu posisi
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -651,7 +860,12 @@ export default function PrintBundleIndex() {
                                 <table className="w-full border-collapse border border-gray-200">
                                     <thead>
                                         <tr className="bg-gray-50">
-                                            <th className="border border-gray-200 p-3 text-center">Order</th>
+                                            <th className="border border-gray-200 p-3 text-center">
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <GripVertical className="h-4 w-4 text-gray-400" />
+                                                    Order
+                                                </div>
+                                            </th>
                                             <th className="border border-gray-200 p-3 text-left">Document Type</th>
                                             <th className="border border-gray-200 p-3 text-center">Records</th>
                                             <th className="border border-gray-200 p-3 text-center">Actions</th>
@@ -661,10 +875,23 @@ export default function PrintBundleIndex() {
                                         {getSelectedDocuments().map((doc, index) => (
                                             <tr 
                                                 key={doc.id} 
-                                                className="hover:bg-gray-50 transition-colors"
+                                                draggable
+                                                onDragStart={(e) => handleDragStart(e, doc.id)}
+                                                onDragOver={(e) => handleDragOver(e, doc.id)}
+                                                onDragLeave={handleDragLeave}
+                                                onDrop={(e) => handleDrop(e, doc.id)}
+                                                onDragEnd={handleDragEnd}
+                                                className={cn(
+                                                    "hover:bg-gray-50 transition-all duration-200 cursor-move select-none",
+                                                    draggedItem === doc.id ? "opacity-50 bg-blue-100 shadow-lg transform scale-105" : "",
+                                                    draggedOverItem === doc.id && draggedItem !== doc.id ? "bg-blue-50 border-t-4 border-t-blue-500 shadow-md" : ""
+                                                )}
                                             >
                                                 <td className="border border-gray-200 p-3 text-center">
-                                                    <Badge variant="default">#{index + 1}</Badge>
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <GripVertical className="h-4 w-4 text-gray-400" />
+                                                        <Badge variant="default">#{index + 1}</Badge>
+                                                    </div>
                                                 </td>
                                                 <td className="border border-gray-200 p-3">
                                                     <div className="flex items-center gap-3">
@@ -697,8 +924,12 @@ export default function PrintBundleIndex() {
                                                             <Button 
                                                                 size="sm" 
                                                                 variant="outline"
-                                                                onClick={() => reorderDocument(index, index - 1)}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    reorderDocument(index, index - 1);
+                                                                }}
                                                                 className="text-blue-600 hover:text-blue-800"
+                                                                title="Move up"
                                                             >
                                                                 ↑
                                                             </Button>
@@ -707,8 +938,12 @@ export default function PrintBundleIndex() {
                                                             <Button 
                                                                 size="sm" 
                                                                 variant="outline"
-                                                                onClick={() => reorderDocument(index, index + 1)}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    reorderDocument(index, index + 1);
+                                                                }}
                                                                 className="text-blue-600 hover:text-blue-800"
+                                                                title="Move down"
                                                             >
                                                                 ↓
                                                             </Button>
@@ -716,8 +951,12 @@ export default function PrintBundleIndex() {
                                                         <Button 
                                                             size="sm" 
                                                             variant="outline"
-                                                            onClick={() => toggleDocument(doc.id)}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                toggleDocument(doc.id);
+                                                            }}
                                                             className="text-red-600 hover:text-red-800"
+                                                            title="Remove from selection"
                                                         >
                                                             Remove
                                                         </Button>
@@ -765,13 +1004,13 @@ export default function PrintBundleIndex() {
 
                 {/* Unavailable Documents */}
                 {unavailableDocuments.length > 0 && (
-                    <Card>
+                    <Card className='mb-4'>
                         <CardHeader>
                             <CardTitle className="text-gray-500">
-                                Unavailable Documents ({unavailableDocuments.length})
+                                Dokumen Tidak Tersedia ({unavailableDocuments.length})
                             </CardTitle>
                             <CardDescription>
-                                These documents have no data for this patient.
+                                Dokumen-dokumen ini tidak memiliki data untuk pasien ini.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>

@@ -50,6 +50,7 @@ export interface User {
     updated_at: string;
     role_id?: number;
     role?: Role;
+    nik?: string; // NIK column added to users table
     [key: string]: unknown; // This allows for additional properties...
 }
 

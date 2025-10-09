@@ -200,6 +200,16 @@ export default function RawatInapResumeMedisRawatJalan() {
         }
     };
 
+    // Helper function untuk handle input field (text dan number)
+    const handleFieldChange = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+        if (pasien) {
+            setPasien({
+                ...pasien,
+                [field]: e.target.value,
+            });
+        }
+    };
+
     // Helper function to remove .00 from numbers
     const formatNumber = (value: any): string => {
         if (value === null || value === undefined) return 'Tidak Diketahui';
@@ -898,9 +908,7 @@ export default function RawatInapResumeMedisRawatJalan() {
                                             <input
                                                 type="text"
                                                 value={pasien?.tanda_vital_keadaan_umum || ''}
-                                                onChange={(e) =>
-                                                    setPasien((prev) => (prev ? { ...prev, tanda_vital_keadaan_umum: e.target.value } : null))
-                                                }
+                                                onChange={(e) => handleFieldChange(e, 'tanda_vital_keadaan_umum')}
                                                 style={{
                                                     width: '100%',
                                                     border: 'none',
@@ -920,9 +928,7 @@ export default function RawatInapResumeMedisRawatJalan() {
                                             <input
                                                 type="text"
                                                 value={pasien?.tanda_vital_kesadaran || ''}
-                                                onChange={(e) =>
-                                                    setPasien((prev) => (prev ? { ...prev, tanda_vital_kesadaran: e.target.value } : null))
-                                                }
+                                                onChange={(e) => handleFieldChange(e, 'tanda_vital_kesadaran')}
                                                 style={{
                                                     width: '100%',
                                                     border: 'none',
@@ -942,7 +948,7 @@ export default function RawatInapResumeMedisRawatJalan() {
                                             <input
                                                 type="text"
                                                 value={pasien?.tanda_vital_eye || ''}
-                                                onChange={(e) => setPasien((prev) => (prev ? { ...prev, tanda_vital_eye: e.target.value } : null))}
+                                                onChange={(e) => handleFieldChange(e, 'tanda_vital_eye')}
                                                 style={{
                                                     width: '100%',
                                                     border: 'none',
@@ -962,9 +968,7 @@ export default function RawatInapResumeMedisRawatJalan() {
                                             <input
                                                 type="text"
                                                 value={pasien?.tanda_vital_motorik || ''}
-                                                onChange={(e) =>
-                                                    setPasien((prev) => (prev ? { ...prev, tanda_vital_motorik: e.target.value } : null))
-                                                }
+                                                onChange={(e) => handleFieldChange(e, 'tanda_vital_motorik')}
                                                 style={{
                                                     width: '100%',
                                                     border: 'none',
@@ -984,7 +988,7 @@ export default function RawatInapResumeMedisRawatJalan() {
                                             <input
                                                 type="text"
                                                 value={pasien?.tanda_vital_verbal || ''}
-                                                onChange={(e) => setPasien((prev) => (prev ? { ...prev, tanda_vital_verbal: e.target.value } : null))}
+                                                onChange={(e) => handleFieldChange(e, 'tanda_vital_verbal')}
                                                 style={{
                                                     width: '100%',
                                                     border: 'none',
@@ -1004,7 +1008,7 @@ export default function RawatInapResumeMedisRawatJalan() {
                                             <input
                                                 type="text"
                                                 value={pasien?.tanda_vital_gcs || ''}
-                                                onChange={(e) => setPasien((prev) => (prev ? { ...prev, tanda_vital_gcs: e.target.value } : null))}
+                                                onChange={(e) => handleFieldChange(e, 'tanda_vital_gcs')}
                                                 style={{
                                                     width: '100%',
                                                     border: 'none',
@@ -1024,9 +1028,7 @@ export default function RawatInapResumeMedisRawatJalan() {
                                             <input
                                                 type="number"
                                                 value={pasien?.tanda_vital_sistolik || ''}
-                                                onChange={(e) =>
-                                                    setPasien((prev) => (prev ? { ...prev, tanda_vital_sistolik: e.target.value } : null))
-                                                }
+                                                onChange={(e) => handleFieldChange(e, 'tanda_vital_sistolik')}
                                                 style={{
                                                     width: '100%',
                                                     border: 'none',
@@ -1046,9 +1048,7 @@ export default function RawatInapResumeMedisRawatJalan() {
                                             <input
                                                 type="number"
                                                 value={pasien?.tanda_vital_distolik || ''}
-                                                onChange={(e) =>
-                                                    setPasien((prev) => (prev ? { ...prev, tanda_vital_distolik: e.target.value } : null))
-                                                }
+                                                onChange={(e) => handleFieldChange(e, 'tanda_vital_distolik')}
                                                 style={{
                                                     width: '100%',
                                                     border: 'none',
@@ -1068,9 +1068,7 @@ export default function RawatInapResumeMedisRawatJalan() {
                                             <input
                                                 type="number"
                                                 value={pasien?.tanda_vital_frekuensi_nadi || ''}
-                                                onChange={(e) =>
-                                                    setPasien((prev) => (prev ? { ...prev, tanda_vital_frekuensi_nadi: e.target.value } : null))
-                                                }
+                                                onChange={(e) => handleFieldChange(e, 'tanda_vital_frekuensi_nadi')}
                                                 style={{
                                                     width: '100%',
                                                     border: 'none',
@@ -1090,9 +1088,7 @@ export default function RawatInapResumeMedisRawatJalan() {
                                             <input
                                                 type="number"
                                                 value={pasien?.tanda_vital_frekuensi_nafas || ''}
-                                                onChange={(e) =>
-                                                    setPasien((prev) => (prev ? { ...prev, tanda_vital_frekuensi_nafas: e.target.value } : null))
-                                                }
+                                                onChange={(e) => handleFieldChange(e, 'tanda_vital_frekuensi_nafas')}
                                                 style={{
                                                     width: '100%',
                                                     border: 'none',
@@ -1113,7 +1109,7 @@ export default function RawatInapResumeMedisRawatJalan() {
                                                 type="number"
                                                 step="0.1"
                                                 value={pasien?.tanda_vital_suhu || ''}
-                                                onChange={(e) => setPasien((prev) => (prev ? { ...prev, tanda_vital_suhu: e.target.value } : null))}
+                                                onChange={(e) => handleFieldChange(e, 'tanda_vital_suhu')}
                                                 style={{
                                                     width: '100%',
                                                     border: 'none',
@@ -1133,9 +1129,7 @@ export default function RawatInapResumeMedisRawatJalan() {
                                             <input
                                                 type="number"
                                                 value={pasien?.tanda_vital_saturasi_o2 || ''}
-                                                onChange={(e) =>
-                                                    setPasien((prev) => (prev ? { ...prev, tanda_vital_saturasi_o2: e.target.value } : null))
-                                                }
+                                                onChange={(e) => handleFieldChange(e, 'tanda_vital_saturasi_o2')}
                                                 style={{
                                                     width: '100%',
                                                     border: 'none',
@@ -1165,7 +1159,7 @@ export default function RawatInapResumeMedisRawatJalan() {
                                         <input
                                             type="text"
                                             value={pasien?.cara_keluar || ''}
-                                            onChange={(e) => setPasien((prev) => (prev ? { ...prev, cara_keluar: e.target.value } : null))}
+                                            onChange={(e) => handleFieldChange(e, 'cara_keluar')}
                                             style={{
                                                 width: '100%',
                                                 border: 'none',
@@ -1185,7 +1179,7 @@ export default function RawatInapResumeMedisRawatJalan() {
                                         <input
                                             type="text"
                                             value={pasien?.keadaan_keluar || ''}
-                                            onChange={(e) => setPasien((prev) => (prev ? { ...prev, keadaan_keluar: e.target.value } : null))}
+                                            onChange={(e) => handleFieldChange(e, 'keadaan_keluar')}
                                             style={{
                                                 width: '100%',
                                                 border: 'none',

@@ -119,12 +119,6 @@ export default function HasilLaboratoriumPage() {
     // Use flash messages hook untuk menangani pesan dari backend
     useFlashMessages();
     
-    // Debug log untuk melihat struktur dataFiktif
-    useEffect(() => {
-        console.log('dataFiktif:', dataFiktif);
-        console.log('dataFiktif length:', dataFiktif?.length);
-    }, [dataFiktif]);
-    
     const [loading, setLoading] = useState<'load' | 'simpan' | 'hapus' | null>(null);
     const [kunjunganData, setKunjunganData] = useState<Kunjungan | null>(null);
     const [pasienData, setPasienData] = useState<any>(null);
@@ -1483,9 +1477,6 @@ export default function HasilLaboratoriumPage() {
                                                         }}
                                                     >
                                                         {param.SATUAN || '-'}
-                                                        {
-                                                            console.log('param satuan', param)
-                                                        }
                                                     </td>
                                                     <td
                                                         style={{

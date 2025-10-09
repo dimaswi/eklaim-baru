@@ -1,6 +1,7 @@
 import DiagnosisModal from '@/components/eklaim/DiagnosisModal';
 import ProcedureModal from '@/components/eklaim/ProcedureModal';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { Button } from '@/components/ui/button';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -16,22 +17,105 @@ import { BreadcrumbItem, SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import { Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'E-Klaim',
-        href: '/eklaim',
-    },
-    {
-        title: 'Pengajuan Klaim',
-        href: '/eklaim/pengajuan',
-    },
-    {
-        title: 'Entry Klaim',
-        href: '#',
-    },
-];
+// Import tab components
+import DataDiriTab from '@/components/eklaim/tabs/DataDiriTab';
+import ICUTab from '@/components/eklaim/tabs/ICUTab';
+import VentilatorTab from '@/components/eklaim/tabs/VentilatorTab';
+import UpgradeKelasTab from '@/components/eklaim/tabs/UpgradeKelasTab';
+import DataMedisTab from '@/components/eklaim/tabs/DataMedisTab';
+import TarifTab from '@/components/eklaim/tabs/TarifTab';
+import COVIDTab from '@/components/eklaim/tabs/COVIDTab';
+import APGARTab from '@/components/eklaim/tabs/APGARTab';
+import PersalinanTab from '@/components/eklaim/tabs/PersalinanTab';
+import LainLainTab from '@/components/eklaim/tabs/LainLainTab';
+import DataRSTab from '@/components/eklaim/tabs/DataRSTab';
+import HasilGrouperTab from '@/components/eklaim/tabs/HasilGrouperTab';
+
+// Helper functions for diagnosis and procedure formatting
+const formatDiagnosesToString = (diagnoses: { name: string; code: string }[]): string => {
+    if (!diagnoses || diagnoses.length === 0) return '';
+    
+    // Count occurrences of each code
+    const codeCount: { [key: string]: number } = {};
+    diagnoses.forEach(diag => {
+        if (diag.code) {
+            codeCount[diag.code] = (codeCount[diag.code] || 0) + 1;
+        }
+    });
+    
+    // Build formatted string
+    const formattedCodes = Object.keys(codeCount).map(code => {
+        const count = codeCount[code];
+        return count > 1 ? `${code}+${count}` : code;
+    });
+    
+    return formattedCodes.join('#');
+};
+
+const formatProceduresToString = (procedures: { name: string; code: string }[]): string => {
+    if (!procedures || procedures.length === 0) return '';
+    
+    // Count occurrences of each code
+    const codeCount: { [key: string]: number } = {};
+    procedures.forEach(proc => {
+        if (proc.code) {
+            codeCount[proc.code] = (codeCount[proc.code] || 0) + 1;
+        }
+    });
+    
+    // Build formatted string
+    const formattedCodes = Object.keys(codeCount).map(code => {
+        const count = codeCount[code];
+        return count > 1 ? `${code}+${count}` : code;
+    });
+    
+    return formattedCodes.join('#');
+};
+
+const parseStringToDiagnoses = (diagnosesString: string): { name: string; code: string }[] => {
+    if (!diagnosesString) return [];
+    
+    const codes = diagnosesString.split('#').filter(code => code.trim() !== '');
+    const result: { name: string; code: string }[] = [];
+    
+    codes.forEach(codeWithCount => {
+        const [code, countStr] = codeWithCount.split('+');
+        const count = countStr ? parseInt(countStr) : 1;
+        
+        // Add multiple entries for repeated diagnoses
+        for (let i = 0; i < count; i++) {
+            result.push({
+                name: `Diagnosa ${code}`,
+                code: code
+            });
+        }
+    });
+    
+    return result;
+};
+
+const parseStringToProcedures = (proceduresString: string): { name: string; code: string }[] => {
+    if (!proceduresString) return [];
+    
+    const codes = proceduresString.split('#').filter(code => code.trim() !== '');
+    const result: { name: string; code: string }[] = [];
+    
+    codes.forEach(codeWithCount => {
+        const [code, countStr] = codeWithCount.split('+');
+        const count = countStr ? parseInt(countStr) : 1;
+        
+        // Add multiple entries for repeated procedures
+        for (let i = 0; i < count; i++) {
+            result.push({
+                name: `Procedure ${code}`,
+                code: code
+            });
+        }
+    });
+    
+    return result;
+};
 
 interface Props extends SharedData {
     pengajuanKlaim: {
@@ -62,21 +146,255 @@ interface Props extends SharedData {
     pengkajianAwalData?: any;
     kunjunganbpjsData?: any;
     dataTagihan?: any;
+    dataGroupper?: any;
+    dataGrouperStage2?: any;
 }
 
 export default function Index() {
-    const { referenceData, pengajuanKlaim, resumeMedisData, pengkajianAwalData, kunjunganbpjsData, dataTagihan, existingDataKlaim } = usePage<Props>().props;
-    console.log(dataTagihan);
+    const { auth, referenceData, pengajuanKlaim, resumeMedisData, pengkajianAwalData, kunjunganbpjsData, dataTagihan, existingDataKlaim, dataGroupper, dataGrouperStage2 } = usePage<Props>().props;
     const [formData, setFormData] = useState<{ [key: string]: any }>({});
     const [isLoading, setIsLoading] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        {
+            title: 'Pengajuan Klaim',
+            href: '/eklaim/pengajuan',
+        },
+        {
+            title: `${pengajuanKlaim.nomor_sep}`,
+            href: `/eklaim/pengajuan/${pengajuanKlaim.id}/rm`,
+        },
+        {
+            title: `Pengisian Klaim`,
+            href: `#`,
+        },
+    ];
+    
+    const [activeTab, setActiveTab] = useState(1);
+    
+    // Force re-render of tab counters when formData changes
+    const [counterUpdateKey, setCounterUpdateKey] = useState(0);
+    
+    useEffect(() => {
+        setCounterUpdateKey(prev => prev + 1);
+    }, [formData]);
+
 
     // Alert dialog states
     const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false);
     const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false);
     const [isConfirmSubmitOpen, setIsConfirmSubmitOpen] = useState(false);
+    const [isConfirmKirimOpen, setIsConfirmKirimOpen] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
+
+    // Loading states untuk button baru
+    const [isLoadingFinal, setIsLoadingFinal] = useState(false);
+    const [isLoadingGrouperUlang, setIsLoadingGrouperUlang] = useState(false);
+    const [isLoadingReedit, setIsLoadingReedit] = useState(false);
+    const [isLoadingKirimInacbg, setIsLoadingKirimInacbg] = useState(false);
+
+    // Check apakah klaim sudah final (status_pengiriman = 4 atau 5)
+    const isKlaimFinal = pengajuanKlaim.status_pengiriman === 4 || pengajuanKlaim.status_pengiriman === 5;
+
+    // Helper function untuk check apakah ada special_cmg_option dan groupper stage 1 selesai
+    const hasSpecialCmgOptions = (): boolean => {
+        // Check dari dataGroupper apakah ada special_cmg_option
+        if (dataGroupper?.special_cmg_option && 
+            Array.isArray(dataGroupper.special_cmg_option) && 
+            dataGroupper.special_cmg_option.length > 0) {
+            return true;
+        }
+        
+        return false;
+    };
+
+    // Helper function untuk check apakah groupper stage 1 sudah selesai
+    const isGrouperStage1Complete = (): boolean => {
+        return dataGroupper !== null && dataGroupper !== undefined;
+    };
+
+    // Wrapper functions untuk button clicks
+    const handleFinalClick = () => {
+        handleFinal();
+    };
+
+    const handleGrouperUlangClick = () => {
+        handleGrouperUlang();
+    };
+
+    // Field mappings for each tab to count filled/empty fields
+    interface TabFieldMapping {
+        fields: string[];
+        required?: string[];
+        conditional?: {
+            dependsOn: string;
+            value: string;
+            fields: string[];
+        };
+    }
+
+    const tabFieldMappings: { [key: number]: TabFieldMapping } = {
+        1: { // Data Diri
+            fields: ['nomor_sep', 'nomor_kartu', 'tgl_masuk', 'tgl_pulang', 'cara_masuk', 'jenis_rawat', 'kelas_rawat'],
+            required: ['nomor_sep', 'nomor_kartu', 'tgl_masuk', 'tgl_pulang', 'cara_masuk', 'jenis_rawat', 'kelas_rawat']
+        },
+        2: { // ICU
+            fields: ['icu_indikator', 'adl_sub_acute', 'adl_chronic', 'icu_los'],
+            conditional: { dependsOn: 'icu_indikator', value: '1', fields: ['adl_sub_acute', 'adl_chronic', 'icu_los'] }
+        },
+        3: { // Ventilator
+            fields: ['ventilator.use_ind', 'ventilator.start_dttm', 'ventilator.stop_dttm', 'ventilator_hour'],
+            conditional: { dependsOn: 'ventilator.use_ind', value: '1', fields: ['ventilator.start_dttm', 'ventilator.stop_dttm', 'ventilator_hour'] }
+        },
+        4: { // Upgrade Kelas
+            fields: ['upgrade_class_ind', 'upgrade_class_class', 'upgrade_class_los', 'upgrade_class_payor', 'add_payment_pct'],
+            conditional: { dependsOn: 'upgrade_class_ind', value: '1', fields: ['upgrade_class_class', 'upgrade_class_los', 'upgrade_class_payor', 'add_payment_pct'] }
+        },
+        5: { // Data Medis
+            fields: ['birth_weight', 'sistole', 'diastole', 'discharge_status', 'nama_dokter', 'diagnosa', 'procedure', 'diagnosa_inagrouper', 'procedure_inagrouper'],
+            required: ['discharge_status', 'nama_dokter']
+        },
+        6: { // Tarif
+            fields: [
+                'tarif_rs.prosedur_non_bedah', 'tarif_rs.prosedur_bedah', 'tarif_rs.konsultasi', 'tarif_rs.tenaga_ahli',
+                'tarif_rs.keperawatan', 'tarif_rs.penunjang', 'tarif_rs.radiologi', 'tarif_rs.laboratorium',
+                'tarif_rs.pelayanan_darah', 'tarif_rs.rehabilitasi', 'tarif_rs.kamar', 'tarif_rs.rawat_intensif',
+                'tarif_rs.obat', 'tarif_rs.obat_kronis', 'tarif_rs.obat_kemoterapi', 'tarif_rs.alkes',
+                'tarif_rs.bmhp', 'tarif_rs.sewa_alat'
+            ]
+        },
+        7: { // COVID-19
+            fields: ['pemulasaraan_jenazah', 'kantong_jenazah', 'peti_jenazah', 'plastik_erat', 'desinfektan_jenazah', 'mobil_jenazah', 'desinfektan_mobil_jenazah', 'is_covid19_suspect', 'is_covid19_probable', 'is_covid19_confirmed']
+        },
+        8: { // APGAR Score
+            fields: ['apgar.appearance_1', 'apgar.pulse_1', 'apgar.grimace_1', 'apgar.activity_1', 'apgar.respiration_1', 'apgar.appearance_5', 'apgar.pulse_5', 'apgar.grimace_5', 'apgar.activity_5', 'apgar.respiration_5']
+        },
+        9: { // Persalinan
+            fields: ['persalinan.usia_kehamilan', 'persalinan.gravida', 'persalinan.partus', 'persalinan.abortus', 'persalinan.onset_kontraksi']
+        },
+        10: { // Lain-lain
+            fields: ['terapi_konvalesen', 'akses_naat', 'isoman_ind', 'bayi_lahir_status_cd', 'dializer_single_use', 'kantong_darah', 'alteplase_ind']
+        },
+        11: { // Data RS
+            fields: ['tarif_poli_eks', 'nama_dokter', 'kode_tarif', 'payor_id', 'payor_cd', 'cob_cd', 'coder_nik']
+        },
+        12: { // Hasil Groupper (read-only tab)
+            fields: []
+        }
+    };
+
+    // Function to get nested field value
+    const getFieldValue = (fieldPath: string): any => {
+        const keys = fieldPath.split('.');
+        let value = formData;
+        for (const key of keys) {
+            if (!value || typeof value !== 'object') return '';
+            value = value[key];
+        }
+        return value || '';
+    };
+
+    // Function to check if a field is filled (with proper handling for different data types)
+    const isFieldFilled = (fieldPath: string): boolean => {
+        const value = getFieldValue(fieldPath);
+        
+        if (typeof value === 'string') {
+            return value.trim() !== '' && value.trim() !== '0';
+        }
+        if (typeof value === 'number') {
+            return value !== 0;
+        }
+        if (typeof value === 'boolean') {
+            return true; // Boolean values are always considered "filled"
+        }
+        if (Array.isArray(value)) {
+            return value.length > 0;
+        }
+        if (typeof value === 'object' && value !== null) {
+            return Object.keys(value).length > 0;
+        }
+        
+        return value !== null && value !== undefined && value !== '';
+    };
+
+    // Special function for Data RS tab to handle auto-filled fields
+    const isDataRSFieldFilled = (fieldPath: string): boolean => {
+        const value = getFieldValue(fieldPath);
+        
+        // For Data RS tab, treat any non-empty string as filled (including '0', 'DS', etc.)
+        if (typeof value === 'string') {
+            return value.trim() !== '';
+        }
+        if (typeof value === 'number') {
+            return value !== 0;
+        }
+        if (typeof value === 'boolean') {
+            return true;
+        }
+        if (Array.isArray(value)) {
+            return value.length > 0;
+        }
+        if (typeof value === 'object' && value !== null) {
+            return Object.keys(value).length > 0;
+        }
+        
+        return value !== null && value !== undefined && value !== '';
+    };
+
+    // Function to count fields for a specific tab
+    const getTabFieldCount = (tabId: number): { filled: number; total: number } => {
+        const tabMapping = tabFieldMappings[tabId];
+        if (!tabMapping) return { filled: 0, total: 0 };
+
+        let fields = [...tabMapping.fields];
+        let filledCount = 0;
+
+        // Handle conditional fields
+        if (tabMapping.conditional) {
+            const { dependsOn, value: requiredValue, fields: conditionalFields } = tabMapping.conditional;
+            const dependentFieldValue = getFieldValue(dependsOn);
+            
+            if (dependentFieldValue !== requiredValue) {
+                // Remove conditional fields from counting if condition not met
+                fields = fields.filter(field => !conditionalFields.includes(field));
+            }
+        }
+
+        // Count filled fields - use special logic for Data RS tab (tab 11)
+        fields.forEach(field => {
+            if (tabId === 11) {
+                // Use special Data RS field checking logic
+                if (isDataRSFieldFilled(field)) {
+                    filledCount++;
+                }
+            } else {
+                // Use normal field checking for all other tabs
+                if (isFieldFilled(field)) {
+                    filledCount++;
+                }
+            }
+        });
+
+        return { filled: filledCount, total: fields.length };
+    };
+
+    // Tab configuration
+    const tabs = [
+        { id: 1, name: 'Data Diri', icon: '👤' },
+        { id: 2, name: 'ICU', icon: '🏥' },
+        { id: 3, name: 'Ventilator', icon: '🤧' },
+        { id: 4, name: 'Upgrade Kelas', icon: '⬆️' },
+        { id: 5, name: 'Data Medis', icon: '🩺' },
+        { id: 6, name: 'Tarif', icon: '💰' },
+        { id: 7, name: 'COVID-19', icon: '🦠' },
+        { id: 8, name: 'APGAR Score', icon: '👶' },
+        { id: 9, name: 'Persalinan', icon: '🤱' },
+        { id: 10, name: 'Lain-lain', icon: '📋' },
+        { id: 11, name: 'Data RS', icon: '🏥' },
+        ...(dataGroupper || dataGrouperStage2 ? [{ id: 12, name: 'Hasil Groupper', icon: '📊' }] : []),
+    ];
 
     const [isDiagnosisModalOpen, setIsDiagnosisModalOpen] = useState(false);
     const [isProcedureModalOpen, setIsProcedureModalOpen] = useState(false);
@@ -97,6 +415,16 @@ export default function Index() {
         updateField('tgl_masuk', toDatetimeLocal(pengajuanKlaim.tanggal_masuk) || '');
         updateField('tgl_pulang', toDatetimeLocal(pengajuanKlaim.tanggal_keluar) || '');
 
+        // Set default values for ICU, Ventilator, and Upgrade Class
+        updateField('icu_indikator', '0');
+        updateField('adl_sub_acute', '0');
+        updateField('adl_chronic', '0');
+        updateField('icu_los', '0');
+        updateNestedField('ventilator', 'use_ind', '0');
+        updateField('ventilator_hour', '0');
+        updateField('upgrade_class_ind', '0');
+
+
         let jenisRawat = '';
         switch (pengajuanKlaim.jenis_kunjungan) {
             case 1:
@@ -104,7 +432,7 @@ export default function Index() {
                 jenisRawat = '1';
                 break;
             case 2:
-            case 'Rawata Jalan':
+            case 'Rawat Jalan':
                 jenisRawat = '2';
                 break;
             case 3:
@@ -117,65 +445,69 @@ export default function Index() {
         updateField('jenis_rawat', jenisRawat);
 
         let caraKeluar = '';
-        switch (resumeMedisData.cara_keluar) {
-            case 1:
-            case 'Diijinkan Pulang':
-                caraKeluar = '1';
-                break;
-            case 2:
-            case 'Pulang Paksa + Alasan':
-                caraKeluar = '3';
-                break;
-            case 3:
-            case 'Dirujukan Ke RS Lain':
-                caraKeluar = '2';
-                break;
-            case 4:
-            case 'Lari':
-                caraKeluar = '3';
-                break;
-            case 5:
-            case 'Pindah RS Lain':
-                caraKeluar = '3';
-                break;
-            case 6:
-            case 'Meninggal':
-                caraKeluar = '4';
-                break;
-            case 7:
-            case 'DOA':
-                caraKeluar = '4';
-                break;
-            case 8:
-            case 'Masuk Rawat Inap':
-                caraKeluar = '5';
-                break;
-            default:
-                caraKeluar = '';
+        if (resumeMedisData?.cara_keluar) {
+            switch (resumeMedisData.cara_keluar) {
+                case 1:
+                case 'Diijinkan Pulang':
+                    caraKeluar = '1';
+                    break;
+                case 2:
+                case 'Pulang Paksa + Alasan':
+                    caraKeluar = '3';
+                    break;
+                case 3:
+                case 'Dirujukan Ke RS Lain':
+                    caraKeluar = '2';
+                    break;
+                case 4:
+                case 'Lari':
+                    caraKeluar = '3';
+                    break;
+                case 5:
+                case 'Pindah RS Lain':
+                    caraKeluar = '3';
+                    break;
+                case 6:
+                case 'Meninggal':
+                    caraKeluar = '4';
+                    break;
+                case 7:
+                case 'DOA':
+                    caraKeluar = '4';
+                    break;
+                case 8:
+                case 'Masuk Rawat Inap':
+                    caraKeluar = '5';
+                    break;
+                default:
+                    caraKeluar = '1';
+            }
         }
         updateField('discharge_status', caraKeluar);
-        updateField('nama_dokter', resumeMedisData.dokter || '');
+        updateField('nama_dokter', resumeMedisData?.dokter || '');
 
         let kelas_rwt = '';
-        switch (kunjunganbpjsData.klsRawat) {
-            case 1:
-            case '1':
-                kelas_rwt = '1';
-                break;
-            case 2:
-            case '2':
-                kelas_rwt = '3';
-                break;
-            case 3:
-            case '3':
-                kelas_rwt = '2';
-                break;
-            default:
-                kelas_rwt = '';
+        if (kunjunganbpjsData?.klsRawat) {
+            switch (kunjunganbpjsData.klsRawat) {
+                case 1:
+                case '1':
+                    kelas_rwt = '1';
+                    break;
+                case 2:
+                case '2':
+                    kelas_rwt = '3';
+                    break;
+                case 3:
+                case '3':
+                    kelas_rwt = '2';
+                    break;
+                default:
+                    kelas_rwt = '';
+            }
         }
         updateField('kelas_rawat', kelas_rwt || '');
-        updateField('sistole', resumeMedisData.tanda_vital_sistolik || '');
-        updateField('diastole', resumeMedisData.tanda_vital_distolik || '');
+        updateField('sistole', resumeMedisData?.tanda_vital_sistolik || '');
+        updateField('diastole', resumeMedisData?.tanda_vital_distolik || '');
 
         if (resumeMedisData?.selected_diagnosa && Array.isArray(resumeMedisData.selected_diagnosa)) {
             const diagnosaCodes = convertArrayToCodeString(resumeMedisData.selected_diagnosa, ['kode', 'code', 'kd_penyakit']);
@@ -186,7 +518,6 @@ export default function Index() {
             setSelectedDiagnoses(diagnosesForUI);
             setSelectedInagrouperDiagnoses(diagnosesForUI); // Set juga untuk inagrouper
 
-            console.log('Loaded diagnosa from resumeMedisData:', diagnosaCodes, diagnosesForUI);
         }
 
         if (resumeMedisData?.selected_procedure && Array.isArray(resumeMedisData.selected_procedure)) {
@@ -198,7 +529,6 @@ export default function Index() {
             setSelectedProcedures(proceduresForUI);
             setSelectedInagrouperProcedures(proceduresForUI); // Set juga untuk inagrouper
 
-            console.log('Loaded procedure from resumeMedisData:', procedureCodes, proceduresForUI);
         }
 
         // Handle selected_diagnosa_inagrouper jika ada data terpisah untuk inagrouper (akan override data di atas)
@@ -209,7 +539,6 @@ export default function Index() {
             const diagnosesForUI = convertArrayToUIFormat(resumeMedisData.selected_diagnosa_inagrouper, 'diagnosa');
             setSelectedInagrouperDiagnoses(diagnosesForUI);
 
-            console.log('Loaded diagnosa inagrouper from resumeMedisData:', diagnosaCodes, diagnosesForUI);
         }
 
         // Handle selected_procedure_inagrouper jika ada data terpisah untuk inagrouper (akan override data di atas)
@@ -220,7 +549,6 @@ export default function Index() {
             const proceduresForUI = convertArrayToUIFormat(resumeMedisData.selected_procedure_inagrouper, 'procedure');
             setSelectedInagrouperProcedures(proceduresForUI);
 
-            console.log('Loaded procedure inagrouper from resumeMedisData:', procedureCodes, proceduresForUI);
         }
 
         // Mapping tarif RS berdasarkan data tagihan
@@ -242,112 +570,169 @@ export default function Index() {
         updateNestedField('tarif_rs', 'alkes', dataTagihan?.ALKES || '');
         updateNestedField('tarif_rs', 'bmhp', dataTagihan?.BMHP || '');
         updateNestedField('tarif_rs', 'sewa_alat', dataTagihan?.SEWA_ALAT || '');
-    }, [pengajuanKlaim, resumeMedisData, pengkajianAwalData, kunjunganbpjsData, dataTagihan]);
+
+        // Set default values for Data RS tab fields to ensure they're counted as filled
+        updateField('kode_tarif', 'DS');
+        updateField('payor_id', '00003');
+        updateField('payor_cd', 'JKN');
+        
+        // Set coder_nik from current user if available
+        if (auth?.user?.nik) {
+            updateField('coder_nik', auth.user.nik);
+        }
+    }, [pengajuanKlaim, resumeMedisData, pengkajianAwalData, kunjunganbpjsData, dataTagihan, auth]);
+
+    // Separate useEffect to ensure coder_nik is always set from current user
+    useEffect(() => {
+        if (auth?.user?.nik && !formData.coder_nik) {
+            updateField('coder_nik', auth.user.nik);
+        }
+    }, [auth?.user?.nik, formData.coder_nik]);
 
     // Load existing data klaim if exists
     useEffect(() => {
-        if (existingDataKlaim) {
-            console.log('=== LOADING EXISTING DATA FROM DATABASE ===');
-            console.log('Raw existingDataKlaim:', existingDataKlaim);
-            console.log('Available fields in database:', Object.keys(existingDataKlaim));
-            
+        if (existingDataKlaim) {    
             // Load all basic fields from database
+            // Exclude JSON fields from general loading (they're handled separately)
+            const jsonFields = ['tarif_rs', 'apgar', 'ventilator', 'persalinan', 'covid19_penunjang_pengurang'];
             Object.keys(existingDataKlaim).forEach(key => {
-                if (existingDataKlaim[key] !== null && existingDataKlaim[key] !== undefined && key !== 'id') {
-                    console.log(`Loading field ${key}:`, existingDataKlaim[key]);
+                if (existingDataKlaim[key] !== null && existingDataKlaim[key] !== undefined && key !== 'id' && !jsonFields.includes(key)) {
                     updateField(key, existingDataKlaim[key]);
                 }
             });
 
-            // Load nested field: tarif_rs (if stored as JSON in database)
-            if (existingDataKlaim.tarif_rs && typeof existingDataKlaim.tarif_rs === 'object') {
-                console.log('Loading tarif_rs nested data:', existingDataKlaim.tarif_rs);
-                Object.keys(existingDataKlaim.tarif_rs).forEach(tariffKey => {
-                    updateNestedField('tarif_rs', tariffKey, existingDataKlaim.tarif_rs[tariffKey]);
-                });
+            // Load nested field: tarif_rs (parse JSON if string)
+            if (existingDataKlaim.tarif_rs) {
+                let tarifData = existingDataKlaim.tarif_rs;
+                if (typeof tarifData === 'string') {
+                    try {
+                        tarifData = JSON.parse(tarifData);
+                    } catch (e) {
+                        console.error('Failed to parse tarif_rs JSON:', e);
+                        tarifData = {};
+                    }
+                }
+                if (typeof tarifData === 'object' && tarifData) {
+                    Object.keys(tarifData).forEach(tariffKey => {
+                        updateNestedField('tarif_rs', tariffKey, tarifData[tariffKey]);
+                    });
+                }
             }
 
-            // Load nested field: apgar (if stored as JSON in database)
-            if (existingDataKlaim.apgar && typeof existingDataKlaim.apgar === 'object') {
-                console.log('Loading apgar nested data:', existingDataKlaim.apgar);
-                Object.keys(existingDataKlaim.apgar).forEach(apgarKey => {
-                    updateNestedField('apgar', apgarKey, existingDataKlaim.apgar[apgarKey]);
-                });
+            // Load nested field: apgar (parse JSON if string)
+            if (existingDataKlaim.apgar) {
+                let apgarData = existingDataKlaim.apgar;
+                if (typeof apgarData === 'string') {
+                    try {
+                        apgarData = JSON.parse(apgarData);
+                    } catch (e) {
+                        console.error('Failed to parse apgar JSON:', e);
+                        apgarData = {};
+                    }
+                }
+                if (typeof apgarData === 'object' && apgarData) {
+                    Object.keys(apgarData).forEach(apgarKey => {
+                        updateNestedField('apgar', apgarKey, apgarData[apgarKey]);
+                    });
+                }
             }
 
-            // Load nested field: ventilator (if stored as JSON in database)
-            if (existingDataKlaim.ventilator && typeof existingDataKlaim.ventilator === 'object') {
-                console.log('Loading ventilator nested data:', existingDataKlaim.ventilator);
-                Object.keys(existingDataKlaim.ventilator).forEach(ventilatorKey => {
-                    updateNestedField('ventilator', ventilatorKey, existingDataKlaim.ventilator[ventilatorKey]);
-                });
+            // Load nested field: ventilator (parse JSON if string)
+            if (existingDataKlaim.ventilator) {
+                let ventilatorData = existingDataKlaim.ventilator;
+                if (typeof ventilatorData === 'string') {
+                    try {
+                        ventilatorData = JSON.parse(ventilatorData);
+                    } catch (e) {
+                        console.error('Failed to parse ventilator JSON:', e);
+                        ventilatorData = {};
+                    }
+                }
+                if (typeof ventilatorData === 'object' && ventilatorData) {
+                    Object.keys(ventilatorData).forEach(ventilatorKey => {
+                        updateNestedField('ventilator', ventilatorKey, ventilatorData[ventilatorKey]);
+                    });
+                }
+            }
+
+            // Load nested field: persalinan (parse JSON if string)
+            if (existingDataKlaim.persalinan) {
+                let persalinanData = existingDataKlaim.persalinan;
+                if (typeof persalinanData === 'string') {
+                    try {
+                        persalinanData = JSON.parse(persalinanData);
+                    } catch (e) {
+                        console.error('Failed to parse persalinan JSON:', e);
+                        persalinanData = {};
+                    }
+                }
+                if (typeof persalinanData === 'object' && persalinanData) {
+                    Object.keys(persalinanData).forEach(persalinanKey => {
+                        updateNestedField('persalinan', persalinanKey, persalinanData[persalinanKey]);
+                    });
+                }
+            }
+
+            // Load nested field: covid19_penunjang_pengurang (parse JSON if string)
+            if (existingDataKlaim.covid19_penunjang_pengurang) {
+                let covidData = existingDataKlaim.covid19_penunjang_pengurang;
+                if (typeof covidData === 'string') {
+                    try {
+                        covidData = JSON.parse(covidData);
+                    } catch (e) {
+                        console.error('Failed to parse covid19_penunjang_pengurang JSON:', e);
+                        covidData = {};
+                    }
+                }
+                if (typeof covidData === 'object' && covidData) {
+                    Object.keys(covidData).forEach(covidKey => {
+                        updateNestedField('covid19_penunjang_pengurang', covidKey, covidData[covidKey]);
+                    });
+                }
             }
 
             // Load nested field: upgrade_class (if stored as JSON in database)
             if (existingDataKlaim.upgrade_class && typeof existingDataKlaim.upgrade_class === 'object') {
-                console.log('Loading upgrade_class nested data:', existingDataKlaim.upgrade_class);
                 Object.keys(existingDataKlaim.upgrade_class).forEach(upgradeKey => {
                     updateNestedField('upgrade_class', upgradeKey, existingDataKlaim.upgrade_class[upgradeKey]);
                 });
             }
 
-            // Load diagnosa and procedures if exist in database
-            if (existingDataKlaim.diagnosa_sekunder && Array.isArray(existingDataKlaim.diagnosa_sekunder)) {
-                console.log('Loading diagnosa_sekunder:', existingDataKlaim.diagnosa_sekunder);
-                const diagnosesForUI = existingDataKlaim.diagnosa_sekunder.map((diag: any) => ({
-                    name: diag.name || diag.diagnosa || '',
-                    code: diag.code || diag.kode || ''
-                }));
+            // Load diagnosa and procedures from string format (S71.0#A00.1 or S71.0+2#A00.1)
+            if (existingDataKlaim.diagnosa) {
+                const diagnosesForUI = parseStringToDiagnoses(existingDataKlaim.diagnosa);
                 setSelectedDiagnoses(diagnosesForUI);
-                // Also set the string format
-                const diagnosaCodes = diagnosesForUI.map((d: { code: string; name: string }) => d.code).join('#');
-                updateField('diagnosa', diagnosaCodes);
             }
 
-            if (existingDataKlaim.tindakan_sekunder && Array.isArray(existingDataKlaim.tindakan_sekunder)) {
-                console.log('Loading tindakan_sekunder:', existingDataKlaim.tindakan_sekunder);
-                const proceduresForUI = existingDataKlaim.tindakan_sekunder.map((proc: any) => ({
-                    name: proc.name || proc.tindakan || '',
-                    code: proc.code || proc.kode || ''
-                }));
+            if (existingDataKlaim.procedure) {
+                const proceduresForUI = parseStringToProcedures(existingDataKlaim.procedure);
                 setSelectedProcedures(proceduresForUI);
-                // Also set the string format
-                const procedureCodes = proceduresForUI.map((p: { code: string; name: string }) => p.code).join('#');
-                updateField('procedure', procedureCodes);
             }
 
             // Set for inagrouper if data exists
             if (existingDataKlaim.diagnosa_inagrouper) {
-                console.log('Loading diagnosa_inagrouper:', existingDataKlaim.diagnosa_inagrouper);
-                const diagnosaCodes = existingDataKlaim.diagnosa_inagrouper.split('#').filter((code: string) => code.trim() !== '');
-                const diagnosesForUI = diagnosaCodes.map((code: string) => ({
-                    name: `Diagnosa ${code}`,
-                    code: code
-                }));
+                const diagnosesForUI = parseStringToDiagnoses(existingDataKlaim.diagnosa_inagrouper);
                 setSelectedInagrouperDiagnoses(diagnosesForUI);
-            } else if (selectedDiagnoses.length > 0) {
-                setSelectedInagrouperDiagnoses([...selectedDiagnoses]);
+            } else if (existingDataKlaim.diagnosa) {
+                // If no separate inagrouper data, copy from main diagnosa
+                const diagnosesForUI = parseStringToDiagnoses(existingDataKlaim.diagnosa);
+                setSelectedInagrouperDiagnoses(diagnosesForUI);
             }
 
             if (existingDataKlaim.procedure_inagrouper) {
-                console.log('Loading procedure_inagrouper:', existingDataKlaim.procedure_inagrouper);
-                const procedureCodes = existingDataKlaim.procedure_inagrouper.split('#').filter((code: string) => code.trim() !== '');
-                const proceduresForUI = procedureCodes.map((code: string) => ({
-                    name: `Procedure ${code}`,
-                    code: code
-                }));
+                const proceduresForUI = parseStringToProcedures(existingDataKlaim.procedure_inagrouper);
                 setSelectedInagrouperProcedures(proceduresForUI);
-            } else if (selectedProcedures.length > 0) {
-                setSelectedInagrouperProcedures([...selectedProcedures]);
+            } else if (existingDataKlaim.procedure) {
+                // If no separate inagrouper data, copy from main procedure
+                const proceduresForUI = parseStringToProcedures(existingDataKlaim.procedure);
+                setSelectedInagrouperProcedures(proceduresForUI);
             }
 
             // Special handling for date fields to ensure correct format
             if (existingDataKlaim.tanggal_masuk) {
-                console.log('Loading tanggal_masuk:', existingDataKlaim.tanggal_masuk);
                 updateField('tgl_masuk', toDatetimeLocal(existingDataKlaim.tanggal_masuk));
             }
             if (existingDataKlaim.tanggal_keluar) {
-                console.log('Loading tanggal_keluar:', existingDataKlaim.tanggal_keluar);
                 updateField('tgl_pulang', toDatetimeLocal(existingDataKlaim.tanggal_keluar));
             }
 
@@ -362,7 +747,6 @@ export default function Index() {
 
             currencyFields.forEach(field => {
                 if (existingDataKlaim[field] && existingDataKlaim[field] !== '0') {
-                    console.log(`Loading currency field ${field}:`, existingDataKlaim[field]);
                     updateField(field, existingDataKlaim[field].toString());
                 }
             });
@@ -378,22 +762,16 @@ export default function Index() {
 
             booleanFields.forEach(field => {
                 if (existingDataKlaim[field] !== null && existingDataKlaim[field] !== undefined) {
-                    console.log(`Loading boolean field ${field}:`, existingDataKlaim[field]);
                     updateField(field, existingDataKlaim[field] ? '1' : '0');
                 }
             });
-
-            console.log('=== DATABASE LOADING COMPLETED ===');
-            console.log('Current formData after loading:', formData);
-            console.log('Form data field count:', Object.keys(formData).length);
             
             // Debug specific important fields
             const importantFields = ['sistole', 'diastole', 'nama_dokter', 'jenis_rawat', 'discharge_status'];
             importantFields.forEach(field => {
-                console.log(`Important field ${field}:`, formData[field] || 'NOT SET');
             });
             
-            toast.success('Data yang sudah tersimpan berhasil dimuat dari database');
+            // Data loaded successfully - flash message will be handled by backend if needed
         }
     }, [existingDataKlaim]);
 
@@ -537,62 +915,6 @@ export default function Index() {
         return total;
     };
 
-    // Component untuk currency input
-    const CurrencyInput = ({ 
-        label, 
-        value, 
-        onChange, 
-        placeholder = "0",
-        showFormatted = true 
-    }: {
-        label: string;
-        value: string | number;
-        onChange: (value: string) => void;
-        placeholder?: string;
-        showFormatted?: boolean;
-    }) => {
-        const [isEditing, setIsEditing] = useState(false);
-        const [displayValue, setDisplayValue] = useState('');
-
-        useEffect(() => {
-            if (!isEditing) {
-                setDisplayValue(value ? value.toString() : '');
-            }
-        }, [value, isEditing]);
-
-        const handleFocus = () => {
-            setIsEditing(true);
-            setDisplayValue(value ? value.toString() : '');
-        };
-
-        const handleBlur = () => {
-            setIsEditing(false);
-            const parsedValue = parseRupiah(displayValue);
-            onChange(parsedValue);
-        };
-
-        const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-            setDisplayValue(e.target.value);
-        };
-
-        return (
-            <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
-                <div className="relative">
-                    <input
-                        type="text"
-                        value={isEditing ? displayValue : (showFormatted && value ? formatRupiah(value) : value || '')}
-                        onChange={handleChange}
-                        onFocus={handleFocus}
-                        onBlur={handleBlur}
-                        placeholder={placeholder}
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    />
-                </div>
-            </div>
-        );
-    };
-
     // Helper functions untuk mengelola data form
     const updateField = (field: string, value: any) => {
         setFormData((prev) => ({
@@ -651,57 +973,92 @@ export default function Index() {
     const handleSelectDiagnosis = (diagnosis: { name: string; code: string }) => {
         const newSelected = [...selectedDiagnoses, diagnosis];
         setSelectedDiagnoses(newSelected);
-        const codes = newSelected.map((d) => d.code).join('#');
+        const codes = formatDiagnosesToString(newSelected);
         updateField('diagnosa', codes);
     };
 
     const handleRemoveDiagnosis = (code: string) => {
-        const newSelected = selectedDiagnoses.filter((d) => d.code !== code);
-        setSelectedDiagnoses(newSelected);
-        const codes = newSelected.map((d) => d.code).join('#');
-        updateField('diagnosa', codes);
+        // Remove only one instance of the diagnosis
+        const indexToRemove = selectedDiagnoses.findIndex((d) => d.code === code);
+        if (indexToRemove > -1) {
+            const newSelected = [...selectedDiagnoses];
+            newSelected.splice(indexToRemove, 1);
+            setSelectedDiagnoses(newSelected);
+            const codes = formatDiagnosesToString(newSelected);
+            updateField('diagnosa', codes);
+        }
     };
 
     const handleSelectProcedure = (procedure: { name: string; code: string }) => {
         const newSelected = [...selectedProcedures, procedure];
         setSelectedProcedures(newSelected);
-        const codes = newSelected.map((p) => p.code).join('#');
+        const codes = formatProceduresToString(newSelected);
         updateField('procedure', codes);
     };
 
     const handleRemoveProcedure = (code: string) => {
-        const newSelected = selectedProcedures.filter((p) => p.code !== code);
-        setSelectedProcedures(newSelected);
-        const codes = newSelected.map((p) => p.code).join('#');
-        updateField('procedure', codes);
+        // Remove only one instance of the procedure
+        const indexToRemove = selectedProcedures.findIndex((p) => p.code === code);
+        if (indexToRemove > -1) {
+            const newSelected = [...selectedProcedures];
+            newSelected.splice(indexToRemove, 1);
+            setSelectedProcedures(newSelected);
+            const codes = formatProceduresToString(newSelected);
+            updateField('procedure', codes);
+        }
     };
-
     const handleSelectInagrouperDiagnosis = (diagnosis: { name: string; code: string }) => {
         const newSelected = [...selectedInagrouperDiagnoses, diagnosis];
         setSelectedInagrouperDiagnoses(newSelected);
-        const codes = newSelected.map((d) => d.code).join('#');
+        const codes = formatDiagnosesToString(newSelected);
         updateField('diagnosa_inagrouper', codes);
     };
 
     const handleRemoveInagrouperDiagnosis = (code: string) => {
-        const newSelected = selectedInagrouperDiagnoses.filter((d) => d.code !== code);
-        setSelectedInagrouperDiagnoses(newSelected);
-        const codes = newSelected.map((d) => d.code).join('#');
-        updateField('diagnosa_inagrouper', codes);
+        // Remove only one instance of the diagnosis
+        const indexToRemove = selectedInagrouperDiagnoses.findIndex((d) => d.code === code);
+        if (indexToRemove > -1) {
+            const newSelected = [...selectedInagrouperDiagnoses];
+            newSelected.splice(indexToRemove, 1);
+            setSelectedInagrouperDiagnoses(newSelected);
+            const codes = formatDiagnosesToString(newSelected);
+            updateField('diagnosa_inagrouper', codes);
+        }
     };
 
     const handleSelectInagrouperProcedure = (procedure: { name: string; code: string }) => {
         const newSelected = [...selectedInagrouperProcedures, procedure];
         setSelectedInagrouperProcedures(newSelected);
-        const codes = newSelected.map((p) => p.code).join('#');
+        const codes = formatProceduresToString(newSelected);
         updateField('procedure_inagrouper', codes);
     };
 
     const handleRemoveInagrouperProcedure = (code: string) => {
-        const newSelected = selectedInagrouperProcedures.filter((p) => p.code !== code);
-        setSelectedInagrouperProcedures(newSelected);
-        const codes = newSelected.map((p) => p.code).join('#');
+        // Remove only one instance of the procedure
+        const indexToRemove = selectedInagrouperProcedures.findIndex((p) => p.code === code);
+        if (indexToRemove > -1) {
+            const newSelected = [...selectedInagrouperProcedures];
+            newSelected.splice(indexToRemove, 1);
+            setSelectedInagrouperProcedures(newSelected);
+            const codes = formatProceduresToString(newSelected);
+            updateField('procedure_inagrouper', codes);
+        }
+    };
+
+    // Sync inagrouper diagnoses with main diagnoses
+    const handleSyncInagrouperDiagnoses = () => {
+        setSelectedInagrouperDiagnoses([...selectedDiagnoses]);
+        const codes = formatDiagnosesToString(selectedDiagnoses);
+        updateField('diagnosa_inagrouper', codes);
+        // Sync completed - could add flash message from backend if needed
+    };
+
+    // Sync inagrouper procedures with main procedures
+    const handleSyncInagrouperProcedures = () => {
+        setSelectedInagrouperProcedures([...selectedProcedures]);
+        const codes = formatProceduresToString(selectedProcedures);
         updateField('procedure_inagrouper', codes);
+        // Sync completed - could add flash message from backend if needed
     };
 
     const handleSaveProgress = async () => {
@@ -715,38 +1072,24 @@ export default function Index() {
                 formData[key] !== undefined && 
                 formData[key] !== ''
             ).length;
-            
-            // Log data being sent for debugging
-            console.log('=== SAVE PROGRESS DEBUG ===');
-            console.log('Total form fields:', fieldCount);
-            console.log('Filled fields:', filledFields);
-            console.log('Form data keys:', Object.keys(formData));
-            console.log('Sample form data:', Object.fromEntries(
-                Object.entries(formData).slice(0, 10)
-            ));
-            
-            // Log specific nested structures
-            console.log('Tarif RS data:', formData.tarif_rs);
-            console.log('APGAR data:', formData.apgar);
-            console.log('Ventilator data:', formData.ventilator);
-            
+
+            // For save progress, we can use original formData or transformed data
+            // Using original formData for save progress to maintain flexibility
             await router.post(
                 `/eklaim/klaim/${pengajuanKlaim.id}/store-progress`,
                 formData,
                 {
                     preserveState: true,
                     onSuccess: (response) => {
-                        console.log('Save success response:', response);
                         
                         // Show detailed success dialog
                         setIsSuccessDialogOpen(true);
                         setSuccessMessage(`Data berhasil disimpan!\n\nTotal field: ${fieldCount}\nField terisi: ${filledFields}\nStatus: Draft`);
                         
-                        toast.success('Progress berhasil disimpan');
+                        // Success message handled by useFlashMessages hook
                     },
                     onError: (errors) => {
                         console.error('Save progress errors:', errors);
-                        console.log('Error details:', JSON.stringify(errors, null, 2));
                         
                         // Show detailed error dialog
                         setIsErrorDialogOpen(true);
@@ -755,7 +1098,7 @@ export default function Index() {
                         ).join('\n');
                         setErrorMessage(`Gagal menyimpan beberapa field:\n\n${errorMessages}`);
                         
-                        toast.error('Gagal menyimpan progress');
+                        // Error message handled by useFlashMessages hook
                     },
                 },
             );
@@ -766,10 +1109,179 @@ export default function Index() {
             setIsErrorDialogOpen(true);
             setErrorMessage(`Terjadi kesalahan:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
             
-            toast.error('Terjadi kesalahan saat menyimpan');
+            // Error message handled by useFlashMessages hook
         } finally {
             setIsLoading(false);
         }
+    };
+
+    // Function to transform formData to match expected JSON structure
+    // Helper function to convert datetime-local format to database format
+    const formatDateTimeForDatabase = (dateTimeLocal: string): string => {
+        if (!dateTimeLocal) return '';
+        // Convert from '2025-07-03T21:00' to '2025-07-03 21:00:00'
+        const formatted = dateTimeLocal.replace('T', ' ') + ':00';
+        return formatted;
+    };
+
+    // Helper function to convert tariff to integer
+    const formatTariffToInteger = (value: string | number): string => {
+        if (!value || value === '0' || value === 0) return '0';
+        const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^\d.-]/g, '')) : value;
+        return Math.floor(numValue).toString();
+    };
+
+    const transformDataForSubmission = (formData: { [key: string]: any }) => {
+        const transformedData = {
+            // Header/Patient Information - required for validation
+            nomor_sep: formData.nomor_sep || '',
+            nomor_kartu: formData.nomor_kartu || '',
+            nama_pasien: formData.nama_pasien || '',
+            norm: formData.norm || '',
+            tgl_masuk: formatDateTimeForDatabase(formData.tgl_masuk),
+            tgl_pulang: formatDateTimeForDatabase(formData.tgl_pulang),
+            cara_masuk: formData.cara_masuk || '',
+            jenis_rawat: formData.jenis_rawat || '',
+            kelas_rawat: formData.kelas_rawat || '',
+            
+            // ICU fields
+            adl_sub_acute: formData.adl_sub_acute || '0',
+            adl_chronic: formData.adl_chronic || '0',
+            icu_indikator: formData.icu_indikator || '0',
+            icu_los: formData.icu_los || '0',
+            
+            // Ventilator fields
+            ventilator_hour: formData.ventilator_hour || '0',
+            ventilator: {
+                use_ind: formData.ventilator?.use_ind || '0',
+                start_dttm: formData.ventilator?.start_dttm || '',
+                stop_dttm: formData.ventilator?.stop_dttm || ''
+            },
+            
+            // Upgrade Class fields
+            upgrade_class_ind: formData.upgrade_class_ind || '0',
+            upgrade_class_class: formData.upgrade_class_class || '',
+            upgrade_class_los: formData.upgrade_class_los || '',
+            upgrade_class_payor: formData.upgrade_class_payor || '',
+            add_payment_pct: formData.add_payment_pct || '',
+            
+            // Medical data
+            birth_weight: formData.birth_weight || '0',
+            sistole: parseInt(formData.sistole) || 0,
+            diastole: parseInt(formData.diastole) || 0,
+            discharge_status: formData.discharge_status || '',
+            nama_dokter: formData.nama_dokter || '',
+            
+            // Diagnosis and procedures - format from selected arrays
+            diagnosa: formatDiagnosesToString(selectedDiagnoses),
+            procedure: formatProceduresToString(selectedProcedures),
+            diagnosa_inagrouper: formatDiagnosesToString(selectedInagrouperDiagnoses),
+            procedure_inagrouper: formatProceduresToString(selectedInagrouperProcedures),
+            
+            // Tarif RS structure - convert all to integer
+            tarif_rs: {
+                prosedur_non_bedah: formatTariffToInteger(formData.tarif_rs?.prosedur_non_bedah),
+                prosedur_bedah: formatTariffToInteger(formData.tarif_rs?.prosedur_bedah),
+                konsultasi: formatTariffToInteger(formData.tarif_rs?.konsultasi),
+                tenaga_ahli: formatTariffToInteger(formData.tarif_rs?.tenaga_ahli),
+                keperawatan: formatTariffToInteger(formData.tarif_rs?.keperawatan),
+                penunjang: formatTariffToInteger(formData.tarif_rs?.penunjang),
+                radiologi: formatTariffToInteger(formData.tarif_rs?.radiologi),
+                laboratorium: formatTariffToInteger(formData.tarif_rs?.laboratorium),
+                pelayanan_darah: formatTariffToInteger(formData.tarif_rs?.pelayanan_darah),
+                rehabilitasi: formatTariffToInteger(formData.tarif_rs?.rehabilitasi),
+                kamar: formatTariffToInteger(formData.tarif_rs?.kamar),
+                rawat_intensif: formatTariffToInteger(formData.tarif_rs?.rawat_intensif),
+                obat: formatTariffToInteger(formData.tarif_rs?.obat),
+                obat_kronis: formatTariffToInteger(formData.tarif_rs?.obat_kronis),
+                obat_kemoterapi: formatTariffToInteger(formData.tarif_rs?.obat_kemoterapi),
+                alkes: formatTariffToInteger(formData.tarif_rs?.alkes),
+                bmhp: formatTariffToInteger(formData.tarif_rs?.bmhp),
+                sewa_alat: formatTariffToInteger(formData.tarif_rs?.sewa_alat)
+            },
+            
+            // COVID-19 fields
+            pemulasaraan_jenazah: formData.pemulasaraan_jenazah || '0',
+            kantong_jenazah: formData.kantong_jenazah || '0',
+            peti_jenazah: formData.peti_jenazah || '0',
+            plastik_erat: formData.plastik_erat || '0',
+            desinfektan_jenazah: formData.desinfektan_jenazah || '0',
+            mobil_jenazah: formData.mobil_jenazah || '0',
+            desinfektan_mobil_jenazah: formData.desinfektan_mobil_jenazah || '0',
+            is_covid19_suspect: formData.is_covid19_suspect || '0',
+            is_covid19_probable: formData.is_covid19_probable || '0',
+            is_covid19_confirmed: formData.is_covid19_confirmed || '0',
+            
+            // APGAR Score structure - sesuai dengan dokumentasi JSON
+            apgar: {
+                menit_1: {
+                    appearance: parseInt(formData.apgar?.appearance_1) || 0,
+                    pulse: parseInt(formData.apgar?.pulse_1) || 0,
+                    grimace: parseInt(formData.apgar?.grimace_1) || 0,
+                    activity: parseInt(formData.apgar?.activity_1) || 0,
+                    respiration: parseInt(formData.apgar?.respiration_1) || 0
+                },
+                menit_5: {
+                    appearance: parseInt(formData.apgar?.appearance_5) || 0,
+                    pulse: parseInt(formData.apgar?.pulse_5) || 0,
+                    grimace: parseInt(formData.apgar?.grimace_5) || 0,
+                    activity: parseInt(formData.apgar?.activity_5) || 0,
+                    respiration: parseInt(formData.apgar?.respiration_5) || 0
+                }
+            },
+            
+            // COVID-19 Penunjang structure - sesuai dengan dokumentasi JSON
+            covid19_penunjang_pengurang: {
+                lab_asam_laktat: formData.covid19_penunjang?.lab_asam_laktat || '0',
+                lab_procalcitonin: formData.covid19_penunjang?.lab_procalcitonin || '0',
+                lab_crp: formData.covid19_penunjang?.lab_crp || '0',
+                lab_kultur: formData.covid19_penunjang?.lab_kultur || '0',
+                lab_d_dimer: formData.covid19_penunjang?.lab_d_dimer || '0',
+                lab_pt: formData.covid19_penunjang?.lab_pt || '0',
+                lab_aptt: formData.covid19_penunjang?.lab_aptt || '0',
+                lab_waktu_pendarahan: formData.covid19_penunjang?.lab_waktu_pendarahan || '0',
+                lab_anti_hiv: formData.covid19_penunjang?.lab_anti_hiv || '0',
+                lab_analisa_gas: formData.covid19_penunjang?.lab_analisa_gas || '0',
+                lab_albumin: formData.covid19_penunjang?.lab_albumin || '0',
+                rad_thorax_ap_pa: formData.covid19_penunjang?.rad_thorax_ap_pa || '0'
+            },
+            
+            // Fields sesuai dengan dokumentasi JSON
+            episodes: formData.episodes || '',
+            covid19_cc_ind: formData.covid19_cc_ind || '0',
+            covid19_rs_darurat_ind: formData.covid19_rs_darurat_ind || '0',
+            covid19_co_insidense_ind: formData.covid19_co_insidense_ind || '0',
+            covid19_status_cd: formData.covid19_status_cd || '0',
+            nomor_kartu_t: formData.nomor_kartu_t || 'nik',
+            
+            // Persalinan structure
+            persalinan: {
+                usia_kehamilan: formData.persalinan?.usia_kehamilan || '',
+                gravida: formData.persalinan?.gravida || '',
+                partus: formData.persalinan?.partus || '',
+                abortus: formData.persalinan?.abortus || '',
+                onset_kontraksi: formData.persalinan?.onset_kontraksi || ''
+            },
+            
+            // Lain-lain fields
+            terapi_konvalesen: formatTariffToInteger(formData.terapi_konvalesen),
+            akses_naat: formData.akses_naat || '',
+            isoman_ind: formData.isoman_ind || '0',
+            bayi_lahir_status_cd: parseInt(formData.bayi_lahir_status_cd) || 0,
+            dializer_single_use: parseInt(formData.dializer_single_use) || 0,
+            kantong_darah: parseInt(formData.kantong_darah) || 0,
+            alteplase_ind: parseInt(formData.alteplase_ind) || 0,
+            
+            // Data RS fields
+            tarif_poli_eks: formatTariffToInteger(formData.tarif_poli_eks),
+            kode_tarif: formData.kode_tarif || 'DS',
+            payor_id: formData.payor_id || '00003',
+            payor_cd: formData.payor_cd || 'JKN',
+            cob_cd: formData.cob_cd || '',
+            coder_nik: formData.coder_nik || auth?.user?.nik || ''
+        };
+
+        return transformedData;
     };
 
     const handleSubmitKlaim = async () => {
@@ -782,30 +1294,14 @@ export default function Index() {
             setIsLoading(true);
             setIsConfirmSubmitOpen(false);
             
+            // Transform data to match expected JSON structure
+            const transformedData = transformDataForSubmission(formData);
+            
             await router.post(
                 `/eklaim/klaim/${pengajuanKlaim.id}/submit`,
-                formData,
+                transformedData, // Send direct data without wrapper
                 {
-                    onSuccess: () => {
-                        setIsSuccessDialogOpen(true);
-                        setSuccessMessage('Klaim berhasil disubmit ke INACBG!\n\nData telah dikirim dan tidak dapat diubah lagi.');
-                        
-                        // Redirect after showing success message
-                        setTimeout(() => {
-                            router.visit('/eklaim/pengajuan');
-                        }, 2000);
-                    },
-                    onError: (errors) => {
-                        console.error('Submit klaim errors:', errors);
-                        
-                        setIsErrorDialogOpen(true);
-                        const errorMessages = Object.entries(errors).map(([key, value]) => 
-                            `${key}: ${Array.isArray(value) ? value.join(', ') : value}`
-                        ).join('\n');
-                        setErrorMessage(`Gagal submit klaim ke INACBG:\n\n${errorMessages}`);
-                        
-                        toast.error('Gagal submit klaim');
-                    },
+                    preserveState: true,
                 },
             );
         } catch (error) {
@@ -814,9 +1310,375 @@ export default function Index() {
             setIsErrorDialogOpen(true);
             setErrorMessage(`Terjadi kesalahan saat submit klaim:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
             
-            toast.error('Terjadi kesalahan saat submit');
+            // Error message handled by useFlashMessages hook
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleGroupper = async () => {
+        try {
+            setIsLoading(true);
+            
+            // Transform data to match expected JSON structure for groupper
+            const transformedData = transformDataForSubmission(formData);
+            
+            await router.post(
+                `/eklaim/klaim/${pengajuanKlaim.id}/groupper`,
+                transformedData,
+                {
+                    preserveState: true,
+                },
+            );
+        } catch (error) {
+            console.error('Error calling groupper:', error);
+            
+            setIsErrorDialogOpen(true);
+            setErrorMessage(`Terjadi kesalahan saat memanggil groupper:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Handler untuk Groupper Ulang (menggunakan endpoint yang sama dengan groupper)
+    const handleGrouperUlang = async (nomor_sep?: string) => {
+        try {
+            setIsLoadingGrouperUlang(true);
+            
+            // Transform data to match expected JSON structure for groupper
+            const transformedData = transformDataForSubmission(formData);
+            
+            await router.post(
+                `/eklaim/klaim/${pengajuanKlaim.id}/groupper`,
+                transformedData,
+                {
+                    preserveState: true,
+                },
+            );
+        } catch (error) {
+            console.error('Error calling groupper ulang:', error);
+            
+            setIsErrorDialogOpen(true);
+            setErrorMessage(`Terjadi kesalahan saat memanggil groupper ulang:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setIsLoadingGrouperUlang(false);
+        }
+    };
+
+    // Handler untuk Final 
+    const handleFinal = async (nomor_sep?: string, coder_nik?: string) => {
+        try {
+            setIsLoadingFinal(true);
+            
+            // Data untuk final sesuai dengan format pada gambar
+            const finalData = {
+                metadata: {
+                    method: "claim_final"
+                },
+                data: {
+                    nomor_sep: nomor_sep || formData.nomor_sep || pengajuanKlaim.nomor_sep,
+                    coder_nik: coder_nik || formData.coder_nik || auth?.user?.nik || ''
+                }
+            };
+            
+            await router.post(
+                `/eklaim/klaim/${pengajuanKlaim.id}/final`,
+                finalData,
+                {
+                    preserveState: true,
+                    onSuccess: (response) => {
+                        // Response akan dihandle oleh backend flash messages
+                        // Berdasarkan response['metadata']['message']
+                    },
+                    onError: (errors) => {
+                        console.error('Final errors:', errors);
+                        setIsErrorDialogOpen(true);
+                        const errorMessages = Object.entries(errors).map(([key, value]) => 
+                            `${key}: ${Array.isArray(value) ? value.join(', ') : value}`
+                        ).join('\n');
+                        setErrorMessage(`Gagal memfinalisasi klaim:\n\n${errorMessages}`);
+                    },
+                },
+            );
+        } catch (error) {
+            console.error('Error calling final:', error);
+            
+            setIsErrorDialogOpen(true);
+            setErrorMessage(`Terjadi kesalahan saat memanggil final:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setIsLoadingFinal(false);
+        }
+    };
+
+    // Handler untuk Reedit klaim (mengubah status kembali ke 1)
+    const handleReedit = async () => {
+        try {
+            setIsLoadingReedit(true);
+            
+            const reeditData = {
+                metadata: {
+                    method: 'reedit_claim'
+                },
+                data: {
+                    nomor_sep: pengajuanKlaim.nomor_sep
+                }
+            };
+
+            await router.post(
+                `/eklaim/klaim/${pengajuanKlaim.id}/reedit`,
+                reeditData,
+                {
+                    preserveState: false, // Reload page after success
+                    onSuccess: (response) => {
+                        // Response akan dihandle oleh backend flash messages
+                        setSuccessMessage('Klaim berhasil dibuka untuk edit ulang');
+                        setIsSuccessDialogOpen(true);
+                        // Reload setelah 2 detik
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 2000);
+                    },
+                    onError: (errors) => {
+                        console.error('Reedit errors:', errors);
+                        setIsErrorDialogOpen(true);
+                        const errorMessages = Object.entries(errors).map(([key, value]) => 
+                            `${key}: ${Array.isArray(value) ? value.join(', ') : value}`
+                        ).join('\n');
+                        setErrorMessage(`Gagal membuka klaim untuk edit ulang:\n\n${errorMessages}`);
+                    },
+                },
+            );
+        } catch (error) {
+            console.error('Error calling reedit:', error);
+            
+            setIsErrorDialogOpen(true);
+            setErrorMessage(`Terjadi kesalahan saat membuka klaim untuk edit ulang:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setIsLoadingReedit(false);
+        }
+    };
+
+    // Handler untuk menampilkan modal konfirmasi kirim INACBG
+    const handleKirimInacbg = () => {
+        setIsConfirmKirimOpen(true);
+    };
+
+    // Handler untuk konfirmasi kirim ke INACBG (status_pengiriman = 4 -> 5)
+    const handleConfirmKirimInacbg = async () => {
+        try {
+            setIsLoadingKirimInacbg(true);
+            setIsConfirmKirimOpen(false);
+            
+            const kirimData = {
+                metadata: {
+                    method: 'send_claim_individual'
+                },
+                data: {
+                    nomor_sep: pengajuanKlaim.nomor_sep
+                }
+            };
+
+            await router.post(
+                `/eklaim/klaim/${pengajuanKlaim.id}/kirim-inacbg`,
+                kirimData,
+                {
+                    preserveState: false, // Reload page after success
+                    onSuccess: (response) => {
+                        // Response akan dihandle oleh backend flash messages
+                        setSuccessMessage('Klaim berhasil dikirim ke INACBG! Status diubah menjadi "Selesai Proses Klaim"');
+                        setIsSuccessDialogOpen(true);
+                        // Reload setelah 2 detik
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 2000);
+                    },
+                    onError: (errors) => {
+                        console.error('Kirim INACBG errors:', errors);
+                        setIsErrorDialogOpen(true);
+                        const errorMessages = Object.entries(errors).map(([key, value]) => 
+                            `${key}: ${Array.isArray(value) ? value.join(', ') : value}`
+                        ).join('\n');
+                        setErrorMessage(`Gagal mengirim klaim ke INACBG:\n\n${errorMessages}`);
+                    },
+                },
+            );
+        } catch (error) {
+            console.error('Error calling kirim INACBG:', error);
+            
+            setIsErrorDialogOpen(true);
+            setErrorMessage(`Terjadi kesalahan saat mengirim klaim ke INACBG:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setIsLoadingKirimInacbg(false);
+        }
+    };
+
+    // Helper function to get status label and color for modal/overlay
+    const getStatusInfo = (statusPengiriman: number) => {
+        switch (statusPengiriman) {
+            case 0:
+                return { label: 'Draft', color: 'bg-gray-100 text-gray-800' };
+            case 1:
+                return { label: 'Tersimpan', color: 'bg-green-100 text-green-800' };
+            case 2:
+                return { label: 'Grouper Stage 1 Selesai', color: 'bg-blue-100 text-blue-800' };
+            case 3:
+                return { label: 'Grouper Stage 2 Selesai', color: 'bg-purple-100 text-purple-800' };
+            case 4:
+                return { label: 'Final', color: 'bg-yellow-100 text-yellow-800' };
+            case 5:
+                return { label: 'Selesai Proses Klaim', color: 'bg-emerald-100 text-emerald-800' };
+            default:
+                return { label: 'Unknown', color: 'bg-gray-100 text-gray-800' };
+        }
+    };
+
+    // Helper function to get header status label and color (different from modal status)
+    const getHeaderStatusInfo = (statusPengiriman: number) => {
+        switch (statusPengiriman) {
+            case 0:
+                return { label: 'Draft', color: 'bg-gray-100 text-gray-800' };
+            case 1:
+                return { label: 'Tersimpan', color: 'bg-green-100 text-green-800' };
+            case 2:
+                return { label: 'Siap Difinalisasi', color: 'bg-blue-100 text-blue-800' };
+            case 3:
+                return { label: 'Siap Difinalisasi', color: 'bg-purple-100 text-purple-800' };
+            case 4:
+                return { label: 'Siap Dikirim', color: 'bg-yellow-100 text-yellow-800' };
+            case 5:
+                return { label: 'Selesai Proses Klaim', color: 'bg-emerald-100 text-emerald-800' };
+            default:
+                return { label: 'Unknown', color: 'bg-gray-100 text-gray-800' };
+        }
+    };
+
+    // Tab content renderer
+    const renderTabContent = () => {
+        const commonProps = {
+            formData,
+            updateField,
+            getNestedValue,
+            updateNestedField,
+        };
+
+        switch (activeTab) {
+            case 1:
+                return (
+                    <DataDiriTab
+                        formData={formData}
+                        updateField={updateField}
+                        referenceData={referenceData}
+                    />
+                );
+            case 2:
+                return (
+                    <ICUTab
+                        formData={formData}
+                        updateField={updateField}
+                    />
+                );
+            case 3:
+                return (
+                    <VentilatorTab
+                        {...commonProps}
+                    />
+                );
+            case 4:
+                return (
+                    <UpgradeKelasTab
+                        formData={formData}
+                        updateField={updateField}
+                    />
+                );
+            case 5:
+                return (
+                    <DataMedisTab
+                        formData={formData}
+                        updateField={updateField}
+                        referenceData={referenceData}
+                        selectedDiagnoses={selectedDiagnoses}
+                        selectedProcedures={selectedProcedures}
+                        selectedInagrouperDiagnoses={selectedInagrouperDiagnoses}
+                        selectedInagrouperProcedures={selectedInagrouperProcedures}
+                        handleRemoveDiagnosis={handleRemoveDiagnosis}
+                        handleRemoveProcedure={handleRemoveProcedure}
+                        handleRemoveInagrouperDiagnosis={handleRemoveInagrouperDiagnosis}
+                        handleRemoveInagrouperProcedure={handleRemoveInagrouperProcedure}
+                        handleSyncInagrouperDiagnoses={handleSyncInagrouperDiagnoses}
+                        handleSyncInagrouperProcedures={handleSyncInagrouperProcedures}
+                        setIsDiagnosisModalOpen={setIsDiagnosisModalOpen}
+                        setIsProcedureModalOpen={setIsProcedureModalOpen}
+                        setIsInagrouperDiagnosisModalOpen={setIsInagrouperDiagnosisModalOpen}
+                        setIsInagrouperProcedureModalOpen={setIsInagrouperProcedureModalOpen}
+                    />
+                );
+            case 6:
+                return (
+                    <TarifTab
+                        formData={formData}
+                        getNestedValue={getNestedValue}
+                        updateNestedField={updateNestedField}
+                        calculateTotalTarif={calculateTotalTarif}
+                        formatRupiah={formatRupiah}
+                    />
+                );
+            case 7:
+                return (
+                    <COVIDTab
+                        formData={formData}
+                        updateField={updateField}
+                        getNestedValue={getNestedValue}
+                        updateNestedField={updateNestedField}
+                    />
+                );
+            case 8:
+                return (
+                    <APGARTab
+                        {...commonProps}
+                    />
+                );
+            case 9:
+                return (
+                    <PersalinanTab
+                        {...commonProps}
+                    />
+                );
+            case 10:
+                return (
+                    <LainLainTab
+                        formData={formData}
+                        updateField={updateField}
+                    />
+                );
+            case 11:
+                return (
+                    <DataRSTab
+                        formData={formData}
+                        updateField={updateField}
+                    />
+                );
+            case 12:
+                return (
+                    <HasilGrouperTab
+                        dataGroupper={dataGroupper}
+                        dataGrouperStage2={dataGrouperStage2}
+                        onRequestFinal={handleFinal}
+                        onRequestGrouperUlang={handleGrouperUlang}
+                        isLoadingFinal={isLoadingFinal}
+                        isLoadingGrouperUlang={isLoadingGrouperUlang}
+                        statusPengiriman={pengajuanKlaim.status_pengiriman}
+                        coderNik={formData.coder_nik || auth?.user?.nik || ''}
+                        hasSpecialCmgOptions={hasSpecialCmgOptions()}
+                    />
+                );
+            default:
+                return (
+                    <DataDiriTab
+                        formData={formData}
+                        updateField={updateField}
+                        referenceData={referenceData}
+                    />
+                );
         }
     };
 
@@ -834,1466 +1696,272 @@ export default function Index() {
                                 <div className="flex items-center space-x-3 text-sm text-gray-600">
                                     <span className="font-semibold text-gray-900">{pengajuanKlaim.nama_pasien}</span>
                                     <span className="text-gray-400">•</span>
-                                    <span className="font-medium">{pengajuanKlaim.norm}</span>
+                                    <span>{pengajuanKlaim.nomor_sep}</span>
+                                    <span className="text-gray-400">•</span>
+                                    <span>{pengajuanKlaim.nomor_kartu}</span>
+                                    <span className="text-gray-400">•</span>
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getHeaderStatusInfo(pengajuanKlaim.status_pengiriman).color}`}>
+                                        {getHeaderStatusInfo(pengajuanKlaim.status_pengiriman).label}
+                                    </span>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-
-                    {/* Informasi Dasar Pasien */}
-                    <div className="mb-6">
-                        <h3 className="mb-4 text-lg font-semibold text-gray-900">Informasi Dasar Pasien</h3>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">
-                                    Nomor SEP <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.nomor_sep || ''}
-                                    onChange={(e) => updateField('nomor_sep', e.target.value)}
-                                    placeholder="Masukkan nomor SEP"
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">
-                                    Nomor Kartu BPJS <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.nomor_kartu || ''}
-                                    onChange={(e) => updateField('nomor_kartu', e.target.value)}
-                                    placeholder="Masukkan nomor kartu"
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">Tipe Nomor Kartu</label>
-                                <SearchableSelect
-                                    options={[
-                                        { value: 'nik', label: 'NIK' },
-                                        { value: 'noka', label: 'No Kartu' },
-                                        { value: 'kitas', label: 'KITAS/KITAP' },
-                                        { value: 'paspor', label: 'Passport' },
-                                        { value: 'kartu_jkn', label: 'Kartu JKN' },
-                                        { value: 'kk', label: 'Kartu Keluarga' },
-                                        { value: 'unhcr', label: 'UNHCR' },
-                                        { value: 'kelurahan', label: 'Kelurahan' },
-                                        { value: 'dinsos', label: 'Dinsos' },
-                                        { value: 'dinkes', label: 'Dinkes' },
-                                        { value: 'sjp', label: 'SJP' },
-                                        { value: 'klaim_ibu', label: 'Klaim Ibu' },
-                                        { value: 'lainnya', label: 'Lainnya' },
-                                    ]}
-                                    value={formData.nomor_kartu_t || ''}
-                                    onSelect={(value) => updateField('nomor_kartu_t', value)}
-                                    placeholder="Pilih tipe kartu..."
-                                    searchPlaceholder="Cari tipe kartu..."
-                                    className="w-full"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">Status Bayi Lahir</label>
-                                <SearchableSelect
-                                    options={[
-                                        { value: '1', label: 'Tanpa Kelainan' },
-                                        { value: '2', label: 'Dengan Kelainan' },
-                                    ]}
-                                    value={formData.bayi_lahir_status_cd || ''}
-                                    onSelect={(value) => updateField('bayi_lahir_status_cd', value)}
-                                    placeholder="Pilih status bayi..."
-                                    searchPlaceholder="Cari status bayi..."
-                                    className="w-full"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">Status COVID-19</label>
-                                <SearchableSelect
-                                    options={[
-                                        { value: '1', label: 'ODP' },
-                                        { value: '2', label: 'PDP' },
-                                        { value: '3', label: 'Terkonfirmasi Positif' },
-                                        { value: '4', label: 'Suspek' },
-                                        { value: '5', label: 'Probabel' },
-                                    ]}
-                                    value={formData.covid19_status_cd || ''}
-                                    onSelect={(value) => updateField('covid19_status_cd', value)}
-                                    placeholder="Pilih status COVID-19..."
-                                    searchPlaceholder="Cari status COVID-19..."
-                                    className="w-full"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">Payor ID</label>
-                                <SearchableSelect
-                                    options={[
-                                        { value: '3', label: 'JKN' },
-                                        { value: '73', label: 'Jaminan Bayi Baru Lahir' },
-                                    ]}
-                                    value={formData.payor_id || ''}
-                                    onSelect={(value) => updateField('payor_id', value)}
-                                    placeholder="Pilih payor..."
-                                    searchPlaceholder="Cari payor..."
-                                    className="w-full"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">Payor Code</label>
-                                <input
-                                    type="text"
-                                    value={formData.payor_cd || ''}
-                                    onChange={(e) => updateField('payor_cd', e.target.value)}
-                                    placeholder="Kode payor"
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">COB Code</label>
-                                <input
-                                    type="text"
-                                    value={formData.cob_cd || ''}
-                                    onChange={(e) => updateField('cob_cd', e.target.value)}
-                                    placeholder="Kode COB"
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Informasi Rawat */}
-                    <div className="mb-6">
-                        <h3 className="mb-4 text-lg font-semibold text-gray-900">Informasi Rawat</h3>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">
-                                    Tanggal Masuk <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="datetime-local"
-                                    value={formData.tgl_masuk || ''}
-                                    onChange={(e) => updateField('tgl_masuk', e.target.value)}
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">
-                                    Tanggal Pulang <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="datetime-local"
-                                    value={formData.tgl_pulang || ''}
-                                    onChange={(e) => updateField('tgl_pulang', e.target.value)}
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">
-                                    Cara Masuk <span className="text-red-500">*</span>
-                                </label>
-                                <SearchableSelect
-                                    options={referenceData.cara_masuk_options || []}
-                                    value={formData.cara_masuk || ''}
-                                    onSelect={(value) => updateField('cara_masuk', value)}
-                                    placeholder="Pilih cara masuk..."
-                                    searchPlaceholder="Cari cara masuk..."
-                                    className="w-full"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">
-                                    Jenis Rawat <span className="text-red-500">*</span>
-                                </label>
-                                <SearchableSelect
-                                    options={referenceData.jenis_rawat_options || []}
-                                    value={formData.jenis_rawat || ''}
-                                    onSelect={(value) => updateField('jenis_rawat', value)}
-                                    placeholder="Pilih jenis rawat..."
-                                    searchPlaceholder="Cari jenis rawat..."
-                                    className="w-full"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">
-                                    Kelas Rawat <span className="text-red-500">*</span>
-                                </label>
-                                <SearchableSelect
-                                    options={referenceData.kelas_rawat_options || []}
-                                    value={formData.kelas_rawat || ''}
-                                    onSelect={(value) => updateField('kelas_rawat', value)}
-                                    placeholder="Pilih kelas rawat..."
-                                    searchPlaceholder="Cari kelas rawat..."
-                                    className="w-full"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">
-                                    Status Pulang <span className="text-red-500">*</span>
-                                </label>
-                                <SearchableSelect
-                                    options={referenceData.discharge_status_options || []}
-                                    value={formData.discharge_status || ''}
-                                    onSelect={(value) => updateField('discharge_status', value)}
-                                    placeholder="Pilih status pulang..."
-                                    searchPlaceholder="Cari status pulang..."
-                                    className="w-full"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">
-                                    Nama Dokter <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.nama_dokter || ''}
-                                    onChange={(e) => updateField('nama_dokter', e.target.value)}
-                                    placeholder="Nama dokter"
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">Kode Tarif</label>
-                                <input
-                                    type="text"
-                                    value={formData.kode_tarif || ''}
-                                    onChange={(e) => updateField('kode_tarif', e.target.value)}
-                                    placeholder="Kode tarif"
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">NIK Coder</label>
-                                <input
-                                    type="text"
-                                    value={formData.coder_nik || ''}
-                                    onChange={(e) => updateField('coder_nik', e.target.value)}
-                                    placeholder="NIK Coder"
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">Episodes</label>
-                                <input
-                                    type="text"
-                                    value={formData.episodes || ''}
-                                    onChange={(e) => updateField('episodes', e.target.value)}
-                                    placeholder="1;12#2;3#6;5"
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Data Medis & Vital Signs */}
-                    <div className="mb-6">
-                        <h3 className="mb-4 text-lg font-semibold text-gray-900">Data Medis & Vital Signs</h3>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">Berat Badan (kg)</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    step="0.1"
-                                    value={formData.birth_weight || ''}
-                                    onChange={(e) => updateField('birth_weight', e.target.value)}
-                                    placeholder="0.0"
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">
-                                    Sistole (mmHg) <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    max="300"
-                                    value={formData.sistole || ''}
-                                    onChange={(e) => updateField('sistole', e.target.value)}
-                                    placeholder="120"
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">
-                                    Diastole (mmHg) <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    max="200"
-                                    value={formData.diastole || ''}
-                                    onChange={(e) => updateField('diastole', e.target.value)}
-                                    placeholder="80"
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">ADL Sub Acute</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    max="23"
-                                    value={formData.adl_sub_acute || ''}
-                                    onChange={(e) => updateField('adl_sub_acute', e.target.value)}
-                                    placeholder="15"
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">ADL Chronic</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    max="23"
-                                    value={formData.adl_chronic || ''}
-                                    onChange={(e) => updateField('adl_chronic', e.target.value)}
-                                    placeholder="12"
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">Kantong Darah</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    value={formData.kantong_darah || ''}
-                                    onChange={(e) => updateField('kantong_darah', e.target.value)}
-                                    placeholder="0"
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">Ventilator Hour</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    value={formData.ventilator_hour || ''}
-                                    onChange={(e) => updateField('ventilator_hour', e.target.value)}
-                                    placeholder="0"
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">ICU LOS (hari)</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    value={formData.icu_los || ''}
-                                    onChange={(e) => updateField('icu_los', e.target.value)}
-                                    placeholder="0"
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                            <div className="flex items-center">
-                                <input
-                                    type="checkbox"
-                                    id="dializer_single_use"
-                                    checked={formData.dializer_single_use === '1' || formData.dializer_single_use === true}
-                                    onChange={(e) => updateField('dializer_single_use', e.target.checked ? '1' : '0')}
-                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <label htmlFor="dializer_single_use" className="ml-2 text-sm text-gray-700">
-                                    Dializer Single Use
-                                </label>
-                            </div>
-                            <div className="flex items-center">
-                                <input
-                                    type="checkbox"
-                                    id="alteplase_ind"
-                                    checked={formData.alteplase_ind === '1' || formData.alteplase_ind === true}
-                                    onChange={(e) => updateField('alteplase_ind', e.target.checked ? '1' : '0')}
-                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <label htmlFor="alteplase_ind" className="ml-2 text-sm text-gray-700">
-                                    Alteplase
-                                </label>
-                            </div>
-                            <div className="flex items-center">
-                                <input
-                                    type="checkbox"
-                                    id="icu_indikator"
-                                    checked={formData.icu_indikator === '1' || formData.icu_indikator === true}
-                                    onChange={(e) => updateField('icu_indikator', e.target.checked ? '1' : '0')}
-                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <label htmlFor="icu_indikator" className="ml-2 text-sm text-gray-700">
-                                    ICU Indikator
-                                </label>
-                            </div>
-                            <div className="flex items-center">
-                                <input
-                                    type="checkbox"
-                                    id="upgrade_class_ind"
-                                    checked={formData.upgrade_class_ind === '1' || formData.upgrade_class_ind === true}
-                                    onChange={(e) => updateField('upgrade_class_ind', e.target.checked ? '1' : '0')}
-                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <label htmlFor="upgrade_class_ind" className="ml-2 text-sm text-gray-700">
-                                    Naik Kelas
-                                </label>
-                            </div>
-                            <div className="flex items-center">
-                                <input
-                                    type="checkbox"
-                                    id="covid19_cc_ind"
-                                    checked={formData.covid19_cc_ind === '1' || formData.covid19_cc_ind === true}
-                                    onChange={(e) => updateField('covid19_cc_ind', e.target.checked ? '1' : '0')}
-                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <label htmlFor="covid19_cc_ind" className="ml-2 text-sm text-gray-700">
-                                    COVID-19 Indikator
-                                </label>
-                            </div>
-                            <div className="flex items-center">
-                                <input
-                                    type="checkbox"
-                                    id="covid19_rs_darurat_ind"
-                                    checked={formData.covid19_rs_darurat_ind === '1' || formData.covid19_rs_darurat_ind === true}
-                                    onChange={(e) => {
-                                        updateField('covid19_rs_darurat_ind', e.target.checked ? '1' : '0');
-                                        // Show/hide COVID details
-                                        const covidDetails = document.getElementById('covid-details');
-                                        if (covidDetails) {
-                                            covidDetails.style.display = e.target.checked ? 'block' : 'none';
-                                        }
-                                    }}
-                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <label htmlFor="covid19_rs_darurat_ind" className="ml-2 text-sm text-gray-700">
-                                    COVID-19 RS Darurat
-                                </label>
-                            </div>
-                            <div className="flex items-center">
-                                <input
-                                    type="checkbox"
-                                    id="covid19_co_insidense_ind"
-                                    checked={formData.covid19_co_insidense_ind === '1' || formData.covid19_co_insidense_ind === true}
-                                    onChange={(e) => updateField('covid19_co_insidense_ind', e.target.checked ? '1' : '0')}
-                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <label htmlFor="covid19_co_insidense_ind" className="ml-2 text-sm text-gray-700">
-                                    COVID-19 Co-Insidense
-                                </label>
-                            </div>
-                            <div className="flex items-center">
-                                <input
-                                    type="checkbox"
-                                    id="isoman_ind"
-                                    checked={formData.isoman_ind === '1' || formData.isoman_ind === true}
-                                    onChange={(e) => updateField('isoman_ind', e.target.checked ? '1' : '0')}
-                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <label htmlFor="isoman_ind" className="ml-2 text-sm text-gray-700">
-                                    Isolasi Mandiri
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* COVID-19 & Special Fields */}
-                    <div className="mb-6">
-                        <h3 className="mb-4 text-lg font-semibold text-gray-900">COVID-19 & Special Fields</h3>
-
-                        {/* COVID-19 RS Darurat Indicator */}
-                        <div className="mb-4">
-                            <div className="flex items-center space-x-3">
-                                <input
-                                    type="checkbox"
-                                    id="covid19_rs_darurat_ind"
-                                    checked={formData.covid19_rs_darurat_ind === '1'}
-                                    onChange={(e) => {
-                                        updateField('covid19_rs_darurat_ind', e.target.checked ? '1' : '0');
-                                    }}
-                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                                />
-                                <label htmlFor="covid19_rs_darurat_ind" className="text-sm font-medium text-gray-700">
-                                    Pasien dirawat di RS darurat/lapangan COVID-19
-                                </label>
-                            </div>
-                        </div>
-
-                        {/* COVID-19 Details - Show only if RS darurat indicator is checked */}
-                        {formData.covid19_rs_darurat_ind === '1' && (
-                            <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
-                                <h4 className="mb-4 font-semibold text-gray-900">Detail COVID-19</h4>
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                    <div>
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Status COVID-19</label>
-                                        <SearchableSelect
-                                            options={[
-                                                { value: '1', label: 'ODP' },
-                                                { value: '2', label: 'PDP' },
-                                                { value: '3', label: 'Terkonfirmasi Positif' },
-                                                { value: '4', label: 'Suspek' },
-                                                { value: '5', label: 'Probabel' },
-                                            ]}
-                                            value={formData.covid19_status_cd || ''}
-                                            onSelect={(value) => updateField('covid19_status_cd', value)}
-                                            placeholder="Pilih status COVID-19..."
-                                            searchPlaceholder="Cari status COVID-19..."
-                                            className="w-full"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Tipe Nomor Kartu</label>
-                                        <SearchableSelect
-                                            options={[
-                                                { value: 'nik', label: 'NIK' },
-                                                { value: 'noka', label: 'No Kartu' },
-                                                { value: 'kitas', label: 'KITAS/KITAP' },
-                                                { value: 'paspor', label: 'Passport' },
-                                                { value: 'kartu_jkn', label: 'Kartu JKN' },
-                                                { value: 'kk', label: 'Kartu Keluarga' },
-                                                { value: 'unhcr', label: 'UNHCR' },
-                                                { value: 'kelurahan', label: 'Kelurahan' },
-                                                { value: 'dinsos', label: 'Dinsos' },
-                                                { value: 'dinkes', label: 'Dinkes' },
-                                                { value: 'sjp', label: 'SJP' },
-                                                { value: 'klaim_ibu', label: 'Klaim Ibu' },
-                                                { value: 'lainnya', label: 'Lainnya' },
-                                            ]}
-                                            value={formData.nomor_kartu_t || ''}
-                                            onSelect={(value) => updateField('nomor_kartu_t', value)}
-                                            placeholder="Pilih tipe kartu..."
-                                            searchPlaceholder="Cari tipe kartu..."
-                                            className="w-full"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Episodes Perawatan</label>
-                                        <input
-                                            type="text"
-                                            value={formData.episodes || ''}
-                                            onChange={(e) => updateField('episodes', e.target.value)}
-                                            placeholder="1;12#2;3#6;5"
-                                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                        />
-                                        <p className="mt-1 text-xs text-gray-500">Format: jenis_ruangan;lama_hari#... (contoh: 1;12#2;3)</p>
-                                    </div>
-
-                                    <div>
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Akses NAAT</label>
-                                        <SearchableSelect
-                                            options={[
-                                                { value: 'A', label: 'Kategori A' },
-                                                { value: 'B', label: 'Kategori B' },
-                                                { value: 'C', label: 'Kategori C' },
-                                            ]}
-                                            value={formData.akses_naat || ''}
-                                            onSelect={(value) => updateField('akses_naat', value)}
-                                            placeholder="Pilih kategori NAAT..."
-                                            searchPlaceholder="Cari kategori..."
-                                            className="w-full"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Terapi Konvalesen</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            value={formData.terapi_konvalesen || ''}
-                                            onChange={(e) => updateField('terapi_konvalesen', e.target.value)}
-                                            placeholder="0"
-                                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                        />
-                                        <p className="mt-1 text-xs text-gray-500">Sebelum 1 Okt 2021: nilai rupiah, setelah: jumlah kantong</p>
-                                    </div>
-                                </div>
-
-                                {/* COVID-19 Checkboxes */}
-                                <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                    <div className="flex items-center space-x-2">
-                                        <input
-                                            type="checkbox"
-                                            id="covid19_cc_ind"
-                                            checked={formData.covid19_cc_ind === '1'}
-                                            onChange={(e) => updateField('covid19_cc_ind', e.target.checked ? '1' : '0')}
-                                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <label htmlFor="covid19_cc_ind" className="text-sm text-gray-700">
-                                            Ada Comorbidity/Complexity
-                                        </label>
-                                    </div>
-
-                                    <div className="flex items-center space-x-2">
-                                        <input
-                                            type="checkbox"
-                                            id="covid19_co_insidense_ind"
-                                            checked={formData.covid19_co_insidense_ind === '1'}
-                                            onChange={(e) => updateField('covid19_co_insidense_ind', e.target.checked ? '1' : '0')}
-                                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <label htmlFor="covid19_co_insidense_ind" className="text-sm text-gray-700">
-                                            Kasus Co-Insidence
-                                        </label>
-                                    </div>
-
-                                    <div className="flex items-center space-x-2">
-                                        <input
-                                            type="checkbox"
-                                            id="isoman_ind"
-                                            checked={formData.isoman_ind === '1'}
-                                            onChange={(e) => updateField('isoman_ind', e.target.checked ? '1' : '0')}
-                                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <label htmlFor="isoman_ind" className="text-sm text-gray-700">
-                                            Isolasi Mandiri
-                                        </label>
-                                    </div>
-                                </div>
-
-                                {/* COVID-19 NO SEP for Co-Insidence */}
-                                {formData.covid19_co_insidense_ind === '1' && (
-                                    <div className="mt-4">
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Nomor Klaim COVID-19 Co-Insidence</label>
-                                        <input
-                                            type="text"
-                                            value={formData.covid19_no_sep || ''}
-                                            onChange={(e) => updateField('covid19_no_sep', e.target.value)}
-                                            placeholder="Nomor klaim COVID-19"
-                                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                        />
-                                    </div>
+                            <div className="flex space-x-3">
+                                {/* Button Simpan Progress hanya muncul ketika status_pengiriman = 0 */}
+                                {pengajuanKlaim.status_pengiriman === 0 && (
+                                    <Button
+                                        onClick={handleSaveProgress}
+                                        disabled={isLoading}
+                                        variant="outline"
+                                        className="border-black text-black hover:bg-black hover:text-white"
+                                    >
+                                        {isLoading ? 'Menyimpan...' : 'Simpan Progress'}
+                                    </Button>
                                 )}
-                            </div>
-                        )}
-
-                        {/* Other Special Fields */}
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            <div>
-                                <label className="mb-2 block text-sm font-medium text-gray-700">Status Bayi Lahir</label>
-                                <SearchableSelect
-                                    options={[
-                                        { value: '1', label: 'Tanpa Kelainan' },
-                                        { value: '2', label: 'Dengan Kelainan' },
-                                    ]}
-                                    value={formData.bayi_lahir_status_cd || ''}
-                                    onSelect={(value) => updateField('bayi_lahir_status_cd', value)}
-                                    placeholder="Pilih status bayi..."
-                                    searchPlaceholder="Cari status bayi..."
-                                    className="w-full"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="mb-2 block text-sm font-medium text-gray-700">Kantong Darah</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    value={formData.kantong_darah || ''}
-                                    onChange={(e) => updateField('kantong_darah', e.target.value)}
-                                    placeholder="0"
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="checkbox"
-                                    id="dializer_single_use"
-                                    checked={formData.dializer_single_use === '1'}
-                                    onChange={(e) => updateField('dializer_single_use', e.target.checked ? '1' : '0')}
-                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                                />
-                                <label htmlFor="dializer_single_use" className="text-sm text-gray-700">
-                                    Dializer Single Use (Hemodialisa)
-                                </label>
-                            </div>
-
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="checkbox"
-                                    id="alteplase_ind"
-                                    checked={formData.alteplase_ind === '1'}
-                                    onChange={(e) => updateField('alteplase_ind', e.target.checked ? '1' : '0')}
-                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                                />
-                                <label htmlFor="alteplase_ind" className="text-sm text-gray-700">
-                                    Pemberian Alteplase
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Pemulasaraan Jenazah */}
-                    <div className="mb-6">
-                        <h3 className="mb-4 text-lg font-semibold text-gray-900">Pemulasaraan Jenazah</h3>
-
-                        {/* Pemulasaraan Jenazah Indicator */}
-                        <div className="mb-4">
-                            <div className="flex items-center space-x-3">
-                                <input
-                                    type="checkbox"
-                                    id="pemulasaraan_jenazah"
-                                    checked={formData.pemulasaraan_jenazah === '1'}
-                                    onChange={(e) => {
-                                        updateField('pemulasaraan_jenazah', e.target.checked ? '1' : '0');
-                                    }}
-                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                                />
-                                <label htmlFor="pemulasaraan_jenazah" className="text-sm font-medium text-gray-700">
-                                    Ada pemakaian tambahan pemulasaraan jenazah (Pasien COVID-19 meninggal)
-                                </label>
-                            </div>
-                        </div>
-
-                        {/* Pemulasaraan Details - Show only if indicator is checked */}
-                        {formData.pemulasaraan_jenazah === '1' && (
-                            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                                <h4 className="mb-4 font-semibold text-gray-900">Detail Pemulasaraan Jenazah</h4>
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                                    <div>
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Kantong Jenazah</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            value={formData.kantong_jenazah || ''}
-                                            onChange={(e) => updateField('kantong_jenazah', e.target.value)}
-                                            placeholder="0"
-                                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Peti Jenazah</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            value={formData.peti_jenazah || ''}
-                                            onChange={(e) => updateField('peti_jenazah', e.target.value)}
-                                            placeholder="0"
-                                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Plastik Erat</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            value={formData.plastik_erat || ''}
-                                            onChange={(e) => updateField('plastik_erat', e.target.value)}
-                                            placeholder="0"
-                                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Desinfektan Jenazah</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            value={formData.desinfektan_jenazah || ''}
-                                            onChange={(e) => updateField('desinfektan_jenazah', e.target.value)}
-                                            placeholder="0"
-                                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                        />
-                                    </div>
-
-                                    <div className="flex items-center space-x-2">
-                                        <input
-                                            type="checkbox"
-                                            id="mobil_jenazah"
-                                            checked={formData.mobil_jenazah === '1'}
-                                            onChange={(e) => updateField('mobil_jenazah', e.target.checked ? '1' : '0')}
-                                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <label htmlFor="mobil_jenazah" className="text-sm text-gray-700">
-                                            Mobil Jenazah
-                                        </label>
-                                    </div>
-
-                                    {formData.mobil_jenazah === '1' && (
-                                        <div>
-                                            <label className="mb-2 block text-sm font-medium text-gray-700">Desinfektan Mobil Jenazah</label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                value={formData.desinfektan_mobil_jenazah || ''}
-                                                onChange={(e) => updateField('desinfektan_mobil_jenazah', e.target.value)}
-                                                placeholder="0"
-                                                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                            />
+                                
+                                {/* Conditional button/indicator based on status_pengiriman */}
+                                {pengajuanKlaim.status_pengiriman === 0 ? (
+                                    <Button
+                                        onClick={handleSubmitKlaim}
+                                        disabled={isLoading}
+                                        className="bg-black text-white hover:bg-gray-800"
+                                    >
+                                        {isLoading ? 'Mengirim...' : 'Submit Klaim'}
+                                    </Button>
+                                ) : pengajuanKlaim.status_pengiriman === 1 ? (
+                                    <Button
+                                        onClick={handleGroupper}
+                                        disabled={isLoading}
+                                        className="bg-blue-600 text-white hover:bg-blue-700"
+                                    >
+                                        {isLoading ? 'Memproses...' : 'Groupper'}
+                                    </Button>
+                                ) : pengajuanKlaim.status_pengiriman === 2 ? (
+                                    // Status 2: Grouper Stage 1 Selesai - Siap Difinalisasi
+                                    !hasSpecialCmgOptions() ? (
+                                        <div className="inline-flex items-center px-3 py-1 bg-green-50 border border-green-200 rounded-md">
+                                            <div className="flex items-center space-x-1">
+                                                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                                                <span className="text-green-700 text-sm font-medium">Siap Difinalisasi</span>
+                                            </div>
                                         </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* APGAR Score */}
-                    <div className="mb-6">
-                        <h3 className="mb-4 text-lg font-semibold text-gray-900">APGAR Score (Penilaian Bayi Baru Lahir)</h3>
-                        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                            {/* APGAR Menit 1 */}
-                            <div>
-                                <h4 className="mb-4 text-lg font-semibold text-gray-700">APGAR Menit 1</h4>
-                                <div className="space-y-4">
-                                    <div className="mb-4">
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Appearance (0-2)</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max="2"
-                                            defaultValue={getNestedValue('apgar.menit_1', 'appearance')}
-                                            onChange={(e) => updateNestedField('apgar.menit_1', 'appearance', e.target.value)}
-                                            placeholder="0"
-                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                        />
-                                    </div>
-                                    <div className="mb-4">
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Pulse (0-2)</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max="2"
-                                            defaultValue={getNestedValue('apgar.menit_1', 'pulse')}
-                                            onChange={(e) => updateNestedField('apgar.menit_1', 'pulse', e.target.value)}
-                                            placeholder="0"
-                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                        />
-                                    </div>
-                                    <div className="mb-4">
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Grimace (0-2)</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max="2"
-                                            defaultValue={getNestedValue('apgar.menit_1', 'grimace')}
-                                            onChange={(e) => updateNestedField('apgar.menit_1', 'grimace', e.target.value)}
-                                            placeholder="0"
-                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                        />
-                                    </div>
-                                    <div className="mb-4">
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Activity (0-2)</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max="2"
-                                            defaultValue={getNestedValue('apgar.menit_1', 'activity')}
-                                            onChange={(e) => updateNestedField('apgar.menit_1', 'activity', e.target.value)}
-                                            placeholder="0"
-                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                        />
-                                    </div>
-                                    <div className="mb-4">
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Respiration (0-2)</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max="2"
-                                            defaultValue={getNestedValue('apgar.menit_1', 'respiration')}
-                                            onChange={(e) => updateNestedField('apgar.menit_1', 'respiration', e.target.value)}
-                                            placeholder="0"
-                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* APGAR Menit 5 */}
-                            <div>
-                                <h4 className="mb-4 text-lg font-semibold text-gray-700">APGAR Menit 5</h4>
-                                <div className="space-y-4">
-                                    <div className="mb-4">
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Appearance (0-2)</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max="2"
-                                            defaultValue={getNestedValue('apgar.menit_5', 'appearance')}
-                                            onChange={(e) => updateNestedField('apgar.menit_5', 'appearance', e.target.value)}
-                                            placeholder="0"
-                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                        />
-                                    </div>
-                                    <div className="mb-4">
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Pulse (0-2)</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max="2"
-                                            defaultValue={getNestedValue('apgar.menit_5', 'pulse')}
-                                            onChange={(e) => updateNestedField('apgar.menit_5', 'pulse', e.target.value)}
-                                            placeholder="0"
-                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                        />
-                                    </div>
-                                    <div className="mb-4">
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Grimace (0-2)</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max="2"
-                                            defaultValue={getNestedValue('apgar.menit_5', 'grimace')}
-                                            onChange={(e) => updateNestedField('apgar.menit_5', 'grimace', e.target.value)}
-                                            placeholder="0"
-                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                        />
-                                    </div>
-                                    <div className="mb-4">
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Activity (0-2)</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max="2"
-                                            defaultValue={getNestedValue('apgar.menit_5', 'activity')}
-                                            onChange={(e) => updateNestedField('apgar.menit_5', 'activity', e.target.value)}
-                                            placeholder="0"
-                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                        />
-                                    </div>
-                                    <div className="mb-4">
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Respiration (0-2)</label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max="2"
-                                            defaultValue={getNestedValue('apgar.menit_5', 'respiration')}
-                                            onChange={(e) => updateNestedField('apgar.menit_5', 'respiration', e.target.value)}
-                                            placeholder="0"
-                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* ICU & Ventilator */}
-                    <div className="mb-6">
-                        <h3 className="mb-4 text-lg font-semibold text-gray-900">ICU & Ventilator</h3>
-                        <div className="space-y-6">
-                            {/* ICU Indicator Checkbox */}
-                            <div className="mb-4">
-                                <div className="flex items-center space-x-3">
-                                    <input
-                                        type="checkbox"
-                                        id="icu_indikator"
-                                        checked={formData.icu_indikator === '1'}
-                                        onChange={(e) => {
-                                            updateField('icu_indikator', e.target.checked ? '1' : '0');
-                                        }}
-                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <label htmlFor="icu_indikator" className="text-sm font-medium text-gray-700">
-                                        Pasien masuk ICU selama episode perawatan
-                                    </label>
-                                </div>
-                            </div>
-
-                            {/* ICU Details - Show only if ICU indicator is checked */}
-                            {formData.icu_indikator === '1' && (
-                                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                                    <h4 className="mb-4 font-semibold text-gray-900">Detail ICU</h4>
-                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                        <div>
-                                            <label className="mb-2 block text-sm font-medium text-gray-700">Jumlah Hari ICU</label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                value={formData.icu_los || ''}
-                                                onChange={(e) => updateField('icu_los', e.target.value)}
-                                                placeholder="0"
-                                                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                            />
+                                    ) : (
+                                        <div className="inline-flex items-center px-3 py-1 bg-blue-50 border border-blue-200 rounded-md">
+                                            <div className="flex items-center space-x-1">
+                                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                                                <span className="text-blue-700 text-sm font-medium">Groupper Selesai</span>
+                                            </div>
+                                        </div>
+                                    )
+                                ) : pengajuanKlaim.status_pengiriman === 3 ? (
+                                    // Status 3: Grouper Stage 2 Selesai - Siap Difinalisasi
+                                    <div className="inline-flex items-center px-3 py-1 bg-green-50 border border-green-200 rounded-md">
+                                        <div className="flex items-center space-x-1">
+                                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                                            <span className="text-green-700 text-sm font-medium">Siap Difinalisasi</span>
                                         </div>
                                     </div>
+                                ) : pengajuanKlaim.status_pengiriman === 4 ? (
+                                    // Status 4: Final - Siap Dikirim ke INACBG
+                                    <div className="inline-flex items-center px-3 py-1 bg-yellow-50 border border-yellow-200 rounded-md">
+                                        <div className="flex items-center space-x-1">
+                                            <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-pulse"></div>
+                                            <span className="text-yellow-700 text-sm font-medium">Siap Dikirim</span>
+                                        </div>
+                                    </div>
+                                ) : pengajuanKlaim.status_pengiriman === 5 ? (
+                                    // Status 5: Selesai Proses Klaim
+                                    <div className="inline-flex items-center px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-md">
+                                        <div className="flex items-center space-x-1">
+                                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
+                                            <span className="text-emerald-700 text-sm font-medium">Proses Selesai</span>
+                                        </div>
+                                    </div>
+                                ) : null}
+                            </div>
+                        </div>
+                    </div>
 
-                                    {/* Ventilator Section */}
-                                    <div className="mt-6">
-                                        <div className="mb-4">
-                                            <div className="flex items-center space-x-3">
-                                                <input
-                                                    type="checkbox"
-                                                    id="ventilator_use_ind"
-                                                    checked={formData.ventilator?.use_ind === '1'}
-                                                    onChange={(e) => {
-                                                        updateNestedField('ventilator', 'use_ind', e.target.checked ? '1' : '0');
-                                                    }}
-                                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                    {/* Main Layout: Sidebar + Content */}
+                    <div className="relative flex gap-6">
+                        {/* Sidebar - 20% */}
+                        <div className="w-1/5 space-y-2" key={counterUpdateKey}>
+                            {tabs.map((tab) => {
+                                const fieldCount = getTabFieldCount(tab.id);
+                                const completionPercentage = fieldCount.total > 0 ? Math.round((fieldCount.filled / fieldCount.total) * 100) : 0;
+                                const isComplete = fieldCount.filled === fieldCount.total && fieldCount.total > 0;
+                                const isEmpty = fieldCount.filled === 0;
+                                
+                                return (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`w-full flex items-stretch gap-3 px-4 py-3 text-left text-sm font-medium rounded-lg transition-colors ${
+                                            activeTab === tab.id
+                                                ? 'bg-black text-white'
+                                                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3 flex-1">
+                                            <span className="text-lg">{tab.icon}</span>
+                                            <div className="flex-1">
+                                                <div className="font-medium">{tab.name}</div>
+                                                <div className={`text-xs mt-0.5 ${
+                                                    activeTab === tab.id ? 'text-gray-300' : 'text-gray-500'
+                                                }`}>
+                                                    {fieldCount.filled}/{fieldCount.total} field
+                                                    {fieldCount.total !== 1 ? 's' : ''}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col items-end justify-center gap-1">
+                                            {/* Progress indicator */}
+                                            <div className={`w-8 h-2 rounded-full overflow-hidden ${
+                                                activeTab === tab.id ? 'bg-gray-600' : 'bg-gray-200'
+                                            }`}>
+                                                <div 
+                                                    className={`h-full transition-all duration-300 ${
+                                                        isComplete 
+                                                            ? 'bg-green-500' 
+                                                            : isEmpty 
+                                                                ? 'bg-red-400'
+                                                                : 'bg-blue-500'
+                                                    }`}
+                                                    style={{ width: `${completionPercentage}%` }}
                                                 />
-                                                <label htmlFor="ventilator_use_ind" className="text-sm font-medium text-gray-700">
-                                                    Penggunaan Ventilator
-                                                </label>
                                             </div>
+                                            {/* Percentage */}
+                                            <span className={`text-xs font-medium ${
+                                                activeTab === tab.id 
+                                                    ? 'text-gray-300' 
+                                                    : isComplete 
+                                                        ? 'text-green-600' 
+                                                        : isEmpty 
+                                                            ? 'text-red-500'
+                                                            : 'text-blue-600'
+                                            }`}>
+                                                {completionPercentage}%
+                                            </span>
                                         </div>
-
-                                        {/* Ventilator Details - Show only if ventilator is used */}
-                                        {formData.ventilator?.use_ind === '1' && (
-                                            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                                <div>
-                                                    <label className="mb-2 block text-sm font-medium text-gray-700">Total Jam Ventilator</label>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        value={formData.ventilator_hour || ''}
-                                                        onChange={(e) => updateField('ventilator_hour', e.target.value)}
-                                                        placeholder="0"
-                                                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="mb-2 block text-sm font-medium text-gray-700">Waktu Mulai Ventilator</label>
-                                                    <input
-                                                        type="datetime-local"
-                                                        value={getNestedValue('ventilator', 'start_dttm') || ''}
-                                                        onChange={(e) => updateNestedField('ventilator', 'start_dttm', e.target.value)}
-                                                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="mb-2 block text-sm font-medium text-gray-700">Waktu Selesai Ventilator</label>
-                                                    <input
-                                                        type="datetime-local"
-                                                        value={getNestedValue('ventilator', 'stop_dttm') || ''}
-                                                        onChange={(e) => updateNestedField('ventilator', 'stop_dttm', e.target.value)}
-                                                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                                    />
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
+                                    </button>
+                                );
+                            })}
                         </div>
-                    </div>
 
-                    {/* Naik Kelas */}
-                    <div className="mb-6">
-                        <h3 className="mb-4 text-lg font-semibold text-gray-900">Naik Kelas</h3>
-                        <div className="space-y-6">
-                            {/* Upgrade Class Indicator Checkbox */}
-                            <div className="mb-4">
-                                <div className="flex items-center space-x-3">
-                                    <input
-                                        type="checkbox"
-                                        id="upgrade_class_ind"
-                                        checked={formData.upgrade_class_ind === '1'}
-                                        onChange={(e) => {
-                                            updateField('upgrade_class_ind', e.target.checked ? '1' : '0');
-                                        }}
-                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <label htmlFor="upgrade_class_ind" className="text-sm font-medium text-gray-700">
-                                        Pasien naik kelas perawatan
-                                    </label>
-                                </div>
-                            </div>
-
-                            {/* Upgrade Class Details - Show only if upgrade indicator is checked */}
-                            {formData.upgrade_class_ind === '1' && (
-                                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                                    <h4 className="mb-4 font-semibold text-gray-900">Detail Naik Kelas</h4>
-                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                        <div>
-                                            <label className="mb-2 block text-sm font-medium text-gray-700">Kelas Yang Dituju</label>
-                                            <SearchableSelect
-                                                options={[
-                                                    { value: 'kelas_1', label: 'Kelas 1' },
-                                                    { value: 'kelas_2', label: 'Kelas 2' },
-                                                    { value: 'vip', label: 'VIP' },
-                                                    { value: 'vvip', label: 'VVIP' },
-                                                ]}
-                                                value={formData.upgrade_class_class || ''}
-                                                onSelect={(value) => updateField('upgrade_class_class', value)}
-                                                placeholder="Pilih kelas tujuan..."
-                                                searchPlaceholder="Cari kelas..."
-                                                className="w-full"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="mb-2 block text-sm font-medium text-gray-700">Lama Hari Naik Kelas</label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                value={formData.upgrade_class_los || ''}
-                                                onChange={(e) => updateField('upgrade_class_los', e.target.value)}
-                                                placeholder="0"
-                                                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="mb-2 block text-sm font-medium text-gray-700">Pembayar Naik Kelas</label>
-                                            <SearchableSelect
-                                                options={[
-                                                    { value: 'peserta', label: 'Peserta' },
-                                                    { value: 'pemberi_kerja', label: 'Pemberi Kerja' },
-                                                    { value: 'asuransi_tambahan', label: 'Asuransi Tambahan' },
-                                                ]}
-                                                value={formData.upgrade_class_payor || ''}
-                                                onSelect={(value) => updateField('upgrade_class_payor', value)}
-                                                placeholder="Pilih pembayar..."
-                                                searchPlaceholder="Cari pembayar..."
-                                                className="w-full"
-                                            />
-                                        </div>
-                                        <div className="md:col-span-2 lg:col-span-3">
-                                            <label className="mb-2 block text-sm font-medium text-gray-700">
-                                                Persentase Tambahan Biaya (%) - Khusus untuk VIP/VVIP
-                                            </label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max="100"
-                                                value={formData.add_payment_pct || ''}
-                                                onChange={(e) => updateField('add_payment_pct', e.target.value)}
-                                                placeholder="0"
-                                                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Diagnosa & Prosedur */}
-                    <div className="mb-6">
-                        <h3 className="mb-4 text-lg font-semibold text-gray-900">Diagnosa & Prosedur</h3>
-                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                            {/* Diagnosa */}
-                            <div>
-                                <h4 className="mb-4 font-semibold text-gray-900">Diagnosa ICD-10</h4>
-                                <div className="mb-4">
-                                    <label className="mb-2 block text-sm font-medium text-gray-700">Kode Diagnosa</label>
-                                    <div
-                                        className="relative min-h-[42px] w-full cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-2 focus-within:border-gray-500 focus-within:ring-1 focus-within:ring-gray-500"
-                                        onClick={() => setIsDiagnosisModalOpen(true)}
-                                    >
-                                        <div className="flex min-h-[26px] flex-wrap items-center gap-1">
-                                            {selectedDiagnoses.length > 0 ? (
-                                                selectedDiagnoses.map((diagnosis) => (
-                                                    <span
-                                                        key={diagnosis.code}
-                                                        className="inline-flex items-center rounded-md bg-blue-100 px-2 py-1 text-xs text-blue-800"
-                                                    >
-                                                        {diagnosis.code} -{' '}
-                                                        {diagnosis.name.length > 30 ? diagnosis.name.substring(0, 30) + '...' : diagnosis.name}
-                                                        <button
-                                                            type="button"
-                                                            className="ml-1 inline-flex h-3 w-3 cursor-pointer items-center justify-center hover:text-red-500"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleRemoveDiagnosis(diagnosis.code);
-                                                            }}
-                                                        >
-                                                            <X className="h-3 w-3" />
-                                                        </button>
-                                                    </span>
-                                                ))
-                                            ) : (
-                                                <span className="flex items-center text-sm text-gray-500">
-                                                    <Search className="mr-2 h-4 w-4" />
-                                                    Klik untuk mencari dan memilih diagnosa...
+                        {/* Content Area - 80% */}
+                        <div className="flex-1 bg-white p-6 rounded-lg border border-gray-200 relative">
+                            {/* Jika klaim sudah final, tampilkan overlay hanya di content area */}
+                            {isKlaimFinal ? (
+                                <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+                                    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 p-8 text-center max-w-md mx-4">
+                                        <div className="mb-6">
+                                            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+                                                pengajuanKlaim.status_pengiriman === 5 
+                                                    ? 'bg-emerald-100' 
+                                                    : 'bg-yellow-100'
+                                            }`}>
+                                                <span className="text-3xl">
+                                                    {pengajuanKlaim.status_pengiriman === 5 ? '✅' : '🔒'}
                                                 </span>
+                                            </div>
+                                            <h3 className="text-xl font-bold text-gray-900 mb-2">
+                                                {pengajuanKlaim.status_pengiriman === 5 ? 'Klaim Selesai' : 'Tab Terkunci'}
+                                            </h3>
+                                            <p className="text-gray-600 text-sm leading-relaxed">
+                                                {pengajuanKlaim.status_pengiriman === 5 
+                                                    ? `Klaim untuk nomor SEP ${pengajuanKlaim.nomor_sep} telah berhasil dikirim ke INACBG dan proses klaim sudah selesai.`
+                                                    : `Konten tab ${tabs.find(tab => tab.id === activeTab)?.name} tidak dapat diedit karena klaim sudah difinalisasi.`
+                                                }
+                                            </p>
+                                        </div>
+                                        
+                                        <div className="space-y-3">
+                                            <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3">
+                                                <div className="flex items-center justify-between">
+                                                    <span>Status Klaim:</span>
+                                                    <span className={`font-medium ${
+                                                        pengajuanKlaim.status_pengiriman === 5 
+                                                            ? 'text-emerald-600' 
+                                                            : 'text-yellow-600'
+                                                    }`}>
+                                                        {getStatusInfo(pengajuanKlaim.status_pengiriman).label}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between mt-1">
+                                                    <span>Nomor SEP:</span>
+                                                    <span className="font-medium">{pengajuanKlaim.nomor_sep}</span>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Hanya tampilkan button jika status = 4 (Final), tidak untuk status = 5 (Selesai) */}
+                                            {pengajuanKlaim.status_pengiriman === 4 && (
+                                                <>
+                                                    <Button
+                                                        onClick={handleReedit}
+                                                        disabled={isLoadingReedit}
+                                                        className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                                                    >
+                                                        {isLoadingReedit ? (
+                                                            <div className="flex items-center justify-center space-x-2">
+                                                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                                                <span>Memproses...</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center justify-center space-x-2">
+                                                                <span>✏️</span>
+                                                                <span>Edit Ulang Klaim</span>
+                                                            </div>
+                                                        )}
+                                                    </Button>
+
+                                                    <Button
+                                                        onClick={handleKirimInacbg}
+                                                        disabled={isLoadingKirimInacbg}
+                                                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                    >
+                                                        {isLoadingKirimInacbg ? (
+                                                            <div className="flex items-center justify-center space-x-2">
+                                                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                                                <span>Mengirim...</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center justify-center space-x-2">
+                                                                <span>📤</span>
+                                                                <span>Kirim ke INACBG</span>
+                                                            </div>
+                                                        )}
+                                                    </Button>
+                                                    
+                                                    <p className="text-xs text-gray-500">
+                                                        Klik "Edit Ulang Klaim" untuk membuka kembali semua tab untuk pengeditan, atau klik "Kirim ke INACBG" untuk menyelesaikan proses klaim
+                                                    </p>
+                                                </>
+                                            )}
+
+                                            {/* Pesan untuk status = 5 (Selesai) */}
+                                            {pengajuanKlaim.status_pengiriman === 5 && (
+                                                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="text-emerald-600 text-xl">🎉</div>
+                                                        <div>
+                                                            <h4 className="font-semibold text-emerald-900 mb-1">Proses Selesai!</h4>
+                                                            <p className="text-emerald-700 text-sm">
+                                                                Klaim telah berhasil dikirim ke INACBG dan proses pengajuan klaim sudah selesai.
+                                                                Tidak ada tindakan lebih lanjut yang diperlukan.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             )}
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-
-                            {/* Prosedur */}
-                            <div>
-                                <h4 className="mb-4 font-semibold text-gray-900">Prosedur ICD-9</h4>
-                                <div className="mb-4">
-                                    <label className="mb-2 block text-sm font-medium text-gray-700">Kode Prosedur</label>
-                                    <div
-                                        className="relative min-h-[42px] w-full cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-2 focus-within:border-gray-500 focus-within:ring-1 focus-within:ring-gray-500"
-                                        onClick={() => setIsProcedureModalOpen(true)}
-                                    >
-                                        <div className="flex min-h-[26px] flex-wrap items-center gap-1">
-                                            {selectedProcedures.length > 0 ? (
-                                                selectedProcedures.map((procedure) => (
-                                                    <span
-                                                        key={procedure.code}
-                                                        className="inline-flex items-center rounded-md bg-green-100 px-2 py-1 text-xs text-green-800"
-                                                    >
-                                                        {procedure.code} -{' '}
-                                                        {procedure.name.length > 30 ? procedure.name.substring(0, 30) + '...' : procedure.name}
-                                                        <button
-                                                            type="button"
-                                                            className="ml-1 inline-flex h-3 w-3 cursor-pointer items-center justify-center hover:text-red-500"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleRemoveProcedure(procedure.code);
-                                                            }}
-                                                        >
-                                                            <X className="h-3 w-3" />
-                                                        </button>
-                                                    </span>
-                                                ))
-                                            ) : (
-                                                <span className="flex items-center text-sm text-gray-500">
-                                                    <Search className="mr-2 h-4 w-4" />
-                                                    Klik untuk mencari dan memilih prosedur...
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
+                            ) : null}
+                            
+                            {/* Tab content - akan ter-blur jika final */}
+                            <div className={`transition-all duration-300 ${isKlaimFinal ? 'blur-sm pointer-events-none' : ''}`}>
+                                {renderTabContent()}
                             </div>
                         </div>
-
-                        {/* Inagrouper Section */}
-                        <div className="mt-8 border-t pt-6">
-                            <h4 className="mb-4 font-semibold text-gray-900">Diagnosa & Prosedur Inagrouper</h4>
-                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                                {/* Diagnosa Inagrouper */}
-                                <div>
-                                    <h5 className="mb-4 font-medium text-gray-700">Diagnosa Inagrouper</h5>
-                                    <div className="mb-4">
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Kode Diagnosa</label>
-                                        <div
-                                            className="relative min-h-[42px] w-full cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-2 focus-within:border-gray-500 focus-within:ring-1 focus-within:ring-gray-500"
-                                            onClick={() => setIsInagrouperDiagnosisModalOpen(true)}
-                                        >
-                                            <div className="flex min-h-[26px] flex-wrap items-center gap-1">
-                                                {selectedInagrouperDiagnoses.length > 0 ? (
-                                                    selectedInagrouperDiagnoses.map((diagnosis) => (
-                                                        <span
-                                                            key={diagnosis.code}
-                                                            className="inline-flex items-center rounded-md bg-purple-100 px-2 py-1 text-xs text-purple-800"
-                                                        >
-                                                            {diagnosis.code} -{' '}
-                                                            {diagnosis.name.length > 30 ? diagnosis.name.substring(0, 30) + '...' : diagnosis.name}
-                                                            <button
-                                                                type="button"
-                                                                className="ml-1 inline-flex h-3 w-3 cursor-pointer items-center justify-center hover:text-red-500"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleRemoveInagrouperDiagnosis(diagnosis.code);
-                                                                }}
-                                                            >
-                                                                <X className="h-3 w-3" />
-                                                            </button>
-                                                        </span>
-                                                    ))
-                                                ) : (
-                                                    <span className="flex items-center text-sm text-gray-500">
-                                                        <Search className="mr-2 h-4 w-4" />
-                                                        Klik untuk mencari dan memilih diagnosa inagrouper...
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Prosedur Inagrouper */}
-                                <div>
-                                    <h5 className="mb-4 font-medium text-gray-700">Prosedur Inagrouper</h5>
-                                    <div className="mb-4">
-                                        <label className="mb-2 block text-sm font-medium text-gray-700">Kode Prosedur</label>
-                                        <div
-                                            className="relative min-h-[42px] w-full cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-2 focus-within:border-gray-500 focus-within:ring-1 focus-within:ring-gray-500"
-                                            onClick={() => setIsInagrouperProcedureModalOpen(true)}
-                                        >
-                                            <div className="flex min-h-[26px] flex-wrap items-center gap-1">
-                                                {selectedInagrouperProcedures.length > 0 ? (
-                                                    selectedInagrouperProcedures.map((procedure) => (
-                                                        <span
-                                                            key={procedure.code}
-                                                            className="inline-flex items-center rounded-md bg-orange-100 px-2 py-1 text-xs text-orange-800"
-                                                        >
-                                                            {procedure.code} -{' '}
-                                                            {procedure.name.length > 30 ? procedure.name.substring(0, 30) + '...' : procedure.name}
-                                                            <button
-                                                                type="button"
-                                                                className="ml-1 inline-flex h-3 w-3 cursor-pointer items-center justify-center hover:text-red-500"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleRemoveInagrouperProcedure(procedure.code);
-                                                                }}
-                                                            >
-                                                                <X className="h-3 w-3" />
-                                                            </button>
-                                                        </span>
-                                                    ))
-                                                ) : (
-                                                    <span className="flex items-center text-sm text-gray-500">
-                                                        <Search className="mr-2 h-4 w-4" />
-                                                        Klik untuk mencari dan memilih prosedur inagrouper...
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Tarif RS (Hospital Tariffs) */}
-                    <div className="mb-6">
-                        <h3 className="mb-4 text-lg font-semibold text-gray-900">Tarif Rumah Sakit</h3>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            <CurrencyInput
-                                label="Prosedur Non Bedah"
-                                value={getNestedValue('tarif_rs', 'prosedur_non_bedah') || ''}
-                                onChange={(value) => updateNestedField('tarif_rs', 'prosedur_non_bedah', value)}
-                            />
-                            <CurrencyInput
-                                label="Prosedur Bedah"
-                                value={getNestedValue('tarif_rs', 'prosedur_bedah') || ''}
-                                onChange={(value) => updateNestedField('tarif_rs', 'prosedur_bedah', value)}
-                            />
-                            <CurrencyInput
-                                label="Konsultasi"
-                                value={getNestedValue('tarif_rs', 'konsultasi') || ''}
-                                onChange={(value) => updateNestedField('tarif_rs', 'konsultasi', value)}
-                            />
-                            <CurrencyInput
-                                label="Tenaga Ahli"
-                                value={getNestedValue('tarif_rs', 'tenaga_ahli') || ''}
-                                onChange={(value) => updateNestedField('tarif_rs', 'tenaga_ahli', value)}
-                            />
-                            <CurrencyInput
-                                label="Keperawatan"
-                                value={getNestedValue('tarif_rs', 'keperawatan') || ''}
-                                onChange={(value) => updateNestedField('tarif_rs', 'keperawatan', value)}
-                            />
-                            <CurrencyInput
-                                label="Penunjang"
-                                value={getNestedValue('tarif_rs', 'penunjang') || ''}
-                                onChange={(value) => updateNestedField('tarif_rs', 'penunjang', value)}
-                            />
-                            <CurrencyInput
-                                label="Radiologi"
-                                value={getNestedValue('tarif_rs', 'radiologi') || ''}
-                                onChange={(value) => updateNestedField('tarif_rs', 'radiologi', value)}
-                            />
-                            <CurrencyInput
-                                label="Laboratorium"
-                                value={getNestedValue('tarif_rs', 'laboratorium') || ''}
-                                onChange={(value) => updateNestedField('tarif_rs', 'laboratorium', value)}
-                            />
-                            <CurrencyInput
-                                label="Pelayanan Darah"
-                                value={getNestedValue('tarif_rs', 'pelayanan_darah') || ''}
-                                onChange={(value) => updateNestedField('tarif_rs', 'pelayanan_darah', value)}
-                            />
-                            <CurrencyInput
-                                label="Rehabilitasi"
-                                value={getNestedValue('tarif_rs', 'rehabilitasi') || ''}
-                                onChange={(value) => updateNestedField('tarif_rs', 'rehabilitasi', value)}
-                            />
-                            <CurrencyInput
-                                label="Kamar"
-                                value={getNestedValue('tarif_rs', 'kamar') || ''}
-                                onChange={(value) => updateNestedField('tarif_rs', 'kamar', value)}
-                            />
-                            <CurrencyInput
-                                label="Rawat Intensif"
-                                value={getNestedValue('tarif_rs', 'rawat_intensif') || ''}
-                                onChange={(value) => updateNestedField('tarif_rs', 'rawat_intensif', value)}
-                            />
-                            <CurrencyInput
-                                label="Obat"
-                                value={getNestedValue('tarif_rs', 'obat') || ''}
-                                onChange={(value) => updateNestedField('tarif_rs', 'obat', value)}
-                            />
-                            <CurrencyInput
-                                label="Obat Kronis"
-                                value={getNestedValue('tarif_rs', 'obat_kronis') || ''}
-                                onChange={(value) => updateNestedField('tarif_rs', 'obat_kronis', value)}
-                            />
-                            <CurrencyInput
-                                label="Obat Kemoterapi"
-                                value={getNestedValue('tarif_rs', 'obat_kemoterapi') || ''}
-                                onChange={(value) => updateNestedField('tarif_rs', 'obat_kemoterapi', value)}
-                            />
-                            <CurrencyInput
-                                label="Alat Kesehatan (Alkes)"
-                                value={getNestedValue('tarif_rs', 'alkes') || ''}
-                                onChange={(value) => updateNestedField('tarif_rs', 'alkes', value)}
-                            />
-                            <CurrencyInput
-                                label="BMHP"
-                                value={getNestedValue('tarif_rs', 'bmhp') || ''}
-                                onChange={(value) => updateNestedField('tarif_rs', 'bmhp', value)}
-                            />
-                            <CurrencyInput
-                                label="Sewa Alat"
-                                value={getNestedValue('tarif_rs', 'sewa_alat') || ''}
-                                onChange={(value) => updateNestedField('tarif_rs', 'sewa_alat', value)}
-                            />
-                        </div>
-
-                        {/* Total Indicator */}
-                        <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
-                            <div className="flex items-center justify-between">
-                                <span className="text-lg font-semibold text-gray-700">Total Tarif Rumah Sakit:</span>
-                                <span className="text-xl font-bold text-blue-600">
-                                    {formatRupiah(calculateTotalTarif())}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Tarif Tambahan */}
-                    <div className="mb-6">
-                        <h3 className="mb-4 text-lg font-semibold text-gray-900">Tarif Tambahan</h3>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            <CurrencyInput
-                                label="Tarif Poli Eksekutif"
-                                value={formData.tarif_poli_eks || ''}
-                                onChange={(value) => updateField('tarif_poli_eks', value)}
-                            />
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">Add Payment PCT (%)</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    value={formData.add_payment_pct || ''}
-                                    onChange={(e) => updateField('add_payment_pct', e.target.value)}
-                                    placeholder="0"
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Grand Total Indicator */}
-                        <div className="mt-6 rounded-lg border-2 border-blue-200 bg-blue-50 p-6">
-                            <div className="flex items-center justify-between">
-                                <span className="text-xl font-semibold text-blue-800">TOTAL KESELURUHAN TARIF:</span>
-                                <span className="text-2xl font-bold text-blue-600">
-                                    {formatRupiah(calculateTotalTarif())}
-                                </span>
-                            </div>
-                            <div className="mt-2 text-sm text-blue-600">
-                                Total mencakup semua tarif rumah sakit dan tarif tambahan
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="mt-8 flex justify-end space-x-4">
-                        <button
-                            type="button"
-                            onClick={handleSaveProgress}
-                            disabled={isLoading}
-                            className="rounded-md bg-gray-600 px-6 py-2 text-white transition-colors hover:bg-gray-700 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50"
-                        >
-                            {isLoading ? 'Menyimpan...' : 'Simpan Progress'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleSubmitKlaim}
-                            disabled={isLoading}
-                            className="rounded-md bg-blue-600 px-6 py-2 text-white transition-colors hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
-                        >
-                            {isLoading ? 'Mengirim...' : 'Submit Klaim'}
-                        </button>
                     </div>
                 </div>
             </div>
@@ -2331,97 +1999,243 @@ export default function Index() {
                 onRemoveProcedure={handleRemoveInagrouperProcedure}
             />
 
-            {/* Confirmation Alert Dialog for Submit */}
-            <AlertDialog open={isConfirmSubmitOpen} onOpenChange={setIsConfirmSubmitOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="text-amber-600">⚠️ Konfirmasi Submit Klaim</AlertDialogTitle>
-                        <AlertDialogDescription className="whitespace-pre-line">
-                            <strong>PERINGATAN!</strong>
+            {/* Custom Confirmation Modal for Submit */}
+            {isConfirmSubmitOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <div 
+                        className="fixed inset-0 bg-black/50 animate-in fade-in-0 duration-200"
+                        onClick={() => setIsConfirmSubmitOpen(false)}
+                    />
+                    
+                    {/* Modal Content */}
+                    <div className="relative bg-white rounded-lg shadow-lg max-w-md w-full mx-auto animate-in fade-in-0 zoom-in-95 duration-200">
+                        <div className="p-6">
+                            <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                                Konfirmasi Submit Klaim
+                            </h2>
+                            <p className="text-sm text-gray-600 mb-6">
+                                Apakah Anda yakin ingin submit klaim ini ke INACBG? 
+                                Data yang sudah disubmit tidak dapat diubah lagi.
+                            </p>
                             
-                            Pastikan semua data sudah benar dan lengkap sebelum submit klaim ke INACBG.
-                            
-                            Apakah Anda yakin ingin melanjutkan submit klaim ini?
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setIsConfirmSubmitOpen(false)}>
-                            Batal
-                        </AlertDialogCancel>
-                        <AlertDialogAction onClick={handleConfirmSubmit} className="bg-red-600 hover:bg-red-700">
-                            Ya, Submit Klaim
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                            <div className="flex justify-end space-x-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsConfirmSubmitOpen(false)}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleConfirmSubmit}
+                                    disabled={isLoading}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Ya, Submit Klaim
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
-            {/* Success Alert Dialog */}
-            <AlertDialog open={isSuccessDialogOpen} onOpenChange={setIsSuccessDialogOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="text-green-600">✅ Data Berhasil Disimpan</AlertDialogTitle>
-                        <AlertDialogDescription className="whitespace-pre-line">
-                            {successMessage}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogAction onClick={() => setIsSuccessDialogOpen(false)}>
-                            OK
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            {/* Custom Success Modal */}
+            {isSuccessDialogOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <div 
+                        className="fixed inset-0 bg-black/50 animate-in fade-in-0 duration-200"
+                        onClick={() => setIsSuccessDialogOpen(false)}
+                    />
+                    
+                    {/* Modal Content */}
+                    <div className="relative bg-white rounded-lg shadow-lg max-w-md w-full mx-auto animate-in fade-in-0 zoom-in-95 duration-200">
+                        <div className="p-6">
+                            <div className="flex items-center mb-4">
+                                <div className="flex-shrink-0">
+                                    <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                                <h2 className="ml-3 text-lg font-semibold text-gray-900">
+                                    Berhasil!
+                                </h2>
+                            </div>
+                            <p className="text-sm text-gray-600 mb-6 whitespace-pre-line">
+                                {successMessage}
+                            </p>
+                            
+                            <div className="flex justify-end">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsSuccessDialogOpen(false)}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                                >
+                                    OK
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
-            {/* Error Alert Dialog */}
-            <AlertDialog open={isErrorDialogOpen} onOpenChange={setIsErrorDialogOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="text-red-600">❌ Error Penyimpanan Data</AlertDialogTitle>
-                        <AlertDialogDescription className="whitespace-pre-line">
-                            {errorMessage}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setIsErrorDialogOpen(false)}>
-                            Tutup
-                        </AlertDialogCancel>
-                        <AlertDialogAction onClick={() => {
-                            setIsErrorDialogOpen(false);
+            {/* Custom Error Modal */}
+            {isErrorDialogOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <div 
+                        className="fixed inset-0 bg-black/50 animate-in fade-in-0 duration-200"
+                        onClick={() => setIsErrorDialogOpen(false)}
+                    />
+                    
+                    {/* Modal Content */}
+                    <div className="relative bg-white rounded-lg shadow-lg max-w-md w-full mx-auto animate-in fade-in-0 zoom-in-95 duration-200">
+                        <div className="p-6">
+                            <div className="flex items-center mb-4">
+                                <div className="flex-shrink-0">
+                                    <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </div>
+                                <h2 className="ml-3 text-lg font-semibold text-gray-900">
+                                    Error
+                                </h2>
+                            </div>
+                            <p className="text-sm text-gray-600 mb-6 whitespace-pre-line">
+                                {errorMessage}
+                            </p>
                             
-                            // Create detailed debug info
-                            const debugInfo = {
-                                formDataKeys: Object.keys(formData),
-                                formDataCount: Object.keys(formData).length,
-                                filledFields: Object.keys(formData).filter(key => 
-                                    formData[key] !== null && 
-                                    formData[key] !== undefined && 
-                                    formData[key] !== ''
-                                ),
-                                nestedStructures: {
-                                    tarif_rs: formData.tarif_rs,
-                                    apgar: formData.apgar,
-                                    ventilator: formData.ventilator,
-                                    upgrade_class: formData.upgrade_class
-                                },
-                                sampleData: Object.fromEntries(
-                                    Object.entries(formData).slice(0, 20)
-                                )
-                            };
+                            <div className="flex justify-end">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsErrorDialogOpen(false)}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                >
+                                    OK
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Confirmation Modal for Kirim INACBG */}
+            {isConfirmKirimOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <div 
+                        className="fixed inset-0 bg-black/50 animate-in fade-in-0 duration-200"
+                        onClick={() => setIsConfirmKirimOpen(false)}
+                    />
+                    
+                    {/* Modal Content */}
+                    <div className="relative bg-white rounded-lg shadow-lg max-w-2xl w-full mx-auto animate-in fade-in-0 zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+                        <div className="p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
+                                    <span className="text-2xl">📤</span>
+                                </div>
+                                <h2 className="text-xl font-semibold text-gray-900">
+                                    Konfirmasi Pengiriman ke INACBG
+                                </h2>
+                            </div>
+
+                            <div className="space-y-4 mb-6">
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <p className="text-gray-700 mb-3">
+                                        Anda akan mengirim klaim individual ke sistem INACBG dengan data berikut:
+                                    </p>
+                                    
+                                    <div className="space-y-2 text-sm">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <strong className="text-gray-900">Nomor SEP:</strong>
+                                                <div className="font-mono text-gray-700">{pengajuanKlaim.nomor_sep}</div>
+                                            </div>
+                                            <div>
+                                                <strong className="text-gray-900">Nama Pasien:</strong>
+                                                <div className="text-gray-700">{pengajuanKlaim.nama_pasien}</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="border-t pt-2 mt-3">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <strong className="text-gray-900">Nomor Kartu:</strong>
+                                                    <div className="font-mono text-gray-700">{pengajuanKlaim.nomor_kartu}</div>
+                                                </div>
+                                                <div>
+                                                    <strong className="text-gray-900">Status Saat Ini:</strong>
+                                                    <div className="font-semibold text-yellow-600">Final</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className="text-yellow-600 text-xl">⚠️</div>
+                                        <div>
+                                            <h4 className="font-semibold text-yellow-900 mb-2">Perhatian Penting:</h4>
+                                            <ul className="text-yellow-700 text-sm space-y-1 list-disc list-inside">
+                                                <li>Setelah dikirim ke INACBG, klaim akan berstatus "Selesai Proses Klaim"</li>
+                                                <li>Proses pengiriman tidak dapat dibatalkan</li>
+                                                <li>Pastikan semua data sudah benar dan final</li>
+                                                <li>Klaim yang sudah dikirim tidak dapat diedit kecuali melalui proses khusus</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                                    <h4 className="font-semibold text-emerald-900 mb-2">Data Request yang akan dikirim:</h4>
+                                    <pre className="text-xs text-emerald-800 font-mono bg-white p-2 rounded border overflow-x-auto">
+                                        {`{
+    "metadata": {
+        "method": "send_claim_individual"
+    },
+    "data": {
+        "nomor_sep": "${pengajuanKlaim.nomor_sep}"
+    }
+}`}
+                                    </pre>
+                                </div>
+                            </div>
                             
-                            console.log('=== COMPREHENSIVE DEBUG INFO ===');
-                            console.log('Debug Info:', debugInfo);
-                            console.log('Full Form Data:', formData);
-                            
-                            // Copy debug info to clipboard
-                            navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2))
-                                .then(() => toast.success('Debug info copied to clipboard'))
-                                .catch(() => toast.error('Failed to copy debug info'));
-                        }}>
-                            Debug Info & Copy
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                            <div className="flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsConfirmKirimOpen(false)}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleConfirmKirimInacbg}
+                                    disabled={isLoadingKirimInacbg}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 border border-transparent rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isLoadingKirimInacbg ? (
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            <span>Mengirim...</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <span>📤</span>
+                                            <span>Ya, Kirim ke INACBG</span>
+                                        </div>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </AppLayout>
     );
 }

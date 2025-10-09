@@ -22,6 +22,7 @@ interface User {
     id: number;
     name: string;
     nip: string;
+    nik: string;
     role_id: number | null;
     role?: Role;
     created_at: string;
@@ -39,6 +40,7 @@ export default function EditUser() {
     const { data, setData, put, processing, errors, reset } = useForm({
         name: user.name || '',
         nip: user.nip || '',
+        nik: user.nik || '',
         password: '',
         password_confirmation: '',
         role_id: user.role_id ? user.role_id.toString() : '0',
@@ -132,6 +134,26 @@ export default function EditUser() {
                                 {errors.nip && (
                                     <small className="text-red-500">{errors.nip}</small>
                                 )}
+                            </div>
+
+                            {/* NIK Field */}
+                            <div className="space-y-2">
+                                <Label htmlFor="nik">NIK (Nomor Induk Kependudukan)</Label>
+                                <Input
+                                    id="nik"
+                                    type="text"
+                                    value={data.nik}
+                                    onChange={(e) => setData('nik', e.target.value)}
+                                    placeholder="Masukkan NIK (16 digit)"
+                                    maxLength={16}
+                                    className={errors.nik ? 'border-red-500' : ''}
+                                />
+                                {errors.nik && (
+                                    <Alert variant="destructive">
+                                        <AlertDescription>{errors.nik}</AlertDescription>
+                                    </Alert>
+                                )}
+                                <small className="text-gray-500">NIK akan digunakan sebagai NIK Coder di form E-Klaim</small>
                             </div>
 
                             {/* Password Field */}

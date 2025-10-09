@@ -158,9 +158,6 @@ export default function HasilRadiologiPage() {
             return [];
         }
 
-        // Debug: log data yang diterima
-        console.log('dataFiktif received:', dataFiktif);
-
         // Warna untuk setiap grup data fiktif
         const colors = [
             '#e8f5e8', // Light Green
@@ -177,9 +174,6 @@ export default function HasilRadiologiPage() {
             const fiktifId = item.id;
             const groupColor = colors[dataIndex % colors.length];
             const groupIndex = dataIndex + 1;
-            
-            // Debug: log setiap item
-            console.log(`Item ${dataIndex}:`, item);
             
             // Coba ambil nama tindakan dari berbagai sumber
             let namaTindakan = 'Tindakan Fiktif';
@@ -220,7 +214,6 @@ export default function HasilRadiologiPage() {
             };
             
             // Debug: log hasil mapping
-            console.log(`Mapped result ${dataIndex}:`, result);
             
             return result;
         });
@@ -317,7 +310,6 @@ export default function HasilRadiologiPage() {
             });
             toast.success('Data berhasil dimuat');
         } catch (error) {
-            console.log(error);
             toast.error('Gagal memuat data');
         } finally {
             setLoading(null);

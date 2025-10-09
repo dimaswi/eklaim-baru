@@ -59,10 +59,8 @@ export default function ProcedureModal({
     };
 
     const handleSelectProcedure = (procedure: Procedure) => {
-        const isAlreadySelected = selectedProcedures.some(p => p.code === procedure.code);
-        if (!isAlreadySelected) {
-            onSelectProcedure(procedure);
-        }
+        // Allow selecting the same procedure multiple times for counting
+        onSelectProcedure(procedure);
     };
 
     const handleRemoveProcedure = (code: string) => {
@@ -130,12 +128,11 @@ export default function ProcedureModal({
                                                 <td className="p-2 border-b text-center">
                                                     <Button
                                                         size="sm"
-                                                        variant={selectedProcedures.some(p => p.code === procedure.code) ? "secondary" : "outline"}
+                                                        variant="outline"
                                                         onClick={() => handleSelectProcedure(procedure)}
-                                                        disabled={selectedProcedures.some(p => p.code === procedure.code)}
                                                         className="text-xs"
                                                     >
-                                                        {selectedProcedures.some(p => p.code === procedure.code) ? 'Dipilih' : 'Pilih'}
+                                                        {selectedProcedures.some(p => p.code === procedure.code) ? `Pilih Lagi (${selectedProcedures.filter(p => p.code === procedure.code).length})` : 'Pilih'}
                                                     </Button>
                                                 </td>
                                             </tr>
@@ -157,20 +154,34 @@ export default function ProcedureModal({
                         <div className="border-t pt-4">
                             <p className="font-semibold mb-2">Prosedur Dipilih ({selectedProcedures.length}):</p>
                             <div className="flex flex-wrap gap-2">
-                                {selectedProcedures.map((procedure) => (
+                                {/* Group procedures by code and show count */}
+                                {Object.entries(
+                                    selectedProcedures.reduce((acc, procedure) => {
+                                        if (!acc[procedure.code]) {
+                                            acc[procedure.code] = { ...procedure, count: 0 };
+                                        }
+                                        acc[procedure.code].count++;
+                                        return acc;
+                                    }, {} as Record<string, Procedure & { count: number }>)
+                                ).map(([code, procedureWithCount]) => (
                                     <Badge
-                                        key={procedure.code}
+                                        key={code}
                                         variant="default"
                                         className="text-xs px-3 py-1"
                                     >
-                                        {procedure.code} - {procedure.name}
+                                        {procedureWithCount.code} - {procedureWithCount.name}
+                                        {procedureWithCount.count > 1 && (
+                                            <span className="ml-1 bg-white text-blue-600 px-1 rounded-full text-xs font-bold">
+                                                {procedureWithCount.count}
+                                            </span>
+                                        )}
                                         <button
                                             type="button"
                                             className="ml-2 h-3 w-3 cursor-pointer hover:text-red-500 inline-flex items-center justify-center"
                                             onClick={(e) => {
                                                 e.preventDefault();
                                                 e.stopPropagation();
-                                                handleRemoveProcedure(procedure.code);
+                                                handleRemoveProcedure(procedureWithCount.code);
                                             }}
                                         >
                                             <X className="h-3 w-3" />

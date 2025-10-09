@@ -28,6 +28,7 @@ export default function CreateUser() {
     const { data, setData, post, processing, errors, reset } = useForm({
         name: '',
         nip: '',
+        nik: '',
         password: '',
         password_confirmation: '',
         role_id: '0',
@@ -40,6 +41,7 @@ export default function CreateUser() {
                 setData({
                     name: '',
                     nip: '',
+                    nik: '',
                     password: '',
                     password_confirmation: '',
                     role_id: '0',
@@ -128,6 +130,26 @@ export default function CreateUser() {
                                         <AlertDescription>{errors.nip}</AlertDescription>
                                     </Alert>
                                 )}
+                            </div>
+
+                            {/* NIK Field */}
+                            <div className="space-y-2">
+                                <Label htmlFor="nik">NIK (Nomor Induk Kependudukan)</Label>
+                                <Input
+                                    id="nik"
+                                    type="text"
+                                    value={data.nik}
+                                    onChange={(e) => setData('nik', e.target.value)}
+                                    placeholder="Masukkan NIK (16 digit)"
+                                    maxLength={16}
+                                    className={errors.nik ? 'border-red-500' : ''}
+                                />
+                                {errors.nik && (
+                                    <Alert variant="destructive">
+                                        <AlertDescription>{errors.nik}</AlertDescription>
+                                    </Alert>
+                                )}
+                                <small className="text-gray-500">NIK akan digunakan sebagai NIK Coder di form E-Klaim</small>
                             </div>
 
                             {/* Password Field */}

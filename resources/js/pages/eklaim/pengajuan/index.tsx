@@ -91,8 +91,8 @@ export default function PengajuanIndex() {
         const statusMap = {
             0: { label: 'Default', variant: 'secondary' as const },
             1: { label: 'Tersimpan', variant: 'outline' as const },
-            2: { label: 'Grouper', variant: 'default' as const },
-            3: { label: 'Grouper Stage 2', variant: 'default' as const },
+            2: { label: 'Stage 1', variant: 'default' as const },
+            3: { label: 'Stage 2', variant: 'default' as const },
             4: { label: 'Final', variant: 'default' as const },
             5: { label: 'Kirim', variant: 'destructive' as const },
         };

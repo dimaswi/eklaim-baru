@@ -73,6 +73,8 @@ export default function PengajuanKlaimModal({ data, disabled = false }: Pengajua
         }
     }
 
+    console.log(data.jenis_kunjungan)
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -116,7 +118,7 @@ export default function PengajuanKlaimModal({ data, disabled = false }: Pengajua
                     {disabled ? 'Selesai' : 'Ajukan'}
                 </Button>
             </DialogTrigger>
-            <DialogContent className="!max-w-7xl !top-[25%] overflow-y-auto">
+            <DialogContent className="!max-w-7xl !top-[35%] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Send className="h-5 w-5 text-green-500" />
