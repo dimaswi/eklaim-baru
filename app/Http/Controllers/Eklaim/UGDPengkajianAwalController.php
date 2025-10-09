@@ -66,7 +66,7 @@ class UGDPengkajianAwalController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'pengajuan_klaim_id' => 'required|exists:pengajuan_klaim,id',
+            'pengajuan_klaim_id' => 'required|exists:app.pengajuan_klaim,id',
             'kunjungan_nomor' => 'nullable|string',
             
             // Identitas Pasien
@@ -230,7 +230,7 @@ class UGDPengkajianAwalController extends Controller
         $pengkajianAwal = UGDPengkajianAwal::findOrFail($id);
 
         $validated = $request->validate([
-            'pengajuan_klaim_id' => 'required|exists:pengajuan_klaim,id',
+            'pengajuan_klaim_id' => 'required|exists:app.pengajuan_klaim,id',
             'kunjungan_nomor' => 'nullable|string',
             
             // Identitas Pasien
