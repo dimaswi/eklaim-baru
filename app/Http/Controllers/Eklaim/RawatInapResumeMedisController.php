@@ -102,7 +102,7 @@ class RawatInapResumeMedisController extends Controller
     {
         try {
             $validated = $request->validate([
-                'pengajuan_klaim_id' => 'required|exists:pengajuan_klaim,id',
+                'pengajuan_klaim_id' => 'required|exists:app.pengajuan_klaim,id',
                 'kunjungan_nomor' => 'required|string',
                 'pasien.nama' => 'required|string',
                 'pasien.norm' => 'required|string',
