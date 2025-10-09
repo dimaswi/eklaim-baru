@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DataGrouperStage2 extends Model
 {
+    protected $connection = "app";
     protected $table = 'data_groupper_stage2';
     
     protected $fillable = [
