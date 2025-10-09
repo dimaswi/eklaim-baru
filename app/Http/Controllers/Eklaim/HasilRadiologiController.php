@@ -83,7 +83,7 @@ class HasilRadiologiController extends Controller
     {
         try {
             $validated = $request->validate([
-                'pengajuan_klaim_id' => 'required|exists:pengajuan_klaim,id',
+                'pengajuan_klaim_id' => 'required|exists:app.pengajuan_klaim,id',
                 'kunjungan_nomor' => 'required|string',
                 'hasil_radiologi' => 'required|array',
                 'tanggal_pemeriksaan' => 'nullable|string',
@@ -166,7 +166,7 @@ class HasilRadiologiController extends Controller
     {
         try {
             $validated = $request->validate([
-                'pengajuan_klaim_id' => 'required|exists:pengajuan_klaim,id',
+                'pengajuan_klaim_id' => 'required|exists:app.pengajuan_klaim,id',
                 'hasil_radiologi' => 'required|array',
                 'tanggal_pemeriksaan' => 'nullable|string',
                 'jenis_pemeriksaan' => 'nullable|string',
