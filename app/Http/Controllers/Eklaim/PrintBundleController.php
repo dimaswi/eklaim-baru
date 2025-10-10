@@ -24,17 +24,51 @@ use setasign\Fpdi\PdfParser\StreamReader;
 use App\Helpers\QRCodeHelper;
 use App\Helpers\InacbgHelper;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class PrintBundleController extends Controller
 {
     public function index($pengajuanId)
     {
         try {
+            Log::info('Print Bundle Index Request', [
+                'pengajuan_id' => $pengajuanId,
+                'request_url' => request()->url(),
+                'request_method' => request()->method(),
+                'server_environment' => app()->environment(),
+                'current_time' => now()->toDateTimeString()
+            ]);
+
+            // Test database connections first
+            $connectionStatus = $this->testDatabaseConnections();
+            Log::info('Database Connection Status', $connectionStatus);
+
             // Get pengajuan klaim data
             $pengajuanKlaim = PengajuanKlaim::findOrFail($pengajuanId);
             
+            Log::info('Pengajuan Klaim Found', [
+                'pengajuan_id' => $pengajuanId,
+                'nomor_sep' => $pengajuanKlaim->nomor_sep,
+                'status_pengiriman' => $pengajuanKlaim->status_pengiriman,
+                'nama_pasien' => $pengajuanKlaim->nama_pasien,
+                'database_connection' => $pengajuanKlaim->getConnectionName()
+            ]);
+            
             // Get all related medical records data
             $medicalRecords = $this->getAllMedicalRecords($pengajuanId, $pengajuanKlaim->status_pengiriman);
+            
+            Log::info('Medical Records Retrieved', [
+                'pengajuan_id' => $pengajuanId,
+                'medical_records_count' => count($medicalRecords),
+                'available_types' => array_keys($medicalRecords),
+                'available_documents' => array_filter($medicalRecords, function($record) {
+                    return $record['available'] ?? false;
+                }),
+                'available_count' => count(array_filter($medicalRecords, function($record) {
+                    return $record['available'] ?? false;
+                })),
+                'total_types' => count($medicalRecords)
+            ]);
             
             return Inertia::render('eklaim/print-bundle/index', [
                 'pengajuanKlaim' => $pengajuanKlaim,
@@ -42,20 +76,72 @@ class PrintBundleController extends Controller
                 'csrf_token' => csrf_token(), // Add CSRF token
             ]);
         } catch (\Exception $e) {
-            Log::error('Print Bundle Index Error: ' . $e->getMessage());
+            Log::error('Print Bundle Index Error', [
+                'pengajuan_id' => $pengajuanId,
+                'error_message' => $e->getMessage(),
+                'error_file' => $e->getFile(),
+                'error_line' => $e->getLine(),
+                'stack_trace' => $e->getTraceAsString(),
+                'server_environment' => app()->environment()
+            ]);
+            
             return redirect()->route('eklaim.pengajuan.index')
-                ->with('error', 'Terjadi kesalahan saat memuat data print bundle');
+                ->with('error', 'Terjadi kesalahan saat memuat data print bundle: ' . $e->getMessage());
         }
     }
     
     private function getAllMedicalRecords($pengajuanId, $statusPengiriman = null)
     {
         try {
-            // Get laboratorium data - each row is one record
-            $labData = HasilLaboratorium::where('pengajuan_klaim_id', $pengajuanId)->get();
+            Log::info('Getting medical records', [
+                'pengajuan_id' => $pengajuanId,
+                'status_pengiriman' => $statusPengiriman,
+                'server_environment' => app()->environment()
+            ]);
+
+            // Run database diagnostics untuk troubleshooting production
+            if (app()->environment('production')) {
+                $diagnostics = $this->runDatabaseDiagnostics($pengajuanId);
+                Log::info('Production Database Diagnostics', $diagnostics);
+            }
+
+            // Get laboratorium data dengan detailed error handling
+            try {
+                $labData = HasilLaboratorium::where('pengajuan_klaim_id', $pengajuanId)->get();
+                Log::info('Lab data retrieved', [
+                    'count' => $labData->count(),
+                    'connection' => (new HasilLaboratorium())->getConnectionName(),
+                    'table' => (new HasilLaboratorium())->getTable()
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Lab data query failed', [
+                    'error' => $e->getMessage(),
+                    'code' => $e->getCode(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'connection' => (new HasilLaboratorium())->getConnectionName()
+                ]);
+                $labData = collect([]);
+            }
             
-            // Get radiologi data - each row is one record
-            $radioData = HasilRadiologi::where('pengajuan_klaim_id', $pengajuanId)->get();
+            // Get radiologi data dengan detailed error handling
+            try {
+                $radioData = HasilRadiologi::where('pengajuan_klaim_id', $pengajuanId)->get();
+                Log::info('Radio data retrieved', [
+                    'count' => $radioData->count(),
+                    'connection' => (new HasilRadiologi())->getConnectionName(),
+                    'table' => (new HasilRadiologi())->getTable()
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Radio data query failed', [
+                    'error' => $e->getMessage(),
+                    'code' => $e->getCode(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'connection' => (new HasilRadiologi())->getConnectionName()
+                ]);
+                $radioData = collect([]);
+            }
             
             // Base medical records array
             $medicalRecords = [];
@@ -71,6 +157,10 @@ class PrintBundleController extends Controller
                 'description' => 'Surat Elegibilitas Peserta BPJS Kesehatan',
                 'priority' => 0, // Highest priority to show first
             ];
+            Log::info('SEP record added to medical records', [
+                'pengajuan_id' => $pengajuanId,
+                'sep_status' => 'always_available'
+            ]);
             
             // Add Berkas Klaim if status_pengiriman >= 4
             if ($statusPengiriman >= 4) {
@@ -84,6 +174,17 @@ class PrintBundleController extends Controller
                     'description' => 'Berkas lengkap klaim yang telah difinalisasi',
                     'priority' => 1, // High priority to show first
                 ];
+                Log::info('Berkas Klaim added to medical records', [
+                    'pengajuan_id' => $pengajuanId,
+                    'status_pengiriman' => $statusPengiriman,
+                    'berkas_klaim_status' => 'available'
+                ]);
+            } else {
+                Log::info('Berkas Klaim not added - status pengiriman too low', [
+                    'pengajuan_id' => $pengajuanId,
+                    'status_pengiriman' => $statusPengiriman,
+                    'required_status' => '>= 4'
+                ]);
             }
             
             // Always include all medical records
@@ -129,10 +230,18 @@ class PrintBundleController extends Controller
                     'title' => 'CPPT Rawat Inap',
                     'icon' => '📝',
                     'type' => 'multiple',
-                    'data' => RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->orderBy('tanggal', 'asc')->get(),
-                    'records' => RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->orderBy('tanggal', 'asc')->get(),
-                    'count' => RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->count(),
-                    'available' => RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->exists(),
+                    'data' => $this->safeQuery(function() use ($pengajuanId) {
+                        return RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->orderBy('tanggal', 'asc')->get();
+                    }, 'rawat_inap_cppt', $pengajuanId),
+                    'records' => $this->safeQuery(function() use ($pengajuanId) {
+                        return RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->orderBy('tanggal', 'asc')->get();
+                    }, 'rawat_inap_cppt', $pengajuanId),
+                    'count' => $this->safeQuery(function() use ($pengajuanId) {
+                        return RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->count();
+                    }, 'rawat_inap_cppt_count', $pengajuanId, 0),
+                    'available' => $this->safeQuery(function() use ($pengajuanId) {
+                        return RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->exists();
+                    }, 'rawat_inap_cppt_exists', $pengajuanId, false),
                     'priority' => 3,
                 ],
                 
@@ -182,10 +291,45 @@ class PrintBundleController extends Controller
                 ],
             ]);
             
+            Log::info('All medical records compiled', [
+                'total_types' => count($medicalRecords),
+                'available_count' => count(array_filter($medicalRecords, function($record) {
+                    return $record['available'] ?? false;
+                }))
+            ]);
+
             return $medicalRecords;
         } catch (\Exception $e) {
-            Log::error('Get Medical Records Error: ' . $e->getMessage());
-            return [];
+            Log::error('Get Medical Records Error', [
+                'pengajuan_id' => $pengajuanId,
+                'error_message' => $e->getMessage(),
+                'error_file' => $e->getFile(),
+                'error_line' => $e->getLine(),
+                'stack_trace' => $e->getTraceAsString(),
+                'server_environment' => app()->environment(),
+                'connection_test' => $this->quickConnectionTest()
+            ]);
+            
+            // Return minimal SEP record even if other queries fail
+            Log::warning('Returning fallback medical records due to error', [
+                'pengajuan_id' => $pengajuanId,
+                'fallback_records' => ['sep']
+            ]);
+            
+            return [
+                'sep' => [
+                    'title' => 'Surat Elegibilitas Peserta (SEP)',
+                    'icon' => '📋',
+                    'type' => 'single',
+                    'data' => (object)['status' => 'available'],
+                    'count' => 1,
+                    'available' => true,
+                    'description' => 'Surat Elegibilitas Peserta BPJS Kesehatan',
+                    'priority' => 0,
+                    'error_fallback' => true,
+                    'error_message' => 'Sebagian data tidak dapat dimuat karena masalah koneksi database'
+                ]
+            ];
         }
     }
     
@@ -648,28 +792,49 @@ class PrintBundleController extends Controller
     {
         $resumeData = collect();
         
-        // Check for Rawat Inap Resume Medis
-        $rawatInapResume = RawatInapResumeMedis::where('pengajuan_klaim_id', $pengajuanId)->first();
-        if ($rawatInapResume) {
-            $rawatInapResume->resume_type = 'rawat_inap';
-            $rawatInapResume->resume_title = 'Resume Medis Rawat Inap';
-            $resumeData->push($rawatInapResume);
+        try {
+            // Check for Rawat Inap Resume Medis
+            $rawatInapResume = RawatInapResumeMedis::where('pengajuan_klaim_id', $pengajuanId)->first();
+            if ($rawatInapResume) {
+                $rawatInapResume->resume_type = 'rawat_inap';
+                $rawatInapResume->resume_title = 'Resume Medis Rawat Inap';
+                $resumeData->push($rawatInapResume);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error getting Rawat Inap Resume Medis', [
+                'pengajuan_id' => $pengajuanId,
+                'error' => $e->getMessage()
+            ]);
         }
         
-        // Check for Rawat Jalan Resume Medis
-        $rawatJalanResume = RawatJalanResumeMedis::where('pengajuan_klaim_id', $pengajuanId)->first();
-        if ($rawatJalanResume) {
-            $rawatJalanResume->resume_type = 'rawat_jalan';
-            $rawatJalanResume->resume_title = 'Resume Medis Rawat Jalan';
-            $resumeData->push($rawatJalanResume);
+        try {
+            // Check for Rawat Jalan Resume Medis
+            $rawatJalanResume = RawatJalanResumeMedis::where('pengajuan_klaim_id', $pengajuanId)->first();
+            if ($rawatJalanResume) {
+                $rawatJalanResume->resume_type = 'rawat_jalan';
+                $rawatJalanResume->resume_title = 'Resume Medis Rawat Jalan';
+                $resumeData->push($rawatJalanResume);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error getting Rawat Jalan Resume Medis', [
+                'pengajuan_id' => $pengajuanId,
+                'error' => $e->getMessage()
+            ]);
         }
         
-        // Check for UGD Resume Medis
-        $ugdResume = UGDResumeMedis::where('pengajuan_klaim_id', $pengajuanId)->first();
-        if ($ugdResume) {
-            $ugdResume->resume_type = 'ugd';
-            $ugdResume->resume_title = 'Resume Medis UGD';
-            $resumeData->push($ugdResume);
+        try {
+            // Check for UGD Resume Medis
+            $ugdResume = UGDResumeMedis::where('pengajuan_klaim_id', $pengajuanId)->first();
+            if ($ugdResume) {
+                $ugdResume->resume_type = 'ugd';
+                $ugdResume->resume_title = 'Resume Medis UGD';
+                $resumeData->push($ugdResume);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error getting UGD Resume Medis', [
+                'pengajuan_id' => $pengajuanId,
+                'error' => $e->getMessage()
+            ]);
         }
         
         return $resumeData;
@@ -679,28 +844,49 @@ class PrintBundleController extends Controller
     {
         $pengkajianData = collect();
         
-        // Check for Rawat Inap Pengkajian Awal
-        $rawatInapPengkajian = RawatInapPengkajianAwal::where('pengajuan_klaim_id', $pengajuanId)->first();
-        if ($rawatInapPengkajian) {
-            $rawatInapPengkajian->pengkajian_type = 'rawat_inap';
-            $rawatInapPengkajian->pengkajian_title = 'Pengkajian Awal Rawat Inap';
-            $pengkajianData->push($rawatInapPengkajian);
+        try {
+            // Check for Rawat Inap Pengkajian Awal
+            $rawatInapPengkajian = RawatInapPengkajianAwal::where('pengajuan_klaim_id', $pengajuanId)->first();
+            if ($rawatInapPengkajian) {
+                $rawatInapPengkajian->pengkajian_type = 'rawat_inap';
+                $rawatInapPengkajian->pengkajian_title = 'Pengkajian Awal Rawat Inap';
+                $pengkajianData->push($rawatInapPengkajian);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error getting Rawat Inap Pengkajian Awal', [
+                'pengajuan_id' => $pengajuanId,
+                'error' => $e->getMessage()
+            ]);
         }
         
-        // Check for Rawat Jalan Pengkajian Awal
-        $rawatJalanPengkajian = RawatJalanPengkajianAwal::where('pengajuan_klaim_id', $pengajuanId)->first();
-        if ($rawatJalanPengkajian) {
-            $rawatJalanPengkajian->pengkajian_type = 'rawat_jalan';
-            $rawatJalanPengkajian->pengkajian_title = 'Pengkajian Awal Rawat Jalan';
-            $pengkajianData->push($rawatJalanPengkajian);
+        try {
+            // Check for Rawat Jalan Pengkajian Awal
+            $rawatJalanPengkajian = RawatJalanPengkajianAwal::where('pengajuan_klaim_id', $pengajuanId)->first();
+            if ($rawatJalanPengkajian) {
+                $rawatJalanPengkajian->pengkajian_type = 'rawat_jalan';
+                $rawatJalanPengkajian->pengkajian_title = 'Pengkajian Awal Rawat Jalan';
+                $pengkajianData->push($rawatJalanPengkajian);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error getting Rawat Jalan Pengkajian Awal', [
+                'pengajuan_id' => $pengajuanId,
+                'error' => $e->getMessage()
+            ]);
         }
         
-        // Check for UGD Pengkajian Awal
-        $ugdPengkajian = UGDPengkajianAwal::where('pengajuan_klaim_id', $pengajuanId)->first();
-        if ($ugdPengkajian) {
-            $ugdPengkajian->pengkajian_type = 'ugd';
-            $ugdPengkajian->pengkajian_title = 'Pengkajian Awal UGD';
-            $pengkajianData->push($ugdPengkajian);
+        try {
+            // Check for UGD Pengkajian Awal
+            $ugdPengkajian = UGDPengkajianAwal::where('pengajuan_klaim_id', $pengajuanId)->first();
+            if ($ugdPengkajian) {
+                $ugdPengkajian->pengkajian_type = 'ugd';
+                $ugdPengkajian->pengkajian_title = 'Pengkajian Awal UGD';
+                $pengkajianData->push($ugdPengkajian);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error getting UGD Pengkajian Awal', [
+                'pengajuan_id' => $pengajuanId,
+                'error' => $e->getMessage()
+            ]);
         }
         
         return $pengkajianData;
@@ -1028,6 +1214,202 @@ class PrintBundleController extends Controller
         }
         
         return null;
+    }
+
+    private function safeQuery(callable $query, string $queryName, $pengajuanId, $defaultValue = null)
+    {
+        try {
+            $result = $query();
+            Log::debug("Safe query executed successfully", [
+                'query_name' => $queryName,
+                'pengajuan_id' => $pengajuanId,
+                'result_type' => gettype($result),
+                'result_count' => is_countable($result) ? count($result) : 'not_countable'
+            ]);
+            return $result;
+        } catch (\Exception $e) {
+            Log::error('Safe query failed', [
+                'query_name' => $queryName,
+                'pengajuan_id' => $pengajuanId,
+                'error_message' => $e->getMessage(),
+                'error_file' => $e->getFile(),
+                'error_line' => $e->getLine()
+            ]);
+            
+            // Return appropriate default value
+            if ($defaultValue !== null) {
+                return $defaultValue;
+            }
+            
+            // Return empty collection by default
+            return collect([]);
+        }
+    }
+
+    /**
+     * Test database connections untuk memastikan semua koneksi yang dibutuhkan tersedia
+     */
+    private function testDatabaseConnections()
+    {
+        $connectionStatus = [];
+        
+        // Test koneksi utama 'app' yang digunakan oleh model Eklaim
+        try {
+            DB::connection('app')->getPdo();
+            $connectionStatus['app'] = [
+                'status' => 'connected',
+                'message' => 'Connection successful'
+            ];
+            
+            // Test dengan query sederhana
+            $count = DB::connection('app')->table('pengajuan_klaim')->count();
+            $connectionStatus['app']['pengajuan_klaim_count'] = $count;
+            
+        } catch (\Exception $e) {
+            $connectionStatus['app'] = [
+                'status' => 'failed',
+                'message' => $e->getMessage(),
+                'error_code' => $e->getCode()
+            ];
+            
+            Log::error('Database connection test failed for app', [
+                'connection' => 'app',
+                'error' => $e->getMessage(),
+                'code' => $e->getCode()
+            ]);
+        }
+        
+        // Test tabel-tabel yang digunakan dalam getAllMedicalRecords
+        $tables = [
+            'hasil_laboratoriums',
+            'hasil_radiologis', 
+            'rawat_inap_resume_medis',
+            'rawat_jalan_resume_medis',
+            'ugd_resume_medis',
+            'rawat_inap_cpptes',
+            'rawat_inap_pengkajian_awals',
+            'rawat_jalan_pengkajian_awals',
+            'ugd_pengkajian_awals',
+            'ugd_triages',
+            'rawat_inap_balance_cairans',
+            'tagihans'
+        ];
+        
+        foreach ($tables as $table) {
+            try {
+                $exists = DB::connection('app')->getSchemaBuilder()->hasTable($table);
+                $connectionStatus['tables'][$table] = [
+                    'exists' => $exists,
+                    'status' => $exists ? 'found' : 'missing'
+                ];
+                
+                if ($exists) {
+                    try {
+                        $count = DB::connection('app')->table($table)->count();
+                        $connectionStatus['tables'][$table]['count'] = $count;
+                    } catch (\Exception $e) {
+                        $connectionStatus['tables'][$table]['count_error'] = $e->getMessage();
+                    }
+                }
+                
+            } catch (\Exception $e) {
+                $connectionStatus['tables'][$table] = [
+                    'exists' => false,
+                    'status' => 'error',
+                    'error' => $e->getMessage()
+                ];
+            }
+        }
+        
+        return $connectionStatus;
+    }
+
+    /**
+     * Detailed database diagnostics untuk production troubleshooting
+     */
+    private function runDatabaseDiagnostics($pengajuanId)
+    {
+        $diagnostics = [
+            'pengajuan_id' => $pengajuanId,
+            'timestamp' => now()->toDateTimeString(),
+            'environment' => app()->environment(),
+            'php_version' => phpversion(),
+            'laravel_version' => app()->version()
+        ];
+        
+        // Check database configuration
+        $diagnostics['database_config'] = [
+            'default_connection' => config('database.default'),
+            'app_connection' => config('database.connections.app', 'not_configured')
+        ];
+        
+        // Test specific model queries
+        try {
+            $pengajuanKlaim = PengajuanKlaim::find($pengajuanId);
+            $diagnostics['pengajuan_test'] = [
+                'found' => !is_null($pengajuanKlaim),
+                'nomor_sep' => $pengajuanKlaim?->nomor_sep,
+                'status_pengiriman' => $pengajuanKlaim?->status_pengiriman
+            ];
+        } catch (\Exception $e) {
+            $diagnostics['pengajuan_test'] = [
+                'error' => $e->getMessage(),
+                'code' => $e->getCode()
+            ];
+        }
+        
+        // Test each model used in getAllMedicalRecords
+        $models = [
+            'HasilLaboratorium' => HasilLaboratorium::class,
+            'HasilRadiologi' => HasilRadiologi::class,
+            'RawatInapResumeMedis' => RawatInapResumeMedis::class,
+            'RawatJalanResumeMedis' => RawatJalanResumeMedis::class,
+            'UGDResumeMedis' => UGDResumeMedis::class,
+            'RawatInapCPPT' => RawatInapCPPT::class,
+            'RawatInapPengkajianAwal' => RawatInapPengkajianAwal::class,
+            'RawatJalanPengkajianAwal' => RawatJalanPengkajianAwal::class,
+            'UGDPengkajianAwal' => UGDPengkajianAwal::class,
+            'UGDTriage' => UGDTriage::class,
+            'RawatInapBalanceCairan' => RawatInapBalanceCairan::class,
+            'Tagihan' => Tagihan::class,
+        ];
+        
+        foreach ($models as $modelName => $modelClass) {
+            try {
+                $count = $modelClass::where('pengajuan_klaim_id', $pengajuanId)->count();
+                $diagnostics['model_tests'][$modelName] = [
+                    'status' => 'success',
+                    'count' => $count,
+                    'table' => (new $modelClass)->getTable(),
+                    'connection' => (new $modelClass)->getConnectionName()
+                ];
+            } catch (\Exception $e) {
+                $diagnostics['model_tests'][$modelName] = [
+                    'status' => 'error',
+                    'error' => $e->getMessage(),
+                    'code' => $e->getCode(),
+                    'table' => 'unknown',
+                    'connection' => 'unknown'
+                ];
+            }
+        }
+        
+        Log::info('Database Diagnostics Complete', $diagnostics);
+        
+        return $diagnostics;
+    }
+
+    /**
+     * Quick connection test untuk error reporting
+     */
+    private function quickConnectionTest()
+    {
+        try {
+            DB::connection('app')->getPdo();
+            return 'app_connection_ok';
+        } catch (\Exception $e) {
+            return 'app_connection_failed: ' . $e->getMessage();
+        }
     }
 
 
