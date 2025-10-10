@@ -115,7 +115,7 @@ class RawatJalanResumeMedisController extends Controller
         ]);
 
         $validated = $request->validate([
-            'pengajuan_klaim_id' => 'required|exists:pengajuan_klaim,id',
+            'pengajuan_klaim_id' => 'required|exists:app.pengajuan_klaim,id',
             'kunjungan_nomor' => 'required|string',
             'tanggal_masuk' => 'nullable|string',
             'tanggal_keluar' => 'nullable|string',

@@ -9,6 +9,8 @@ class DataKlaim extends Model
 {
     use HasFactory;
 
+    protected $connection = "app";
+    
     protected $table = 'data_klaim';
 
     protected $fillable = [

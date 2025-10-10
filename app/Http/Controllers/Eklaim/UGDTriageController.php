@@ -65,7 +65,7 @@ class UGDTriageController extends Controller
     {
         try {
             $validated = $request->validate([
-                'pengajuan_klaim_id' => 'required|exists:pengajuan_klaim,id',
+                'pengajuan_klaim_id' => 'required|exists:app.pengajuan_klaim,id',
                 'pasien.nama' => 'required|string',
                 'pasien.norm' => 'required|string',
                 'pasien.tanggal_lahir' => 'required|string',

@@ -12,6 +12,6 @@ class TarifHargaBarang extends Model
 
     public function nama_barang()
     {
-        return $this->hasOne(BARANG::class, 'ID', 'BARANG');
+        return $this->hasOne(Barang::class, 'ID', 'BARANG');
     }
 }

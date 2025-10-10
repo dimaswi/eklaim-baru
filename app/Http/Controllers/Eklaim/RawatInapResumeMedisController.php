@@ -102,7 +102,7 @@ class RawatInapResumeMedisController extends Controller
     {
         try {
             $validated = $request->validate([
-                'pengajuan_klaim_id' => 'required|exists:pengajuan_klaim,id',
+                'pengajuan_klaim_id' => 'required|exists:app.pengajuan_klaim,id',
                 'kunjungan_nomor' => 'required|string',
                 'pasien.nama' => 'required|string',
                 'pasien.norm' => 'required|string',
@@ -151,7 +151,7 @@ class RawatInapResumeMedisController extends Controller
                 'resepPulang.*.kode_obat' => 'required_with:resepPulang|string',
             ]);
 
-            DB::beginTransaction();
+            DB::connection('app')->beginTransaction();
 
             // Hapus data lama untuk pengajuan dan kunjungan ini
             RawatInapResumeMedis::where('pengajuan_klaim_id', $validated['pengajuan_klaim_id'])
@@ -200,11 +200,11 @@ class RawatInapResumeMedisController extends Controller
                 'resep_pulang' => $validated['resepPulang'] ?? null,
             ]);
 
-            DB::commit();
+            DB::connection('app')->commit();
 
             return redirect()->back()->with('success', 'Data Resume Medis berhasil disimpan ke sistem E-Klaim');
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('app')->rollBack();
             Log::error('Error menyimpan data Resume Medis E-Klaim: ' . $e->getMessage());
 
             return redirect()->back()->with('error', 'Gagal menyimpan data Resume Medis: ' . $e->getMessage());

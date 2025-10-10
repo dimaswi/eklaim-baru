@@ -82,7 +82,7 @@ class HasilLaboratoriumController extends Controller
     {
         try {
             $validated = $request->validate([
-                'pengajuan_klaim_id' => 'required|exists:pengajuan_klaim,id',
+                'pengajuan_klaim_id' => 'required|exists:app.pengajuan_klaim,id',
                 'kunjungan_nomor' => 'required|string',
                 'hasil_laboratorium' => 'required|array',
                 'tanggal_pemeriksaan' => 'nullable|string',
@@ -147,7 +147,7 @@ class HasilLaboratoriumController extends Controller
     {
         try {
             $validated = $request->validate([
-                'pengajuan_klaim_id' => 'required|exists:pengajuan_klaim,id',
+                'pengajuan_klaim_id' => 'required|exists:app.pengajuan_klaim,id',
                 'hasil_laboratorium' => 'required|array',
                 'tanggal_pemeriksaan' => 'nullable|string',
                 'dokter_pengirim' => 'nullable|string',

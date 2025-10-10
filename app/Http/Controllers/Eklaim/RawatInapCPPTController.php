@@ -56,7 +56,7 @@ class RawatInapCPPTController extends Controller
     {
         try {
             $validated = $request->validate([
-                'pengajuan_klaim_id' => 'required|exists:pengajuan_klaim,id',
+                'pengajuan_klaim_id' => 'required|exists:app.pengajuan_klaim,id',
                 'kunjungan_nomor' => 'required|string',
                 'cppt_data' => 'required|array',
                 'cppt_data.*.tanggal' => 'required|string',

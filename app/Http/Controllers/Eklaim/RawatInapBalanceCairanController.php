@@ -55,7 +55,7 @@ class RawatInapBalanceCairanController extends Controller
     {
         try {
             $validated = $request->validate([
-                'pengajuan_klaim_id' => 'required|exists:pengajuan_klaim,id',
+                'pengajuan_klaim_id' => 'required|exists:app.pengajuan_klaim,id',
                 'kunjungan_nomor' => 'required|string',
                 'balance_cairan_data' => 'required|array',
                 'balance_cairan_data.*.intake_oral' => 'required|string',
