@@ -469,6 +469,8 @@ class PrintBundleController extends Controller
                 'logo_type' => ($documentType === 'sep') ? 'bpjs' : 'regular'
             ]);
 
+            dd($selectedRecords);
+
             // Return HTML preview using same Blade template as PDF
             return view("pdf.templates.{$documentType}", array_merge([
                 'pengajuanKlaim' => $pengajuanKlaim,
