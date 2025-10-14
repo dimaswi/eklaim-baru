@@ -468,7 +468,7 @@ class PrintBundleController extends Controller
                 'has_logo' => !is_null($logoBase64),
                 'logo_type' => ($documentType === 'sep') ? 'bpjs' : 'regular'
             ]);
-            
+
             // Return HTML preview using same Blade template as PDF
             return view("pdf.templates.{$documentType}", array_merge([
                 'pengajuanKlaim' => $pengajuanKlaim,
@@ -486,9 +486,7 @@ class PrintBundleController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
             
-            return response()->json([
-                'error' => 'Terjadi kesalahan saat generate preview: ' . $e->getMessage()
-            ], 500);
+            return redirect()->back()->with('error', 'Error generate pdf');
         }
     }
     
