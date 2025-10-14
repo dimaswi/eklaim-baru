@@ -372,7 +372,6 @@
     @php
         // Ambil record yang dipilih
         $resumeMedis = data_get($selectedRecords, 'resume_medis', []);
-        print_r($selectedRecords);
     @endphp
 
     @if (!empty($resumeMedis))
