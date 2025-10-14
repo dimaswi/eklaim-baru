@@ -475,6 +475,7 @@ class PrintBundleController extends Controller
                 'data' => $data,
                 'selectedRecords' => $selectedRecords,
                 'logoBase64' => $logoBase64,
+                'documentType' => $documentType,
             ], $qrData));
             
         } catch (\Exception $e) {
@@ -595,6 +596,7 @@ class PrintBundleController extends Controller
                 'data' => $data,
                 'selectedRecords' => $selectedRecords,
                 'logoBase64' => $logoBase64,
+                'documentType' => $documentType,
             ], $qrData))->setPaper('a4', 'portrait');
             
             Log::info('PDF generated successfully', ['document_type' => $documentType]);
@@ -732,6 +734,7 @@ class PrintBundleController extends Controller
                         'data' => $data,
                         'selectedRecords' => $selectedRecords,
                         'logoBase64' => $logoBase64,
+                        'documentType' => $documentType,
                     ], $qrData))->setPaper('a4', 'portrait');
                     
                     $pdfContent = $pdf->output();
