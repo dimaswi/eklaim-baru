@@ -366,7 +366,7 @@
 <body>
     @php
         $recordCount = 0;
-        echo($data);
+        echo($selectedRecords);
     @endphp
 
     @if ($data && $data->count() > 0)
