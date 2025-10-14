@@ -369,9 +369,6 @@
     @endphp
 
     @if ($data && $data->count() > 0)
-        @php
-            dd($data);
-        @endphp
         {{-- Check if we have selected records for resume_medis --}}
         @if (!empty($selectedRecords['resume_medis'] ?? []))
             @php
