@@ -232,6 +232,8 @@ export default function PrintBundleIndex() {
                 selectedRecordsData[doc.type] = doc.selectedRecords;
             }
 
+            console.log(selectedRecordsData);
+
             // Handle berkas_klaim API data
             const requestBody = doc.type === 'berkas_klaim' 
                 ? {
