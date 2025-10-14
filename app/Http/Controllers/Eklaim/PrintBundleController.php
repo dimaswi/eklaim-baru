@@ -335,6 +335,7 @@ class PrintBundleController extends Controller
     
     public function generatePreview(Request $request, $pengajuanId)
     {
+        dd($request->all());
         try {
             // Handle potential CSRF token issues for POST requests
             if ($request->isMethod('POST')) {
@@ -468,8 +469,6 @@ class PrintBundleController extends Controller
                 'has_logo' => !is_null($logoBase64),
                 'logo_type' => ($documentType === 'sep') ? 'bpjs' : 'regular'
             ]);
-
-            dd($selectedRecords);
 
             // Return HTML preview using same Blade template as PDF
             return view("pdf.templates.{$documentType}", array_merge([
