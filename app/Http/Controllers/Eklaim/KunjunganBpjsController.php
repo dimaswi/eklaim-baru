@@ -195,83 +195,77 @@ class KunjunganBpjsController extends Controller
                 }
             }
 
-            $response = InacbgHelper::hitApi($data, 'POST');
-
-            Log::info('Response INACBG', [
-                'status_code' => $response['status_code'] ?? 'undefined',
-                'response' => $response['response'] ?? null,
-                'error' => $response['error'] ?? null
-            ]);
-
-            if (isset($response['status_code']) && $response['status_code'] === 200) {
-                $responseData = $response['response'];
-                
-                if (isset($responseData['metadata']['code']) && $responseData['metadata']['code'] == 200) {
-                    $claimData = $responseData['response'];
-                    
-                    // Update status kunjungan
-                    if ($kunjungan) {
-                        $kunjungan->klaimStatus = 1; // Set sebagai sudah diklaim
-                        $kunjungan->save();
-                    }
-
-                    // Simpan data pengajuan dengan status 0 (default)
-                    $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_DEFAULT;
-                    $pengajuanData['response_message'] = $responseData['metadata']['message'];
-                    $pengajuanData['response_data'] = $responseData;
-                    
-                    PengajuanKlaim::create($pengajuanData);
-
-                    Log::info('INACBG Claim Success', [
-                        'noSEP' => $request->get('nomor_sep'),
-                        'metadata' => $responseData['metadata'],
-                        'claim_data' => $claimData
-                    ]);
-
-                    return redirect()->route('eklaim.kunjungan.index')->with('success', 
-                        'Klaim berhasil diajukan ke INACBG. ' . $responseData['metadata']['message']);
-                } else {
-                    $errorCode = $responseData['metadata']['code'] ?? 'Unknown';
-                    $errorMessage = $responseData['metadata']['message'] ?? 'Unknown error from INACBG';
-                    
-                    // Simpan data pengajuan dengan status 0 (default)
-                    $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_DEFAULT;
-                    $pengajuanData['response_message'] = $errorMessage;
-                    $pengajuanData['response_data'] = $responseData;
-                    
-                    PengajuanKlaim::create($pengajuanData);
-                    
-                    Log::error('INACBG API Error', [
-                        'code' => $errorCode,
-                        'message' => $errorMessage,
-                        'noSEP' => $request->get('nomor_sep'),
-                        'full_response' => $responseData
-                    ]);
-                    
-                    return redirect()->route('eklaim.kunjungan.index')->with('error', 
-                        'Gagal mengajukan klaim (Code: ' . $errorCode . '): ' . $errorMessage);
-                }
-            } else {
-                // Handle errors from INACBG API or HTTP errors
-                $statusCode = $response['status_code'] ?? 'unknown';
-                $errorMessage = $response['error'] ?? 'Unknown error';
-                
-                // Simpan data pengajuan dengan status 0 (default)
+            // Check if this is a force create (bypass API)
+            if ($request->get('force_create')) {
+                // Skip API call and directly create pengajuan klaim
                 $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_DEFAULT;
-                $pengajuanData['response_message'] = 'Error (Code: ' . $statusCode . '): ' . $errorMessage;
-                $pengajuanData['response_data'] = $response;
+                $pengajuanData['response_message'] = 'Data disimpan tanpa mengirim ke API INACBG (Force Create)';
+                $pengajuanData['response_data'] = ['force_create' => true, 'timestamp' => now()];
                 
                 PengajuanKlaim::create($pengajuanData);
-                
-                Log::error('INACBG Connection Error', [
-                    'status_code' => $statusCode,
-                    'error' => $errorMessage,
-                    'noSEP' => $request->get('nomor_sep'),
-                    'full_response' => $response
+
+                Log::info('Force Create Pengajuan Klaim', [
+                    'nomor_sep' => $request->get('nomor_sep'),
+                    'message' => 'Data disimpan tanpa API call',
+                    'user_action' => 'force_create'
+                ]);
+
+                return redirect()->route('eklaim.kunjungan.index')->with('success', 
+                    'Data pengajuan klaim berhasil disimpan. Anda dapat mencoba mengirim ke API INACBG nanti.');
+            }
+
+            // Submit to INACBG API
+            $inacbgResponse = InacbgHelper::hitApi($data, 'POST');
+            
+            Log::info('INACBG Response', [
+                'nomor_sep' => $request->get('nomor_sep'),
+                'response_structure' => [
+                    'has_metadata' => isset($inacbgResponse['metadata']),
+                    'metadata_code' => $inacbgResponse['metadata']['code'] ?? 'not_set',
+                    'has_response' => isset($inacbgResponse['response']),
+                ],
+                'response' => $inacbgResponse['response'] ?? null,
+                'error' => $inacbgResponse['error'] ?? null
+            ]);
+            
+            // Jika response code bukan 200 (API error)
+            if ($inacbgResponse['metadata']['code'] != 200) {
+                Log::error('INACBG API Error', [
+                    'nomor_sep' => $request->get('nomor_sep'),
+                    'error_code' => $inacbgResponse['metadata']['code'],
+                    'error_message' => $inacbgResponse['metadata']['message'] ?? 'Unknown error',
+                    'full_response' => $inacbgResponse
                 ]);
                 
-                return redirect()->route('eklaim.kunjungan.index')->with('error', 
-                    'Gagal terhubung ke INACBG (Code: ' . $statusCode . '): ' . $errorMessage);
+                // Return error untuk ditangani di frontend
+                return back()->withErrors([
+                    'message' => $inacbgResponse['metadata']['message'] ?? 'Error from INACBG API'
+                ]);
+            }
+
+            // Jika response code 200 (sukses)
+            if ($inacbgResponse['metadata']['code'] == 200) {
+                // Update status kunjungan
+                if ($kunjungan) {
+                    $kunjungan->klaimStatus = 1; // Set sebagai sudah diklaim
+                    $kunjungan->save();
+                }
+
+                // Simpan data pengajuan dengan status sukses
+                $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_DEFAULT;
+                $pengajuanData['response_message'] = $inacbgResponse['metadata']['message'] ?? 'Klaim berhasil diajukan';
+                $pengajuanData['response_data'] = $inacbgResponse;
+                
+                PengajuanKlaim::create($pengajuanData);
+
+                Log::info('INACBG Claim Success', [
+                    'nomor_sep' => $request->get('nomor_sep'),
+                    'success_message' => $inacbgResponse['metadata']['message'] ?? 'Success',
+                    'response_data' => $inacbgResponse['response'] ?? null
+                ]);
+
+                return redirect()->route('eklaim.kunjungan.index')->with('success', 
+                    'Klaim berhasil diajukan ke INACBG: ' . ($inacbgResponse['metadata']['message'] ?? 'Berhasil'));
             }
 
         } catch (\Exception $e) {
