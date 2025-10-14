@@ -335,7 +335,6 @@ class PrintBundleController extends Controller
     
     public function generatePreview(Request $request, $pengajuanId)
     {
-        dd($request->all());
         try {
             // Handle potential CSRF token issues for POST requests
             if ($request->isMethod('POST')) {
