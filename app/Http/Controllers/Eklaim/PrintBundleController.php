@@ -405,8 +405,6 @@ class PrintBundleController extends Controller
                 Log::warning('No data found', ['type' => $documentType, 'pengajuan_id' => $pengajuanId]);
                 return response()->json(['error' => 'No data found for this document type'], 404);
             }
-
-            dd($data);
             
             // Special handling for berkas_klaim from INACBG API
             if ($documentType === 'berkas_klaim') {
