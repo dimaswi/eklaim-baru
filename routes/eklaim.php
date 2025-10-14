@@ -27,11 +27,19 @@ Route::middleware('auth')->group(function () {
     Route::get('/eklaim/pengajuan', [PengajuanKlaimController::class, 'index'])->name('eklaim.pengajuan.index')->middleware('permission:pengajuan-klaim.view');
     Route::get('/eklaim/pengajuan/{id}/rm', [PengajuanKlaimController::class, 'show'])->name('eklaim.pengajuan.show')->middleware('permission:pengajuan-klaim.view');
     
-    // Print Bundle Routes
-    Route::get('/eklaim/print-bundle/{pengajuan}', [PrintBundleController::class, 'index'])->name('eklaim.print-bundle.index')->middleware('permission:pengajuan-klaim.view');
-    Route::match(['GET', 'POST'], '/eklaim/print-bundle/{pengajuan}/preview', [PrintBundleController::class, 'generatePreview'])->name('eklaim.print-bundle.preview')->middleware('permission:pengajuan-klaim.view');
-    Route::match(['GET', 'POST'],'/eklaim/print-bundle/{pengajuan}/pdf', [PrintBundleController::class, 'generatePDF'])->name('eklaim.print-bundle.pdf')->middleware('permission:pengajuan-klaim.view');
-    Route::post('/eklaim/print-bundle/{pengajuan}/bundle', [PrintBundleController::class, 'generateBundle'])->name('eklaim.print-bundle.bundle')->middleware('permission:pengajuan-klaim.view');
+    // Print Bundle Routes - with production CSRF handling
+    Route::get('/eklaim/print-bundle/{pengajuan}', [PrintBundleController::class, 'index'])->name('eklaim.print-bundle.index')->middleware(['permission:pengajuan-klaim.view']);
+    
+    // Preview routes - GET only for initial load, POST for form submission
+    Route::get('/eklaim/print-bundle/{pengajuan}/preview', [PrintBundleController::class, 'generatePreview'])->name('eklaim.print-bundle.preview')->middleware(['permission:pengajuan-klaim.view']);
+    Route::post('/eklaim/print-bundle/{pengajuan}/preview', [PrintBundleController::class, 'generatePreview'])->name('eklaim.print-bundle.preview.post')->middleware(['permission:pengajuan-klaim.view', 'production.csrf']);
+    
+    // PDF generation routes - GET only for direct access, POST for form submission  
+    Route::get('/eklaim/print-bundle/{pengajuan}/pdf', [PrintBundleController::class, 'generatePDF'])->name('eklaim.print-bundle.pdf')->middleware(['permission:pengajuan-klaim.view']);
+    Route::post('/eklaim/print-bundle/{pengajuan}/pdf', [PrintBundleController::class, 'generatePDF'])->name('eklaim.print-bundle.pdf.post')->middleware(['permission:pengajuan-klaim.view', 'production.csrf']);
+    
+    // Bundle generation - POST only
+    Route::post('/eklaim/print-bundle/{pengajuan}/bundle', [PrintBundleController::class, 'generateBundle'])->name('eklaim.print-bundle.bundle')->middleware(['permission:pengajuan-klaim.view', 'production.csrf']);
 });
 
 //Pengajuan Klaim Ke Inacbg

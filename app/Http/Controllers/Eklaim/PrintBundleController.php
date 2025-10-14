@@ -336,12 +336,39 @@ class PrintBundleController extends Controller
     public function generatePreview(Request $request, $pengajuanId)
     {
         try {
+            // Handle potential CSRF token issues for POST requests
+            if ($request->isMethod('POST')) {
+                // Check if CSRF token is valid
+                $tokenValid = $request->session()->token() === $request->input('_token');
+                
+                if (!$tokenValid && !$request->ajax()) {
+                    Log::warning('CSRF Token Issue Detected in Preview', [
+                        'pengajuan_id' => $pengajuanId,
+                        'method' => $request->method(),
+                        'has_token' => $request->has('_token'),
+                        'session_started' => session()->isStarted(),
+                        'session_token' => substr($request->session()->token() ?? '', 0, 10) . '...',
+                        'request_token' => substr($request->input('_token') ?? '', 0, 10) . '...',
+                        'user_agent' => $request->userAgent()
+                    ]);
+                    
+                    // For POST requests without valid CSRF, redirect to GET with query params
+                    if ($request->has('type')) {
+                        return redirect()->route('eklaim.print-bundle.preview', [
+                            'pengajuan' => $pengajuanId,
+                            'type' => $request->get('type')
+                        ]);
+                    }
+                }
+            }
+
             Log::info('Generate Preview Request', [
                 'pengajuan_id' => $pengajuanId,
                 'document_type' => $request->get('type'),
                 'method' => $request->method(),
                 'session_id' => session()->getId(),
                 'has_session' => session()->isStarted(),
+                'csrf_token_valid' => $request->isMethod('GET') ? 'N/A' : ($request->session()->token() === $request->input('_token') ? 'valid' : 'invalid')
             ]);
 
             $documentType = $request->get('type');
@@ -468,11 +495,47 @@ class PrintBundleController extends Controller
     public function generatePDF(Request $request, $pengajuanId)
     {
         try {
+            // Handle potential CSRF token issues for POST requests
+            if ($request->isMethod('POST')) {
+                // Check if CSRF token is valid
+                $tokenValid = $request->session()->token() === $request->input('_token');
+                
+                if (!$tokenValid && !$request->ajax()) {
+                    Log::warning('CSRF Token Issue in PDF Generation', [
+                        'pengajuan_id' => $pengajuanId,
+                        'method' => $request->method(),
+                        'has_token' => $request->has('_token'),
+                        'session_started' => session()->isStarted(),
+                        'session_token' => substr($request->session()->token() ?? '', 0, 10) . '...',
+                        'request_token' => substr($request->input('_token') ?? '', 0, 10) . '...',
+                        'user_agent' => $request->userAgent()
+                    ]);
+                    
+                    // Return error response for AJAX calls
+                    if ($request->expectsJson()) {
+                        return response()->json([
+                            'error' => 'CSRF token mismatch. Please refresh the page and try again.',
+                            'csrf_error' => true,
+                            'new_token' => csrf_token()
+                        ], 419);
+                    }
+                    
+                    // For regular POST requests, redirect to GET with query params
+                    if ($request->has('type')) {
+                        return redirect()->route('eklaim.print-bundle.pdf', [
+                            'pengajuan' => $pengajuanId,
+                            'type' => $request->get('type')
+                        ]);
+                    }
+                }
+            }
+
             Log::info('Generate PDF Request', [
                 'pengajuan_id' => $pengajuanId,
                 'document_type' => $request->get('type'),
                 'method' => $request->method(),
                 'session_id' => session()->getId(),
+                'csrf_token_valid' => $request->isMethod('GET') ? 'N/A' : ($request->session()->token() === $request->input('_token') ? 'valid' : 'invalid')
             ]);
 
             $documentType = $request->get('type');
@@ -570,10 +633,33 @@ class PrintBundleController extends Controller
     public function generateBundle(Request $request, $pengajuanId)
     {
         try {
+            // Handle CSRF token validation for bundle generation
+            $tokenValid = $request->session()->token() === $request->input('_token');
+            
+            if (!$tokenValid && !$request->ajax()) {
+                Log::warning('CSRF Token Issue in Bundle Generation', [
+                    'pengajuan_id' => $pengajuanId,
+                    'has_token' => $request->has('_token'),
+                    'session_started' => session()->isStarted(),
+                    'session_token' => substr($request->session()->token() ?? '', 0, 10) . '...',
+                    'request_token' => substr($request->input('_token') ?? '', 0, 10) . '...',
+                    'user_agent' => $request->userAgent()
+                ]);
+                
+                // Return proper error response for AJAX calls
+                return response()->json([
+                    'error' => 'CSRF token mismatch. Please refresh the page and try again.',
+                    'csrf_error' => true,
+                    'new_token' => csrf_token(),
+                    'redirect_url' => route('eklaim.print-bundle.index', $pengajuanId)
+                ], 419);
+            }
+
             Log::info('Generate Bundle Request - Frontend PDF Merging Approach', [
                 'pengajuan_id' => $pengajuanId,
                 'document_types' => $request->input('document_types', []),
                 'selected_records' => $request->input('selected_records', []),
+                'csrf_token_valid' => $request->hasValidSignature() ? 'valid' : 'invalid'
             ]);
 
             $documentTypes = $request->input('document_types', []);

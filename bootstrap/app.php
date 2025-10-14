@@ -25,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'permission' => CheckPermission::class,
+            'production.csrf' => \App\Http\Middleware\HandleProductionCsrf::class,
         ]);
 
         $middleware->web(append: [

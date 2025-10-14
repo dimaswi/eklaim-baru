@@ -77,12 +77,22 @@ class InacbgHelper
 
     public static function hitApi($data, $method = 'POST')
     {
-        $key = env('INACBG_KEY');
+        $key = config('inacbg.key');
+        $url = config('inacbg.url');
+        
+        // Validate configuration - especially important for production
+        if (empty($key)) {
+            throw new \Exception('INACBG_KEY is not configured. Please check your environment configuration.');
+        }
+        
+        if (empty($url)) {
+            throw new \Exception('INACBG_URL is not configured. Please check your environment configuration.');
+        }
+        
         $json_request = json_decode(json_encode($data), true);
 
         $payload = self::inacbg_encrypt($json_request, $key);
         $header = array("Content-Type: application/x-www-form-urlencoded");
-        $url = env('INACBG_URL');
 
         //SETUP CURL
         $ch = curl_init();
