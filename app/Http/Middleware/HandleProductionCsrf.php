@@ -35,15 +35,20 @@ class HandleProductionCsrf
             $sessionToken = $request->session()->token();
             $requestToken = $request->input('_token') ?: $request->header('X-CSRF-TOKEN');
 
-            Log::info('Production CSRF Check', [
+            Log::info('Production CSRF Check - Detailed', [
                 'url' => $request->url(),
                 'method' => $request->method(),
                 'has_session_token' => !empty($sessionToken),
                 'has_request_token' => !empty($requestToken),
+                'session_token_preview' => $sessionToken ? substr($sessionToken, 0, 10) . '...' : 'null',
+                'request_token_preview' => $requestToken ? substr($requestToken, 0, 10) . '...' : 'null',
                 'tokens_match' => hash_equals($sessionToken ?? '', $requestToken ?? ''),
+                'request_token_sources' => [
+                    'input_token' => $request->input('_token') ? 'present' : 'missing',
+                    'header_token' => $request->header('X-CSRF-TOKEN') ? 'present' : 'missing',
+                ],
+                'content_type' => $request->header('Content-Type'),
                 'user_agent' => $request->userAgent(),
-                'forwarded_for' => $request->header('X-Forwarded-For'),
-                'real_ip' => $request->header('X-Real-IP'),
             ]);
 
             // If tokens don't match, regenerate and return new token

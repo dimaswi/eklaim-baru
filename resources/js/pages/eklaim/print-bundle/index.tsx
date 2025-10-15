@@ -221,10 +221,6 @@ export default function PrintBundleIndex() {
     const handlePreview = async (doc: PDFDocument) => {
         setLoadingStates(prev => ({ ...prev, [doc.id]: 'preview' }));
         try {
-            console.log('Starting PDF preview', {
-                documentType: doc.type,
-                documentTitle: doc.title
-            });
 
             // Prepare selected records data for this specific document
             const selectedRecordsData: { [key: string]: string[] } = {};
@@ -242,11 +238,14 @@ export default function PrintBundleIndex() {
                     selected_records: selectedRecordsData,
                 };
 
+
+
             const response = await fetch(`/eklaim/print-bundle/${pengajuanKlaim.id}/preview?type=${doc.type}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'X-Requested-With': 'XMLHttpRequest',
                 },
                 body: JSON.stringify(requestBody),
             });
@@ -262,22 +261,17 @@ export default function PrintBundleIndex() {
                 const jsonData = await response.json();
                 
                 if (jsonData.type === 'pdf_base64' && jsonData.data) {
-                    console.log('Received base64 PDF data for preview', {
-                        documentType: doc.type,
-                        dataLength: jsonData.data.length
-                    });
-
                     // Use PDF merger utility for consistent handling
                     previewPDF(jsonData.data);
                     
-                    console.log('PDF preview opened successfully via frontend utility');
+
                     return;
                 } else {
                     throw new Error(jsonData.error || 'Invalid PDF response format');
                 }
             } else {
                 // Handle HTML response (template preview or fallback)
-                console.log('Handling preview response as HTML (template or fallback mode)');
+
                 
                 const htmlContent = await response.text();
                 
@@ -303,10 +297,7 @@ export default function PrintBundleIndex() {
     const handleDownloadIndividual = async (doc: PDFDocument) => {
         setLoadingStates(prev => ({ ...prev, [doc.id]: 'download' }));
         try {
-            console.log('Starting individual PDF download', {
-                documentType: doc.type,
-                documentTitle: doc.title
-            });
+            
 
             // Prepare selected records data for this specific document
             const selectedRecordsData: { [key: string]: string[] } = {};
@@ -344,11 +335,7 @@ export default function PrintBundleIndex() {
                 const jsonData = await response.json();
                 
                 if (jsonData.type === 'pdf_base64' && jsonData.data) {
-                    console.log('Received base64 PDF data for individual download', {
-                        documentType: doc.type,
-                        filename: jsonData.filename,
-                        dataLength: jsonData.data.length
-                    });
+                    
 
                     // Use PDF merger utility for consistent handling
                     downloadIndividualPDF(
@@ -356,14 +343,14 @@ export default function PrintBundleIndex() {
                         jsonData.filename || `${doc.title}-${pengajuanKlaim.nomor_sep}.pdf`
                     );
                     
-                    console.log('Individual PDF downloaded successfully via frontend utility');
+
                     return;
                 } else {
                     throw new Error(jsonData.error || 'Invalid PDF response format');
                 }
             } else {
                 // Fallback: Handle as binary PDF (old approach)
-                console.log('Handling individual PDF response as binary (fallback mode)');
+
                 
                 const blob = await response.blob();
                 
@@ -395,10 +382,7 @@ export default function PrintBundleIndex() {
         
         setIsGenerating(true);
         try {
-            console.log('Starting frontend PDF bundle generation', {
-                documentCount: selectionOrder.length,
-                selectedDocuments: selectionOrder
-            });
+            
 
             // Prepare selected records data
             const selectedRecordsData: { [key: string]: string[] } = {};
@@ -433,24 +417,20 @@ export default function PrintBundleIndex() {
                 // NEW: Handle bundle response with base64 PDFs for frontend merging
                 const bundleData: BundleResponse = await response.json();
                 
-                console.log('Received bundle data for frontend merging', {
-                    type: bundleData.type,
-                    documentCount: bundleData.documents.length,
-                    bundleFilename: bundleData.bundle_filename
-                });
+                
 
                 if (bundleData.type === 'bundle_base64') {
                     // Use the PDF merger utility to merge and download
                     await mergeAndDownloadBundle(bundleData);
                     
-                    console.log('Bundle merged and downloaded successfully via frontend');
+
                     return;
                 } else {
                     throw new Error('Unexpected response format: expected bundle_base64');
                 }
             } else {
                 // Fallback: Handle as binary PDF (old approach)
-                console.log('Handling response as binary PDF (fallback mode)');
+
                 
                 const blob = await response.blob();
                 
@@ -1037,3 +1017,4 @@ export default function PrintBundleIndex() {
         </AppLayout>
     );
 }
+

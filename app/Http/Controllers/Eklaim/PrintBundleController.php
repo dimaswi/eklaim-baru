@@ -335,6 +335,8 @@ class PrintBundleController extends Controller
     
     public function generatePreview(Request $request, $pengajuanId)
     {
+
+        
         try {
             // Handle potential CSRF token issues for POST requests
             if ($request->isMethod('POST')) {
@@ -342,15 +344,6 @@ class PrintBundleController extends Controller
                 $tokenValid = $request->session()->token() === $request->input('_token');
                 
                 if (!$tokenValid && !$request->ajax()) {
-                    Log::warning('CSRF Token Issue Detected in Preview', [
-                        'pengajuan_id' => $pengajuanId,
-                        'method' => $request->method(),
-                        'has_token' => $request->has('_token'),
-                        'session_started' => session()->isStarted(),
-                        'session_token' => substr($request->session()->token() ?? '', 0, 10) . '...',
-                        'request_token' => substr($request->input('_token') ?? '', 0, 10) . '...',
-                        'user_agent' => $request->userAgent()
-                    ]);
                     
                     // For POST requests without valid CSRF, redirect to GET with query params
                     if ($request->has('type')) {
@@ -362,17 +355,22 @@ class PrintBundleController extends Controller
                 }
             }
 
-            Log::info('Generate Preview Request', [
-                'pengajuan_id' => $pengajuanId,
-                'document_type' => $request->get('type'),
-                'method' => $request->method(),
-                'session_id' => session()->getId(),
-                'has_session' => session()->isStarted(),
-                'csrf_token_valid' => $request->isMethod('GET') ? 'N/A' : ($request->session()->token() === $request->input('_token') ? 'valid' : 'invalid')
-            ]);
-
             $documentType = $request->get('type');
+            
+            // Try different ways to get selected_records data
             $selectedRecords = $request->input('selected_records', []);
+            $jsonInput = $request->json('selected_records', []);
+            $rawJsonBody = $request->getContent();
+            $decodedJson = json_decode($rawJsonBody, true);
+            
+
+            
+            // Use the correct source for selected_records
+            if (!empty($decodedJson['selected_records'])) {
+                $selectedRecords = $decodedJson['selected_records'];
+            } elseif (!empty($jsonInput)) {
+                $selectedRecords = $jsonInput;
+            }
             $pengajuanKlaim = PengajuanKlaim::findOrFail($pengajuanId);
             
             // If no document type specified (GET request), find first available document
@@ -399,11 +397,17 @@ class PrintBundleController extends Controller
             }
             
             // Get data based on document type
-            $data = $this->getDocumentData($documentType, $pengajuanId);
+            $data = $this->getDocumentData($documentType, $pengajuanId, $selectedRecords);
             
             if (!$data || $data->isEmpty()) {
-                Log::warning('No data found', ['type' => $documentType, 'pengajuan_id' => $pengajuanId]);
-                return response()->json(['error' => 'No data found for this document type'], 404);
+                Log::warning('No data found', [
+                    'type' => $documentType, 
+                    'pengajuan_id' => $pengajuanId,
+                    'selected_records' => $selectedRecords,
+                    'has_selected_records' => !empty($selectedRecords),
+                    'selected_records_for_type' => $selectedRecords[$documentType] ?? 'none'
+                ]);
+                return response()->json(['error' => 'No data found for selected records'], 404);
             }
             
             // Special handling for berkas_klaim from INACBG API
@@ -500,15 +504,7 @@ class PrintBundleController extends Controller
                 $tokenValid = $request->session()->token() === $request->input('_token');
                 
                 if (!$tokenValid && !$request->ajax()) {
-                    Log::warning('CSRF Token Issue in PDF Generation', [
-                        'pengajuan_id' => $pengajuanId,
-                        'method' => $request->method(),
-                        'has_token' => $request->has('_token'),
-                        'session_started' => session()->isStarted(),
-                        'session_token' => substr($request->session()->token() ?? '', 0, 10) . '...',
-                        'request_token' => substr($request->input('_token') ?? '', 0, 10) . '...',
-                        'user_agent' => $request->userAgent()
-                    ]);
+
                     
                     // Return error response for AJAX calls
                     if ($request->expectsJson()) {
@@ -529,16 +525,22 @@ class PrintBundleController extends Controller
                 }
             }
 
-            Log::info('Generate PDF Request', [
-                'pengajuan_id' => $pengajuanId,
-                'document_type' => $request->get('type'),
-                'method' => $request->method(),
-                'session_id' => session()->getId(),
-                'csrf_token_valid' => $request->isMethod('GET') ? 'N/A' : ($request->session()->token() === $request->input('_token') ? 'valid' : 'invalid')
-            ]);
-
             $documentType = $request->get('type');
+            
+            // Try different ways to get selected_records data
             $selectedRecords = $request->input('selected_records', []);
+            $jsonInput = $request->json('selected_records', []);
+            $rawJsonBody = $request->getContent();
+            $decodedJson = json_decode($rawJsonBody, true);
+            
+
+            
+            // Use the correct source for selected_records
+            if (!empty($decodedJson['selected_records'])) {
+                $selectedRecords = $decodedJson['selected_records'];
+            } elseif (!empty($jsonInput)) {
+                $selectedRecords = $jsonInput;
+            }
             $pengajuanKlaim = PengajuanKlaim::findOrFail($pengajuanId);
             
             // Validate document type
@@ -548,11 +550,15 @@ class PrintBundleController extends Controller
             }
             
             // Get data based on document type
-            $data = $this->getDocumentData($documentType, $pengajuanId);
+            $data = $this->getDocumentData($documentType, $pengajuanId, $selectedRecords);
             
             if (!$data || $data->isEmpty()) {
-                Log::warning('No data found for PDF', ['type' => $documentType, 'pengajuan_id' => $pengajuanId]);
-                return response()->json(['error' => 'No data found for this document type'], 404);
+                Log::warning('No data found for PDF', [
+                    'type' => $documentType, 
+                    'pengajuan_id' => $pengajuanId,
+                    'selected_records' => $selectedRecords
+                ]);
+                return response()->json(['error' => 'No data found for selected records'], 404);
             }
             
             // Special handling for berkas_klaim from INACBG API
@@ -637,14 +643,6 @@ class PrintBundleController extends Controller
             $tokenValid = $request->session()->token() === $request->input('_token');
             
             if (!$tokenValid && !$request->ajax()) {
-                Log::warning('CSRF Token Issue in Bundle Generation', [
-                    'pengajuan_id' => $pengajuanId,
-                    'has_token' => $request->has('_token'),
-                    'session_started' => session()->isStarted(),
-                    'session_token' => substr($request->session()->token() ?? '', 0, 10) . '...',
-                    'request_token' => substr($request->input('_token') ?? '', 0, 10) . '...',
-                    'user_agent' => $request->userAgent()
-                ]);
                 
                 // Return proper error response for AJAX calls
                 return response()->json([
@@ -682,12 +680,13 @@ class PrintBundleController extends Controller
             
             foreach ($documentTypes as $type) {
                 try {
-                    $data = $this->getDocumentData($type, $pengajuanId);
+                    $data = $this->getDocumentData($type, $pengajuanId, $selectedRecords);
                     
                     if (!$data || $data->isEmpty()) {
                         Log::warning("No data found for bundle document type: {$type}", [
                             'pengajuan_id' => $pengajuanId,
-                            'document_type' => $type
+                            'document_type' => $type,
+                            'selected_records' => $selectedRecords[$type] ?? 'none'
                         ]);
                         continue; // Skip if no data
                     }
@@ -734,7 +733,7 @@ class PrintBundleController extends Controller
                         'data' => $data,
                         'selectedRecords' => $selectedRecords,
                         'logoBase64' => $logoBase64,
-                        'documentType' => $documentType,
+                        'documentType' => $type,
                     ], $qrData))->setPaper('a4', 'portrait');
                     
                     $pdfContent = $pdf->output();
@@ -852,8 +851,64 @@ class PrintBundleController extends Controller
         return $qrData;
     }
     
-    private function getDocumentData($type, $pengajuanId)
+    private function getDocumentData($type, $pengajuanId, $selectedRecords = [])
     {
+        // Jika ada selected records, filter berdasarkan ID yang dipilih
+        if (!empty($selectedRecords) && isset($selectedRecords[$type])) {
+            $selectedIds = $selectedRecords[$type];
+            
+            // First check if data exists without filtering
+            $allData = match($type) {
+                'laboratorium' => HasilLaboratorium::where('pengajuan_klaim_id', $pengajuanId)->get(),
+                'radiologi' => HasilRadiologi::where('pengajuan_klaim_id', $pengajuanId)->get(),
+                'resume_medis' => $this->getResumeMedisData($pengajuanId),
+                'pengkajian_awal' => $this->getPengkajianAwalData($pengajuanId),
+                'rawat_inap_resume' => collect([RawatInapResumeMedis::where('pengajuan_klaim_id', $pengajuanId)->first()])->filter(),
+                'rawat_jalan_resume' => collect([RawatJalanResumeMedis::where('pengajuan_klaim_id', $pengajuanId)->first()])->filter(),
+                'ugd_resume' => collect([UGDResumeMedis::where('pengajuan_klaim_id', $pengajuanId)->first()])->filter(),
+                'rawat_inap_cppt' => RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->orderBy('tanggal', 'asc')->get(),
+                'rawat_inap_pengkajian' => collect([RawatInapPengkajianAwal::where('pengajuan_klaim_id', $pengajuanId)->first()])->filter(),
+                'rawat_jalan_pengkajian' => collect([RawatJalanPengkajianAwal::where('pengajuan_klaim_id', $pengajuanId)->first()])->filter(),
+                'ugd_pengkajian' => collect([UGDPengkajianAwal::where('pengajuan_klaim_id', $pengajuanId)->first()])->filter(),
+                'ugd_triage' => collect([UGDTriage::where('pengajuan_klaim_id', $pengajuanId)->first()])->filter(),
+                'rawat_inap_balance' => RawatInapBalanceCairan::where('pengajuan_klaim_id', $pengajuanId)->orderBy('tanggal', 'asc')->orderBy('waktu_pemeriksaan', 'asc')->get(),
+                'tagihan' => collect([Tagihan::where('pengajuan_klaim_id', $pengajuanId)->first()])->filter(),
+                'berkas_klaim' => $this->getBerkasKlaimData($pengajuanId),
+                'sep' => $this->getSepData($pengajuanId),
+                default => collect([]),
+            };
+            
+            Log::info('Filtering data by selected records', [
+                'type' => $type,
+                'selected_ids' => $selectedIds,
+                'pengajuan_id' => $pengajuanId,
+                'all_data_count' => $allData->count(),
+                'all_data_ids' => $allData->pluck('id')->toArray(),
+                'all_data_available' => !$allData->isEmpty()
+            ]);
+            
+            return match($type) {
+                'laboratorium' => HasilLaboratorium::where('pengajuan_klaim_id', $pengajuanId)->whereIn('id', $selectedIds)->get(),
+                'radiologi' => HasilRadiologi::where('pengajuan_klaim_id', $pengajuanId)->whereIn('id', $selectedIds)->get(),
+                'resume_medis' => $this->getResumeMedisDataFiltered($pengajuanId, $selectedIds),
+                'pengkajian_awal' => $this->getPengkajianAwalDataFiltered($pengajuanId, $selectedIds),
+                'rawat_inap_resume' => collect([RawatInapResumeMedis::where('pengajuan_klaim_id', $pengajuanId)->whereIn('id', $selectedIds)->first()])->filter(),
+                'rawat_jalan_resume' => collect([RawatJalanResumeMedis::where('pengajuan_klaim_id', $pengajuanId)->whereIn('id', $selectedIds)->first()])->filter(),
+                'ugd_resume' => collect([UGDResumeMedis::where('pengajuan_klaim_id', $pengajuanId)->whereIn('id', $selectedIds)->first()])->filter(),
+                'rawat_inap_cppt' => RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->whereIn('id', $selectedIds)->orderBy('tanggal', 'asc')->get(),
+                'rawat_inap_pengkajian' => collect([RawatInapPengkajianAwal::where('pengajuan_klaim_id', $pengajuanId)->whereIn('id', $selectedIds)->first()])->filter(),
+                'rawat_jalan_pengkajian' => collect([RawatJalanPengkajianAwal::where('pengajuan_klaim_id', $pengajuanId)->whereIn('id', $selectedIds)->first()])->filter(),
+                'ugd_pengkajian' => collect([UGDPengkajianAwal::where('pengajuan_klaim_id', $pengajuanId)->whereIn('id', $selectedIds)->first()])->filter(),
+                'ugd_triage' => collect([UGDTriage::where('pengajuan_klaim_id', $pengajuanId)->whereIn('id', $selectedIds)->first()])->filter(),
+                'rawat_inap_balance' => RawatInapBalanceCairan::where('pengajuan_klaim_id', $pengajuanId)->whereIn('id', $selectedIds)->orderBy('tanggal', 'asc')->orderBy('waktu_pemeriksaan', 'asc')->get(),
+                'tagihan' => collect([Tagihan::where('pengajuan_klaim_id', $pengajuanId)->whereIn('id', $selectedIds)->first()])->filter(),
+                'berkas_klaim' => $this->getBerkasKlaimData($pengajuanId),
+                'sep' => $this->getSepData($pengajuanId),
+                default => collect([]),
+            };
+        }
+        
+        // Fallback: ambil semua data jika tidak ada selected records
         return match($type) {
             'laboratorium' => HasilLaboratorium::where('pengajuan_klaim_id', $pengajuanId)->get(),
             'radiologi' => HasilRadiologi::where('pengajuan_klaim_id', $pengajuanId)->get(),
@@ -875,13 +930,17 @@ class PrintBundleController extends Controller
         };
     }
     
-    private function getResumeMedisData($pengajuanId)
+    private function getResumeMedisData($pengajuanId, $selectedIds = [])
     {
         $resumeData = collect();
         
         try {
             // Check for Rawat Inap Resume Medis
-            $rawatInapResume = RawatInapResumeMedis::where('pengajuan_klaim_id', $pengajuanId)->first();
+            $query = RawatInapResumeMedis::where('pengajuan_klaim_id', $pengajuanId);
+            if (!empty($selectedIds)) {
+                $query->whereIn('id', $selectedIds);
+            }
+            $rawatInapResume = $query->first();
             if ($rawatInapResume) {
                 $rawatInapResume->resume_type = 'rawat_inap';
                 $rawatInapResume->resume_title = 'Resume Medis Rawat Inap';
@@ -890,13 +949,18 @@ class PrintBundleController extends Controller
         } catch (\Exception $e) {
             Log::error('Error getting Rawat Inap Resume Medis', [
                 'pengajuan_id' => $pengajuanId,
+                'selected_ids' => $selectedIds,
                 'error' => $e->getMessage()
             ]);
         }
         
         try {
             // Check for Rawat Jalan Resume Medis
-            $rawatJalanResume = RawatJalanResumeMedis::where('pengajuan_klaim_id', $pengajuanId)->first();
+            $query = RawatJalanResumeMedis::where('pengajuan_klaim_id', $pengajuanId);
+            if (!empty($selectedIds)) {
+                $query->whereIn('id', $selectedIds);
+            }
+            $rawatJalanResume = $query->first();
             if ($rawatJalanResume) {
                 $rawatJalanResume->resume_type = 'rawat_jalan';
                 $rawatJalanResume->resume_title = 'Resume Medis Rawat Jalan';
@@ -905,13 +969,18 @@ class PrintBundleController extends Controller
         } catch (\Exception $e) {
             Log::error('Error getting Rawat Jalan Resume Medis', [
                 'pengajuan_id' => $pengajuanId,
+                'selected_ids' => $selectedIds,
                 'error' => $e->getMessage()
             ]);
         }
         
         try {
             // Check for UGD Resume Medis
-            $ugdResume = UGDResumeMedis::where('pengajuan_klaim_id', $pengajuanId)->first();
+            $query = UGDResumeMedis::where('pengajuan_klaim_id', $pengajuanId);
+            if (!empty($selectedIds)) {
+                $query->whereIn('id', $selectedIds);
+            }
+            $ugdResume = $query->first();
             if ($ugdResume) {
                 $ugdResume->resume_type = 'ugd';
                 $ugdResume->resume_title = 'Resume Medis UGD';
@@ -920,6 +989,7 @@ class PrintBundleController extends Controller
         } catch (\Exception $e) {
             Log::error('Error getting UGD Resume Medis', [
                 'pengajuan_id' => $pengajuanId,
+                'selected_ids' => $selectedIds,
                 'error' => $e->getMessage()
             ]);
         }
@@ -927,13 +997,17 @@ class PrintBundleController extends Controller
         return $resumeData;
     }
     
-    private function getPengkajianAwalData($pengajuanId)
+    private function getPengkajianAwalData($pengajuanId, $selectedIds = [])
     {
         $pengkajianData = collect();
         
         try {
             // Check for Rawat Inap Pengkajian Awal
-            $rawatInapPengkajian = RawatInapPengkajianAwal::where('pengajuan_klaim_id', $pengajuanId)->first();
+            $query = RawatInapPengkajianAwal::where('pengajuan_klaim_id', $pengajuanId);
+            if (!empty($selectedIds)) {
+                $query->whereIn('id', $selectedIds);
+            }
+            $rawatInapPengkajian = $query->first();
             if ($rawatInapPengkajian) {
                 $rawatInapPengkajian->pengkajian_type = 'rawat_inap';
                 $rawatInapPengkajian->pengkajian_title = 'Pengkajian Awal Rawat Inap';
@@ -942,13 +1016,18 @@ class PrintBundleController extends Controller
         } catch (\Exception $e) {
             Log::error('Error getting Rawat Inap Pengkajian Awal', [
                 'pengajuan_id' => $pengajuanId,
+                'selected_ids' => $selectedIds,
                 'error' => $e->getMessage()
             ]);
         }
         
         try {
             // Check for Rawat Jalan Pengkajian Awal
-            $rawatJalanPengkajian = RawatJalanPengkajianAwal::where('pengajuan_klaim_id', $pengajuanId)->first();
+            $query = RawatJalanPengkajianAwal::where('pengajuan_klaim_id', $pengajuanId);
+            if (!empty($selectedIds)) {
+                $query->whereIn('id', $selectedIds);
+            }
+            $rawatJalanPengkajian = $query->first();
             if ($rawatJalanPengkajian) {
                 $rawatJalanPengkajian->pengkajian_type = 'rawat_jalan';
                 $rawatJalanPengkajian->pengkajian_title = 'Pengkajian Awal Rawat Jalan';
@@ -957,13 +1036,18 @@ class PrintBundleController extends Controller
         } catch (\Exception $e) {
             Log::error('Error getting Rawat Jalan Pengkajian Awal', [
                 'pengajuan_id' => $pengajuanId,
+                'selected_ids' => $selectedIds,
                 'error' => $e->getMessage()
             ]);
         }
         
         try {
             // Check for UGD Pengkajian Awal
-            $ugdPengkajian = UGDPengkajianAwal::where('pengajuan_klaim_id', $pengajuanId)->first();
+            $query = UGDPengkajianAwal::where('pengajuan_klaim_id', $pengajuanId);
+            if (!empty($selectedIds)) {
+                $query->whereIn('id', $selectedIds);
+            }
+            $ugdPengkajian = $query->first();
             if ($ugdPengkajian) {
                 $ugdPengkajian->pengkajian_type = 'ugd';
                 $ugdPengkajian->pengkajian_title = 'Pengkajian Awal UGD';
@@ -972,11 +1056,59 @@ class PrintBundleController extends Controller
         } catch (\Exception $e) {
             Log::error('Error getting UGD Pengkajian Awal', [
                 'pengajuan_id' => $pengajuanId,
+                'selected_ids' => $selectedIds,
                 'error' => $e->getMessage()
             ]);
         }
         
         return $pengkajianData;
+    }
+    
+    private function getResumeMedisDataFiltered($pengajuanId, $selectedIds = [])
+    {
+        // Get all available resume medis data first
+        $allData = $this->getResumeMedisData($pengajuanId);
+        
+        Log::info('Resume Medis Data Filtering', [
+            'pengajuan_id' => $pengajuanId,
+            'selected_ids' => $selectedIds,
+            'all_data_count' => $allData->count(),
+            'all_data_ids' => $allData->pluck('id')->toArray(),
+            'all_data_types' => $allData->pluck('resume_type')->toArray()
+        ]);
+        
+        if (empty($selectedIds)) {
+            return $allData;
+        }
+        
+        // Filter by selected IDs
+        $filteredData = $allData->filter(function ($item) use ($selectedIds) {
+            return in_array($item->id, $selectedIds);
+        });
+        
+        Log::info('Resume Medis Data After Filtering', [
+            'filtered_count' => $filteredData->count(),
+            'filtered_ids' => $filteredData->pluck('id')->toArray()
+        ]);
+        
+        return $filteredData;
+    }
+    
+    private function getPengkajianAwalDataFiltered($pengajuanId, $selectedIds = [])
+    {
+        $pengkajianData = collect();
+        
+        // Get all available pengkajian awal data first
+        $allData = $this->getPengkajianAwalData($pengajuanId);
+        
+        if (empty($selectedIds)) {
+            return $allData;
+        }
+        
+        // Filter by selected IDs
+        return $allData->filter(function ($item) use ($selectedIds) {
+            return in_array($item->id, $selectedIds);
+        });
     }
     
     private function getSuratEligibilitasData($pengajuanId)

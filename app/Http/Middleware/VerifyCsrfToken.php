@@ -12,9 +12,10 @@ class VerifyCsrfToken extends Middleware
      * @var array<int, string>
      */
     protected $except = [
-        // Exclude print bundle preview and PDF generation from CSRF for easier access
-        'eklaim/print-bundle/*/preview',
-        'eklaim/print-bundle/*/pdf',
-        'eklaim/print-bundle/*/bundle',
+        // Exclude ALL print bundle routes from CSRF for easier access
+        'eklaim/print-bundle/*',
+        '/eklaim/print-bundle/*',
     ];
+
+
 }
