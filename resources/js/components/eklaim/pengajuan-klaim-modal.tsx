@@ -26,9 +26,18 @@ interface PengajuanKlaimData {
 interface PengajuanKlaimModalProps {
     data: PengajuanKlaimData;
     disabled?: boolean;
+    actionUrl?: string;
+    triggerClassName?: string;
+    triggerText?: string;
 }
 
-export default function PengajuanKlaimModal({ data, disabled = false }: PengajuanKlaimModalProps) {
+export default function PengajuanKlaimModal({ 
+    data, 
+    disabled = false, 
+    actionUrl = '/eklaim/kunjungan/pengajuan-klaim',
+    triggerClassName,
+    triggerText
+}: PengajuanKlaimModalProps) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [showErrorDialog, setShowErrorDialog] = useState(false);
@@ -82,19 +91,23 @@ export default function PengajuanKlaimModal({ data, disabled = false }: Pengajua
         e.preventDefault();
         setLoading(true);
 
+        const submitData = {
+            nomor_kartu: data.nomor_kartu,
+            nomor_sep: data.nomor_sep,
+            nomor_rm: data.nomor_rm,
+            nama_pasien: data.nama_pasien,
+            tgl_lahir: data.tgl_lahir,
+            gender: data.gender,
+            tanggal_masuk: data.tanggal_masuk,
+            tanggal_keluar: data.tanggal_keluar,
+            ruangan: data.ruangan,
+            jenis_kunjungan: formatJenisKunjungan(data.jenis_kunjungan),
+        };
+
+        console.log('Data yang akan dikirim:', submitData);
+
         try {
-            router.post('/eklaim/kunjungan/pengajuan-klaim', {
-                nomor_kartu: data.nomor_kartu,
-                nomor_sep: data.nomor_sep,
-                nomor_rm: data.nomor_rm,
-                nama_pasien: data.nama_pasien,
-                tgl_lahir: data.tgl_lahir,
-                gender: data.gender,
-                tanggal_masuk: data.tanggal_masuk,
-                tanggal_keluar: data.tanggal_keluar,
-                ruangan: data.ruangan,
-                jenis_kunjungan: formatJenisKunjungan(data.jenis_kunjungan),
-            }, {
+            router.post(actionUrl, submitData, {
                 onSuccess: () => {
                     setOpen(false);
                     setLoading(false);
@@ -119,7 +132,7 @@ export default function PengajuanKlaimModal({ data, disabled = false }: Pengajua
         setLoading(true);
 
         try {
-            router.post('/eklaim/kunjungan/pengajuan-klaim', {
+            router.post(actionUrl, {
                 nomor_kartu: data.nomor_kartu,
                 nomor_sep: data.nomor_sep,
                 nomor_rm: data.nomor_rm,
@@ -148,15 +161,24 @@ export default function PengajuanKlaimModal({ data, disabled = false }: Pengajua
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={disabled}
-                    className={disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-green-50"}
-                >
-                    <Send className={`h-4 w-4 ${disabled ? 'text-red-400' : 'text-green-400'}`} />
-                    {disabled ? 'Selesai' : 'Ajukan'}
-                </Button>
+                {triggerClassName ? (
+                    <button
+                        disabled={disabled}
+                        className={triggerClassName}
+                    >
+                        {triggerText || 'Buat Pengajuan Klaim'}
+                    </button>
+                ) : (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={disabled}
+                        className={disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-green-50"}
+                    >
+                        <Send className={`h-4 w-4 ${disabled ? 'text-red-400' : 'text-green-400'}`} />
+                        {disabled ? 'Selesai' : 'Ajukan'}
+                    </Button>
+                )}
             </DialogTrigger>
             <DialogContent className="!max-w-7xl !top-[35%] overflow-y-auto">
                 <DialogHeader>

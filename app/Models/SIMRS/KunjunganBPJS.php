@@ -10,6 +10,8 @@ class KunjunganBPJS extends Model
 
     protected $table = 'kunjungan';
 
+    public $timestamps = false;
+
     public function scopeActive($query)
     {
         return $query->where('status', 'active');

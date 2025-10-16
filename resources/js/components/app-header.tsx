@@ -11,7 +11,7 @@ import { usePermission } from '@/hooks/use-permission';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, Cog, Folder, Home, LayoutGrid, Menu, Search, Users, Shield, Key, Hospital } from 'lucide-react';
+import { BookOpen, Cog, Folder, Home, LayoutGrid, Menu, Search, Users, Shield, Key, Hospital, Banknote } from 'lucide-react';
 import AppLogo from './app-logo';
 import AppLogoIcon from './app-logo-icon';
 
@@ -39,6 +39,12 @@ const mainNavItems: NavItem[] = [
                 permission: 'pengajuan-klaim.view',
             },
         ],
+    },
+    {
+        title: 'Biaya',
+        href: '/biaya',
+        icon: Banknote,
+        permission: 'biaya.view',
     },
     {
         title: 'Settings',
@@ -242,14 +248,14 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                                                     href={item.href}
                                                     className={cn(
                                                         "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground",
-                                                        page.url === item.href && activeItemStyles,
+                                                        page.url.startsWith(item.href) && activeItemStyles,
                                                         'h-9 cursor-pointer px-3',
                                                     )}
                                                 >
                                                     {item.icon && <Icon iconNode={item.icon} className="mr-2 h-4 w-4" />}
                                                     {item.title}
                                                 </Link>
-                                                {page.url === item.href && (
+                                                {page.url.startsWith(item.href) && (
                                                     <div className="absolute bottom-0 left-0 h-0.5 w-full translate-y-px bg-black dark:bg-white"></div>
                                                 )}
                                             </>

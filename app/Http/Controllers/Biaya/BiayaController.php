@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Eklaim;
+namespace App\Http\Controllers\Biaya;
 
 use App\Http\Controllers\Controller;
 use App\Models\SIMRS\KunjunganBPJS;
@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
-class KunjunganBpjsController extends Controller
+class BiayaController extends Controller
 {
     public function index(Request $request)
     {
@@ -109,7 +109,7 @@ class KunjunganBpjsController extends Controller
             ->orderBy('DESKRIPSI')
             ->get(['ID', 'DESKRIPSI', 'JENIS_KUNJUNGAN']);
         
-        return Inertia::render('eklaim/kunjungan/index', [
+        return Inertia::render('biaya/index', [
             'kunjungan' => $kunjungan,
             'ruangan_list' => $ruangan_list,
             'filters' => [
@@ -127,6 +127,13 @@ class KunjunganBpjsController extends Controller
     public function pengajuanKlaim(Request $request)
     {
         try {
+            // Debug: Log semua data yang masuk
+            Log::info('Data request pengajuan klaim:', [
+                'all_data' => $request->all(),
+                'jenis_kunjungan' => $request->get('jenis_kunjungan'),
+                'jenis_kunjungan_type' => gettype($request->get('jenis_kunjungan'))
+            ]);
+
             // Ambil data kunjungan untuk informasi tambahan
             $kunjungan = KunjunganBPJS::with([
                 'penjamin.pendaftaran.pasien',
@@ -199,10 +206,10 @@ class KunjunganBpjsController extends Controller
             if ($request->get('force_create')) {
 
                 if ($kunjungan) {
-                    $kunjungan->klaimStatus = 1; // Set sebagai sudah diklaim
-                    $kunjungan->save();
+                    KunjunganBPJS::where('noSEP', $kunjungan->noSEP)
+                        ->update(['klaimStatus' => 1]); // Set sebagai sudah diklaim
                 }
-
+                
                 // Skip API call and directly create pengajuan klaim
                 $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_DEFAULT;
                 $pengajuanData['response_message'] = 'Data disimpan tanpa mengirim ke API INACBG (Force Create)';
@@ -216,7 +223,7 @@ class KunjunganBpjsController extends Controller
                     'user_action' => 'force_create'
                 ]);
 
-                return redirect()->route('eklaim.kunjungan.index')->with('success', 
+                return redirect()->route('biaya.index')->with('success', 
                     'Data pengajuan klaim berhasil disimpan. Anda dapat mencoba mengirim ke API INACBG nanti.');
             }
 
@@ -253,8 +260,8 @@ class KunjunganBpjsController extends Controller
             if ($inacbgResponse['metadata']['code'] == 200) {
                 // Update status kunjungan
                 if ($kunjungan) {
-                    $kunjungan->klaimStatus = 1; // Set sebagai sudah diklaim
-                    $kunjungan->save();
+                    KunjunganBPJS::where('noSEP', $kunjungan->noSEP)
+                        ->update(['klaimStatus' => 1]); // Set sebagai sudah diklaim
                 }
 
                 // Simpan data pengajuan dengan status sukses
@@ -270,7 +277,7 @@ class KunjunganBpjsController extends Controller
                     'response_data' => $inacbgResponse['response'] ?? null
                 ]);
 
-                return redirect()->route('eklaim.kunjungan.index')->with('success', 
+                return redirect()->route('biaya.index')->with('success', 
                     'Klaim berhasil diajukan ke INACBG: ' . ($inacbgResponse['metadata']['message'] ?? 'Berhasil'));
             }
 
@@ -305,132 +312,7 @@ class KunjunganBpjsController extends Controller
                 'noSEP' => $request->get('nomor_sep')
             ]);
 
-            return redirect()->route('eklaim.kunjungan.index')->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
-        }
-    }
-
-    public function doGroupping(Request $request)
-    {
-        // Validasi request
-        $request->validate([
-            'pengajuan_klaim_id' => 'required|integer',
-            'nomor_sep' => 'required|string',
-            'diagnosa' => 'required|string',
-            'procedures' => 'required|string',
-        ]);
-
-        try {
-            $pengajuanKlaimId = $request->get('pengajuan_klaim_id');
-            $nomorSep = $request->get('nomor_sep');
-            $diagnosaJson = $request->get('diagnosa');
-            $proceduresJson = $request->get('procedures');
-            
-            // Ambil data pengajuan klaim
-            $pengajuanKlaim = PengajuanKlaim::find($pengajuanKlaimId);
-            
-            if (!$pengajuanKlaim) {
-                return back()->withErrors([
-                    'message' => 'Data pengajuan klaim tidak ditemukan'
-                ]);
-            }
-
-            // Parse JSON data
-            $diagnosaList = json_decode($diagnosaJson, true) ?: [];
-            $proceduresList = json_decode($proceduresJson, true) ?: [];
-
-            Log::info('Groupper Input Data', [
-                'nomor_sep' => $nomorSep,
-                'pengajuan_klaim_id' => $pengajuanKlaimId,
-                'diagnosa_count' => count($diagnosaList),
-                'procedures_count' => count($proceduresList),
-                'diagnosa' => $diagnosaList,
-                'procedures' => $proceduresList
-            ]);
-
-            // Siapkan data untuk INACBG Groupper
-            $metadata = [
-                'method' => 'grouper'
-            ];
-
-            $data = [
-                'metadata' => $metadata,
-                'data' => [
-                    'nomor_sep' => $pengajuanKlaim->nomor_sep,
-                    'diagnosa' => $diagnosaList,
-                    'procedures' => $proceduresList,
-                    // Data tambahan yang diperlukan untuk groupper
-                    'nama_pasien' => $pengajuanKlaim->nama_pasien,
-                    'norm' => $pengajuanKlaim->norm,
-                ]
-            ];
-
-            // Hit API INACBG untuk groupper
-            $inacbgResponse = InacbgHelper::hitApi($data, 'POST');
-            
-            Log::info('INACBG Groupper Response', [
-                'nomor_sep' => $nomorSep,
-                'pengajuan_klaim_id' => $pengajuanKlaimId,
-                'response' => $inacbgResponse
-            ]);
-            
-            // Jika response code bukan 200 (API error)
-            if ($inacbgResponse['metadata']['code'] != 200) {
-                Log::error('INACBG Groupper API Error', [
-                    'nomor_sep' => $nomorSep,
-                    'error_code' => $inacbgResponse['metadata']['code'],
-                    'error_message' => $inacbgResponse['metadata']['message'] ?? 'Unknown error',
-                    'full_response' => $inacbgResponse
-                ]);
-                
-                return back()->withErrors([
-                    'message' => 'Groupper Error: ' . ($inacbgResponse['metadata']['message'] ?? 'Error from INACBG API')
-                ]);
-            }
-
-            // Jika response code 200 (sukses), simpan data groupper
-            if ($inacbgResponse['metadata']['code'] == 200 && isset($inacbgResponse['response'])) {
-                $responseData = $inacbgResponse['response'];
-                
-                // Buat atau update data groupper
-                $dataGroupper = \App\Models\Eklaim\DataGroupper::updateOrCreate(
-                    ['nomor_sep' => $nomorSep],
-                    [
-                        'cbg_code' => $responseData['cbg_code'] ?? '',
-                        'cbg_description' => $responseData['cbg_description'] ?? '',
-                        'cbg_tariff' => $responseData['cbg_tariff'] ?? '0',
-                        'sub_acute_code' => $responseData['sub_acute_code'] ?? null,
-                        'sub_acute_description' => $responseData['sub_acute_description'] ?? null,
-                        'sub_acute_tariff' => $responseData['sub_acute_tariff'] ?? null,
-                        'chronic_code' => $responseData['chronic_code'] ?? null,
-                        'chronic_description' => $responseData['chronic_description'] ?? null,
-                        'chronic_tariff' => $responseData['chronic_tariff'] ?? null,
-                        'kelas' => $responseData['kelas'] ?? '',
-                        'add_payment_amt' => $responseData['add_payment_amt'] ?? null,
-                        'inacbg_version' => $responseData['inacbg_version'] ?? '',
-                    ]
-                );
-
-                Log::info('INACBG Groupper Success', [
-                    'nomor_sep' => $nomorSep,
-                    'cbg_code' => $responseData['cbg_code'] ?? '',
-                    'cbg_tariff' => $responseData['cbg_tariff'] ?? '0'
-                ]);
-
-                return back()->with('success', 
-                    'Groupper berhasil dilakukan. Data CBG: ' . ($responseData['cbg_code'] ?? '') . ' - ' . ($responseData['cbg_description'] ?? ''));
-            }
-
-        } catch (\Exception $e) {
-            Log::error('Exception in doGroupping', [
-                'exception' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'nomor_sep' => $request->get('nomor_sep'),
-                'pengajuan_klaim_id' => $request->get('pengajuan_klaim_id')
-            ]);
-
-            return back()->withErrors([
-                'message' => 'Terjadi kesalahan saat melakukan groupper: ' . $e->getMessage()
-            ]);
+            return redirect()->route('biaya.index')->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
     }
 }

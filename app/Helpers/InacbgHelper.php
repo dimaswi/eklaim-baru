@@ -119,6 +119,7 @@ class InacbgHelper
         // decrypt dengan fungsi inacbg_decrypt
         $response = self::inacbg_decrypt($response, $key);
         $msg = json_decode($response, true);
+
         return $msg;
     }
 }

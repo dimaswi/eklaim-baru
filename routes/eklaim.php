@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth')->group(function () {
     Route::get('/eklaim/kunjungan', [KunjunganBpjsController::class, 'index'])->name('eklaim.kunjungan.index')->middleware('permission:kunjungan.view');
     Route::post('/eklaim/kunjungan/pengajuan-klaim', [KunjunganBpjsController::class, 'pengajuanKlaim'])->name('eklaim.kunjungan.pengajuan-klaim')->middleware('permission:kunjungan.ajukan-klaim');
+    Route::post('/eklaim/groupper', [KunjunganBpjsController::class, 'doGroupping'])->name('eklaim.groupper')->middleware('permission:kunjungan.view');
     
     Route::get('/eklaim/pengajuan', [PengajuanKlaimController::class, 'index'])->name('eklaim.pengajuan.index')->middleware('permission:pengajuan-klaim.view');
     Route::get('/eklaim/pengajuan/{id}/rm', [PengajuanKlaimController::class, 'show'])->name('eklaim.pengajuan.show')->middleware('permission:pengajuan-klaim.view');

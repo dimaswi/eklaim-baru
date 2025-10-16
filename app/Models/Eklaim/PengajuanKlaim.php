@@ -27,6 +27,8 @@ class PengajuanKlaim extends Model
         'gender',
         'tgl_lahir',
         'ruangan',
+        'jenis_kunjungan',
+        'status_pengiriman',
     ];
 
     protected $casts = [

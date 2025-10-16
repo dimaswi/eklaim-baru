@@ -363,13 +363,16 @@ export default function PengajuanIndex() {
                                 <TableHead className="w-[100px]">Tgl. Keluar</TableHead>
                                 <TableHead className="w-[100px]">Status</TableHead>
                                 <TableHead className="w-[120px]">Tgl. Pengajuan</TableHead>
-                                <TableHead className="w-[100px]">Aksi</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {pengajuan_klaim.data && pengajuan_klaim.data.length > 0 ? (
                                 pengajuan_klaim.data.map((item: PengajuanKlaim, index: number) => (
-                                    <TableRow key={item.id}>
+                                    <TableRow 
+                                        key={item.id}
+                                        className="cursor-pointer transition-colors hover:bg-blue-200"
+                                        onClick={() => router.visit(`/eklaim/pengajuan/${item.id}/rm`)}
+                                    >
                                         <TableCell>{(pengajuan_klaim.current_page - 1) * pengajuan_klaim.per_page + index + 1}</TableCell>
                                         <TableCell><Badge variant="outline">{item.nomor_sep}</Badge></TableCell>
                                         <TableCell>{item.nama_pasien}</TableCell>
@@ -380,17 +383,6 @@ export default function PengajuanIndex() {
                                         <TableCell>{item.tanggal_keluar ? formatDate(item.tanggal_keluar) : '-'}</TableCell>
                                         <TableCell>{getStatusBadge(item.status_pengiriman)}</TableCell>
                                         <TableCell>{formatDateTime(item.created_at)}</TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center space-x-2">
-                                                <Link 
-                                                    href={`/eklaim/pengajuan/${item.id}/rm`}
-                                                    className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-blue-50 hover:text-accent-foreground h-9 px-3"
-                                                >
-                                                    <Eye className="h-4 w-4 text-blue-500 mr-1" />
-                                                    Detail
-                                                </Link>
-                                            </div>
-                                        </TableCell>
                                     </TableRow>
                                 ))
                             ) : (

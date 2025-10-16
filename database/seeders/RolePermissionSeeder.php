@@ -41,7 +41,10 @@ class RolePermissionSeeder extends Seeder
             ['name' => 'kunjungan.view', 'display_name' => 'Lihat Kunjungan', 'description' => 'Dapat melihat daftar kunjungan', 'module' => 'Eklaim Kunjungan'],
             ['name' => 'kunjungan.ajukan-klaim', 'display_name' => 'Ajukan Klaim Kunjungan', 'description' => 'Dapat mengajukan klaim untuk kunjungan', 'module' => 'Eklaim Kunjungan'],
             ['name' => 'pengajuan-klaim.view', 'display_name' => 'Lihat Pengajuan Klaim', 'description' => 'Dapat melihat daftar pengajuan klaim', 'module' => 'Pengajuan Klaim'],
-            ['name' => 'pengajuan-klaim.view', 'display_name' => 'Lihat Pengajuan Klaim', 'description' => 'Dapat melihat daftar pengajuan klaim', 'module' => 'Pengajuan Klaim'],
+            
+            // Biaya
+            ['name' => 'biaya.view', 'display_name' => 'Lihat Biaya', 'description' => 'Dapat melihat daftar biaya kunjungan', 'module' => 'Biaya'],
+            ['name' => 'biaya.create', 'display_name' => 'Ajukan Klaim Biaya', 'description' => 'Dapat mengajukan klaim untuk biaya', 'module' => 'Biaya'],
 
 
         ];

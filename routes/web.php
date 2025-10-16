@@ -22,3 +22,4 @@ require __DIR__.'/auth.php';
 require __DIR__.'/master.php';
 require __DIR__.'/eklaim.php';
 require __DIR__.'/kunjungan-fiktif.php';
+require __DIR__.'/biaya.php';
