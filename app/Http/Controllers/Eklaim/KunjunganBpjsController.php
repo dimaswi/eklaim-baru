@@ -199,8 +199,8 @@ class KunjunganBpjsController extends Controller
             if ($request->get('force_create')) {
 
                 if ($kunjungan) {
-                    $kunjungan->klaimStatus = 1; // Set sebagai sudah diklaim
-                    $kunjungan->save();
+                    KunjunganBPJS::where('noSEP', $kunjungan->noSEP)
+                        ->update(['klaimStatus' => 1]); // Set sebagai sudah diklaim
                 }
 
                 // Skip API call and directly create pengajuan klaim
@@ -253,8 +253,8 @@ class KunjunganBpjsController extends Controller
             if ($inacbgResponse['metadata']['code'] == 200) {
                 // Update status kunjungan
                 if ($kunjungan) {
-                    $kunjungan->klaimStatus = 1; // Set sebagai sudah diklaim
-                    $kunjungan->save();
+                    KunjunganBPJS::where('noSEP', $kunjungan->noSEP)
+                        ->update(['klaimStatus' => 1]); // Set sebagai sudah diklaim
                 }
 
                 // Simpan data pengajuan dengan status sukses
