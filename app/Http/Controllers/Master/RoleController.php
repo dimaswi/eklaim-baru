@@ -60,7 +60,7 @@ class RoleController extends Controller
             'display_name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'permission_ids' => 'array',
-            'permission_ids.*' => 'exists:permissions,id',
+            'permission_ids.*' => 'exists:app.permissions,id',
         ], [
             'display_name.required' => 'Display name wajib diisi',
         ]);
@@ -118,7 +118,7 @@ class RoleController extends Controller
             'display_name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'permission_ids' => 'array',
-            'permission_ids.*' => 'exists:permissions,id',
+            'permission_ids.*' => 'exists:app.permissions,id',
         ], [
             'display_name.required' => 'Display name wajib diisi',
         ]);
