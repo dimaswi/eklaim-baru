@@ -131,7 +131,7 @@ class CompareController extends Controller
         try {
             // Validasi input
             $request->validate([
-                'pengajuan_klaim_id' => 'required|exists:pengajuan_klaim,id',
+                'pengajuan_klaim_id' => 'required|exists:app.pengajuan_klaim,id',
                 'nomor_sep' => 'required|string',
                 'diagnosa' => 'required|string',
                 'procedures' => 'required|string',
@@ -1039,7 +1039,7 @@ class CompareController extends Controller
         try {
             // Validasi input
             $request->validate([
-                'pengajuan_klaim_id' => 'required|exists:pengajuan_klaim,id',
+                'pengajuan_klaim_id' => 'required|exists:app.pengajuan_klaim,id',
                 'nomor_sep' => 'required|string',
                 'diagnosa' => 'required|string',
                 'procedures' => 'required|string',
@@ -1166,7 +1166,7 @@ class CompareController extends Controller
     {
         try {
             $request->validate([
-                'pengajuan_klaim_id' => 'required|exists:pengajuan_klaim,id',
+                'pengajuan_klaim_id' => 'required|exists:app.pengajuan_klaim,id',
                 'nomor_sep' => 'required|string',
             ]);
 
@@ -1233,7 +1233,7 @@ class CompareController extends Controller
     {
         try {
             $request->validate([
-                'pengajuan_klaim_id' => 'required|exists:pengajuan_klaim,id',
+                'pengajuan_klaim_id' => 'required|exists:app.pengajuan_klaim,id',
                 'nomor_sep' => 'required|string',
             ]);
 
@@ -1275,7 +1275,7 @@ class CompareController extends Controller
     {
         try {
             $request->validate([
-                'pengajuan_klaim_id' => 'required|exists:pengajuan_klaim,id',
+                'pengajuan_klaim_id' => 'required|exists:app.pengajuan_klaim,id',
                 'nomor_sep' => 'required|string',
                 'diagnosa' => 'required|string',
                 'procedures' => 'required|string',
