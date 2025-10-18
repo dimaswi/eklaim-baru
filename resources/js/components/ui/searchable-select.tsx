@@ -95,6 +95,9 @@ export function SearchableSelect({
             align="start"
             sideOffset={4}
             forceMount
+            style={{
+                zIndex: 999999,
+            }}
         >
         <Command>
           <div className="flex items-center border-b px-3">
