@@ -244,6 +244,12 @@ export default function CompareBiayaIndex() {
         }).format(amount);
     };
 
+    // Fungsi untuk menghitung tarif CBG dengan 91.2%
+    const getDisplayCbgTariff = (cbgTariffString: string): number => {
+        const originalTariff = parseInt(cbgTariffString) || 0;
+        return Math.round(originalTariff * 0.912); // 91.2%
+    };
+
     // Fungsi untuk format tanggal Indonesia
     const formatTanggalIndo = (tanggal?: string) => {
         if (!tanggal) return '-';
@@ -493,7 +499,7 @@ export default function CompareBiayaIndex() {
                                             <div>
                                                 <div className="text-xs font-medium tracking-wide text-gray-500 uppercase">CBG Tariff</div>
                                                 <div className="text-sm font-semibold text-green-600">
-                                                    {formatRupiah(parseInt(dataGroupper.cbg_tariff) || 0)}
+                                                    {formatRupiah(getDisplayCbgTariff(dataGroupper.cbg_tariff))}
                                                 </div>
                                             </div>
                                             <div>
@@ -551,7 +557,7 @@ export default function CompareBiayaIndex() {
                                                 {actionMessage.type === 'create_claim' ? (
                                                     <PengajuanKlaimModal
                                                         data={pengajuanKlaimData}
-                                                        actionUrl="/eklaim/kunjungan/pengajuan-klaim"
+                                                        actionUrl="/biaya/pengajuan-klaim"
                                                         triggerClassName="px-3 py-2 text-xs font-medium text-white bg-yellow-600 rounded-md hover:bg-yellow-700 transition-colors"
                                                         triggerText="Buat Pengajuan Klaim"
                                                     />
@@ -854,7 +860,7 @@ export default function CompareBiayaIndex() {
                                                         <div>
                                                             <div className="text-sm font-medium text-green-600">Tarif CBG</div>
                                                             <div className="text-2xl font-bold text-green-900">
-                                                                {formatRupiah(parseInt(dataGroupper.cbg_tariff) || 0)}
+                                                                {formatRupiah(getDisplayCbgTariff(dataGroupper.cbg_tariff))}
                                                             </div>
                                                             <div className="mt-1 text-xs text-green-600">{dataGroupper.cbg_code}</div>
                                                         </div>
@@ -866,7 +872,7 @@ export default function CompareBiayaIndex() {
 
                                                 {/* Analisis Untung/Rugi Card */}
                                                 {(() => {
-                                                    const cbgTariff = parseInt(dataGroupper.cbg_tariff) || 0;
+                                                    const cbgTariff = getDisplayCbgTariff(dataGroupper.cbg_tariff);
                                                     const selisih = cbgTariff - totalTagihan;
                                                     const isUntung = selisih >= 0;
                                                     const persentase = totalTagihan > 0 ? Math.abs((selisih / totalTagihan) * 100) : 0;
@@ -926,7 +932,7 @@ export default function CompareBiayaIndex() {
                                                         <span className="text-gray-600">Efisiensi Biaya:</span>
                                                         <span className="ml-2 font-medium">
                                                             {totalTagihan > 0
-                                                                ? ((totalTagihan / (parseInt(dataGroupper.cbg_tariff) || 1)) * 100).toFixed(1)
+                                                                ? ((totalTagihan / (getDisplayCbgTariff(dataGroupper.cbg_tariff) || 1)) * 100).toFixed(1)
                                                                 : 0}
                                                             %
                                                         </span>
@@ -935,12 +941,12 @@ export default function CompareBiayaIndex() {
                                                         <span className="text-gray-600">Status:</span>
                                                         <span
                                                             className={`ml-2 font-medium ${
-                                                                (parseInt(dataGroupper.cbg_tariff) || 0) >= totalTagihan
+                                                                getDisplayCbgTariff(dataGroupper.cbg_tariff) >= totalTagihan
                                                                     ? 'text-green-600'
                                                                     : 'text-red-600'
                                                             }`}
                                                         >
-                                                            {(parseInt(dataGroupper.cbg_tariff) || 0) >= totalTagihan
+                                                            {getDisplayCbgTariff(dataGroupper.cbg_tariff) >= totalTagihan
                                                                 ? 'Dalam Batas CBG'
                                                                 : 'Melebihi CBG'}
                                                         </span>
@@ -1009,17 +1015,17 @@ export default function CompareBiayaIndex() {
                                                                 {formatRupiah(totalTagihan)}
                                                             </td>
                                                             <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">
-                                                                {formatRupiah(parseInt(dataGroupper.cbg_tariff) || 0)}
+                                                                {formatRupiah(getDisplayCbgTariff(dataGroupper.cbg_tariff))}
                                                             </td>
                                                             <td
                                                                 className={`px-4 py-3 text-right text-sm font-semibold ${
-                                                                    (parseInt(dataGroupper.cbg_tariff) || 0) - totalTagihan >= 0
+                                                                    getDisplayCbgTariff(dataGroupper.cbg_tariff) - totalTagihan >= 0
                                                                         ? 'text-green-600'
                                                                         : 'text-red-600'
                                                                 }`}
                                                             >
-                                                                {formatRupiah(Math.abs((parseInt(dataGroupper.cbg_tariff) || 0) - totalTagihan))}
-                                                                {(parseInt(dataGroupper.cbg_tariff) || 0) - totalTagihan >= 0
+                                                                {formatRupiah(Math.abs(getDisplayCbgTariff(dataGroupper.cbg_tariff) - totalTagihan))}
+                                                                {getDisplayCbgTariff(dataGroupper.cbg_tariff) - totalTagihan >= 0
                                                                     ? ' (Untung)'
                                                                     : ' (Rugi)'}
                                                             </td>
@@ -1105,7 +1111,7 @@ export default function CompareBiayaIndex() {
                                     {dataGroupper && (
                                         <div className="border-t border-gray-200 bg-amber-50 px-6 py-4">
                                             {(() => {
-                                                const cbgTariff = parseInt(dataGroupper.cbg_tariff) || 0;
+                                                const cbgTariff = getDisplayCbgTariff(dataGroupper.cbg_tariff);
                                                 const selisih = cbgTariff - totalTagihan;
                                                 const isUntung = selisih >= 0;
                                                 const persentaseSelisih = totalTagihan > 0 ? Math.abs((selisih / totalTagihan) * 100) : 0;

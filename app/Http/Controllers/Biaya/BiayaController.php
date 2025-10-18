@@ -173,7 +173,7 @@ class BiayaController extends Controller
                 'tanggal_keluar' => $request->get('tanggal_keluar'),
                 'ruangan' => $request->get('ruangan'),
                 'jenis_kunjungan' => $request->get('jenis_kunjungan'),
-                'status_pengiriman' => PengajuanKlaim::STATUS_DEFAULT,
+                'status_pengiriman' => PengajuanKlaim::STATUS_TERSIMPAN,
             ];
 
             // Fallback ke data kunjungan jika parameter tidak ada
@@ -211,7 +211,7 @@ class BiayaController extends Controller
                 }
                 
                 // Skip API call and directly create pengajuan klaim
-                $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_DEFAULT;
+                $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_TERSIMPAN;
                 $pengajuanData['response_message'] = 'Data disimpan tanpa mengirim ke API INACBG (Force Create)';
                 $pengajuanData['response_data'] = ['force_create' => true, 'timestamp' => now()];
                 
@@ -265,7 +265,7 @@ class BiayaController extends Controller
                 }
 
                 // Simpan data pengajuan dengan status sukses
-                $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_DEFAULT;
+                $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_TERSIMPAN;
                 $pengajuanData['response_message'] = $inacbgResponse['metadata']['message'] ?? 'Klaim berhasil diajukan';
                 $pengajuanData['response_data'] = $inacbgResponse;
                 
@@ -300,7 +300,7 @@ class BiayaController extends Controller
             }
             
             // Simpan data pengajuan dengan status 0 (default)
-            $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_DEFAULT;
+            $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_TERSIMPAN;
             $pengajuanData['response_message'] = 'Exception: ' . $e->getMessage();
             $pengajuanData['response_data'] = ['exception' => $e->getMessage(), 'trace' => $e->getTraceAsString()];
             
