@@ -556,7 +556,7 @@ export default function PrintBundleIndex() {
             //    }
                 
              //   throw new Error(errorMessage);
-            }
+            //}
 
             // Check if response is JSON (bundle_base64) or binary (fallback)
             const contentType = response.headers.get('content-type');
