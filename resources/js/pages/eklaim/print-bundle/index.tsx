@@ -550,8 +550,7 @@ export default function PrintBundleIndex() {
                     }
                 } catch {
                     // If response is not JSON, get text
-                    const errorText = await response.text();
-                    errorMessage = errorText || errorMessage;
+                   errorMessage = errorText || errorMessage;
                 }
                 
                 throw new Error(errorMessage);
