@@ -369,7 +369,7 @@ export default function PrintBundleIndex() {
                 // Handle HTML response (template preview or fallback)
 
                 
-                // const htmlContent = await response.text();
+                const htmlContent = await response.text();
                 
                 // Open HTML preview in new window
                 const previewWindow = window.open('', '_blank', 'width=800,height=600');
