@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -7,18 +7,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-} from "@/components/ui/command";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover";
+import { Search, X } from "lucide-react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
@@ -53,8 +42,9 @@ const ModalTambahHasilRadiologi = ({
     tindakan
 }: ModalTambahHasilRadiologiProps) => {
     const [selectedTindakan, setSelectedTindakan] = useState<Tindakan | null>(null);
-    const [highlightedIndex, setHighlightedIndex] = useState(0);
-    const [openTindakan, setOpenTindakan] = useState(false);
+    const [searchTindakan, setSearchTindakan] = useState('');
+    const [showTindakanList, setShowTindakanList] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement | null>(null);
     const [formData, setFormData] = useState({
         tanggal: '',
         klinis: '',
@@ -63,6 +53,23 @@ const ModalTambahHasilRadiologi = ({
         hasil: '',
         btk: ''
     });
+
+    // Filter tindakan berdasarkan pencarian
+    const filteredTindakan = tindakan.filter(item =>
+        item.NAMA.toLowerCase().includes(searchTindakan.toLowerCase())
+    );
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setShowTindakanList(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     useEffect(() => {
         if (isOpen && !formData.tanggal) {
@@ -73,7 +80,22 @@ const ModalTambahHasilRadiologi = ({
 
     const handleTindakanSelect = (tindakan: Tindakan) => {
         setSelectedTindakan(tindakan);
-        setOpenTindakan(false);
+        setSearchTindakan(tindakan.NAMA);
+        setShowTindakanList(false);
+    };
+
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setSearchTindakan(e.target.value);
+        setShowTindakanList(true);
+        if (!e.target.value) {
+            setSelectedTindakan(null);
+        }
+    };
+
+    const clearTindakan = () => {
+        setSelectedTindakan(null);
+        setSearchTindakan('');
+        setShowTindakanList(false);
     };
 
     const handleSubmit = () => {
@@ -107,35 +129,13 @@ const ModalTambahHasilRadiologi = ({
             hasil: '',
             btk: ''
         });
-        setOpenTindakan(false);
-        setHighlightedIndex(0);
+        setSearchTindakan('');
+        setShowTindakanList(false);
     };
 
     const handleClose = () => {
         handleReset();
         onClose();
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (!openTindakan || !tindakan.length) return;
-
-        if (e.key === "ArrowDown") {
-            e.preventDefault();
-            setHighlightedIndex((prev) =>
-                prev === tindakan.length - 1 ? 0 : prev + 1
-            );
-        } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            setHighlightedIndex((prev) =>
-                prev === 0 ? tindakan.length - 1 : prev - 1
-            );
-        } else if (e.key === "Enter") {
-            e.preventDefault();
-            const selected = tindakan[highlightedIndex];
-            if (selected) handleTindakanSelect(selected);
-        } else if (e.key === "Escape") {
-            setOpenTindakan(false);
-        }
     };
 
     return (
@@ -176,70 +176,53 @@ const ModalTambahHasilRadiologi = ({
                                         padding: '12px'
                                     }}
                                 >
-                                    <Popover open={openTindakan} onOpenChange={setOpenTindakan}>
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                role="combobox"
-                                                aria-expanded={openTindakan}
-                                                className="w-full justify-between h-10 text-left"
-                                            >
-                                                <span className={selectedTindakan ? "text-black" : "text-gray-500"}>
-                                                    {selectedTindakan
-                                                        ? selectedTindakan.NAMA
-                                                        : "Pilih tindakan radiologi..."}
-                                                </span>
-                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                            </Button>
-                                        </PopoverTrigger>
-
-                                        <PopoverContent className="w-[400px] p-0" align="start">
-                                            <Command>
-                                                <CommandInput
-                                                    placeholder="Ketik untuk mencari tindakan..."
-                                                    className="h-10"
-                                                    onKeyDown={handleKeyDown}
-                                                />
-                                                <CommandEmpty>
-                                                    Tidak ada tindakan ditemukan.
-                                                </CommandEmpty>
-
-                                                <CommandGroup className="max-h-48 overflow-auto">
-                                                    {tindakan && tindakan.length > 0 ? (
-                                                        tindakan.map((tindakanItem, index) => (
-                                                            <CommandItem
-                                                                key={tindakanItem.ID}
-                                                                value={tindakanItem.NAMA}
-                                                                onSelect={() =>
-                                                                    handleTindakanSelect(tindakanItem)
-                                                                }
-                                                                className={cn(
-                                                                    "flex items-center py-2 px-3 cursor-pointer",
-                                                                    highlightedIndex === index
-                                                                        ? "bg-blue-100"
-                                                                        : "hover:bg-gray-100"
-                                                                )}
-                                                            >
-                                                                <Check
-                                                                    className={cn(
-                                                                        "mr-2 h-4 w-4",
-                                                                        selectedTindakan?.ID === tindakanItem.ID
-                                                                            ? "opacity-100"
-                                                                            : "opacity-0"
-                                                                    )}
-                                                                />
-                                                                <div>{tindakanItem.NAMA}</div>
-                                                            </CommandItem>
-                                                        ))
-                                                    ) : (
-                                                        <div className="p-4 text-center text-gray-500">
-                                                            Data tindakan tidak tersedia
+                                    <div className="relative" ref={dropdownRef}>
+                                        <div className="relative">
+                                            <Input
+                                                type="text"
+                                                value={searchTindakan}
+                                                onChange={handleSearchChange}
+                                                onFocus={() => setShowTindakanList(true)}
+                                                placeholder="Ketik untuk mencari tindakan radiologi..."
+                                                className="w-full h-10 pr-10"
+                                            />
+                                            <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                                                {searchTindakan ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={clearTindakan}
+                                                        className="text-gray-400 hover:text-gray-600"
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </button>
+                                                ) : (
+                                                    <Search className="h-4 w-4 text-gray-400" />
+                                                )}
+                                            </div>
+                                        </div>
+                                        
+                                        {showTindakanList && (
+                                            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-auto">
+                                                {filteredTindakan.length > 0 ? (
+                                                    filteredTindakan.map((item) => (
+                                                        <div
+                                                            key={item.ID}
+                                                            onClick={() => handleTindakanSelect(item)}
+                                                            className={`px-3 py-2 cursor-pointer hover:bg-green-100 ${
+                                                                selectedTindakan?.ID === item.ID ? 'bg-green-50' : ''
+                                                            }`}
+                                                        >
+                                                            <div className="font-medium">{item.NAMA}</div>
                                                         </div>
-                                                    )}
-                                                </CommandGroup>
-                                            </Command>
-                                        </PopoverContent>
-                                    </Popover>
+                                                    ))
+                                                ) : (
+                                                    <div className="px-3 py-2 text-gray-500 text-center">
+                                                        Tidak ada tindakan ditemukan
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                 </td>
                             </tr>
 

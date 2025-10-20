@@ -11,6 +11,13 @@ Route::get('/', function () {
     return redirect('/login');
 })->name('home');
 
+// CSRF Token Refresh Route
+Route::get('/csrf-token', function () {
+    return response()->json([
+        'csrf_token' => csrf_token()
+    ]);
+})->middleware('web');
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
         return Inertia::render('dashboard');

@@ -39,6 +39,14 @@ Route::middleware('auth')->group(function () {
     
     // Bundle generation - POST only
     Route::post('/eklaim/print-bundle/{pengajuan}/bundle', [PrintBundleController::class, 'generateBundle'])->name('eklaim.print-bundle.bundle')->middleware(['permission:pengajuan-klaim.view', 'production.csrf']);
+    
+    // Default order management routes
+    Route::get('/eklaim/print-bundle/{pengajuan}/default-order', [PrintBundleController::class, 'getDefaultOrder'])->name('eklaim.print-bundle.default-order.get')->middleware(['permission:pengajuan-klaim.view']);
+    Route::post('/eklaim/print-bundle/{pengajuan}/default-order', [PrintBundleController::class, 'updateDefaultOrder'])->name('eklaim.print-bundle.default-order.update')->middleware(['permission:pengajuan-klaim.view']);
+    Route::delete('/eklaim/print-bundle/{pengajuan}/default-order', [PrintBundleController::class, 'clearDefaultOrder'])->name('eklaim.print-bundle.default-order.clear')->middleware(['permission:pengajuan-klaim.view']);
+    
+    // Admin routes for managing all saved settings
+    Route::get('/eklaim/print-bundle/settings/all', [PrintBundleController::class, 'getAllSavedSettingsApi'])->name('eklaim.print-bundle.settings.all')->middleware(['permission:pengajuan-klaim.view']);
 });
 
 //Pengajuan Klaim Ke Inacbg

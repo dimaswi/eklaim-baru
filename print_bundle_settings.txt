@@ -1,0 +1,58 @@
+{
+    "5": {
+        "document_order": [
+            {
+                "id": "sep",
+                "order": 1,
+                "is_default_selected": true
+            },
+            {
+                "id": "berkas_klaim",
+                "order": 2,
+                "is_default_selected": true
+            },
+            {
+                "id": "resume_medis",
+                "order": 3,
+                "is_default_selected": true
+            },
+            {
+                "id": "pengkajian_awal",
+                "order": 4,
+                "is_default_selected": true
+            },
+            {
+                "id": "ugd_triage",
+                "order": 5,
+                "is_default_selected": true
+            },
+            {
+                "id": "laboratorium",
+                "order": 6,
+                "is_default_selected": true
+            },
+            {
+                "id": "rawat_inap_cppt",
+                "order": 7,
+                "is_default_selected": true
+            },
+            {
+                "id": "rawat_inap_balance",
+                "order": 8,
+                "is_default_selected": true
+            },
+            {
+                "id": "tagihan",
+                "order": 9,
+                "is_default_selected": true
+            },
+            {
+                "id": "radiologi",
+                "order": 999,
+                "is_default_selected": false
+            }
+        ],
+        "updated_at": "2025-10-20 01:04:49",
+        "user_id": 1
+    }
+}

@@ -384,7 +384,7 @@
                             <tr>
                                 <td class="label">No. Kunjungan</td>
                                 <td class="colon">:</td>
-                                <td class="value">{{ $triageData->kunjungan_nomor ?? '-' }}</td>
+                                <td class="value">{{ $triageData->kunjungan_nomor ?? $triageData->nomor_kunjungan ?? '-' }}</td>
                             </tr>
                             <tr>
                                 <td class="label">Tanggal Masuk</td>
@@ -417,29 +417,23 @@
             <div class="section">
                 <h4>A. CARA KEDATANGAN</h4>
                 <div class="section-content">
-                    <div style="margin-bottom: 10px;">
-                        <div style="display: inline-block; margin-right: 12px; font-size: 9px; margin-bottom: 3px;">
-                            {{ ($triageData->kedatangan_datang_sendiri ?? false) ? '[V]' : '[ ]' }} Datang Sendiri
-                        </div>
-                        <div style="display: inline-block; margin-right: 12px; font-size: 9px; margin-bottom: 3px;">
-                            {{ ($triageData->kedatangan_pengantar ?? false) ? '[V]' : '[ ]' }} Diantar Keluarga/Orang Lain
-                        </div>
-                        <div style="display: inline-block; margin-right: 12px; font-size: 9px; margin-bottom: 3px;">
-                            {{ ($triageData->kedatangan_alat_transportasi ?? false) ? '[V]' : '[ ]' }} Alat Transportasi
-                        </div>
-                        <div style="display: inline-block; margin-right: 12px; font-size: 9px; margin-bottom: 3px;">
-                            {{ ($triageData->kedatangan_polisi ?? false) ? '[V]' : '[ ]' }} Polisi
-                        </div>
-                    </div>
-                    
-                    @if ($triageData->kedatangan_asal_rujukan)
-                        <table class="form-table" style="margin-top: 10px;">
-                            <tr>
-                                <td class="info-label">Asal Rujukan</td>
-                                <td class="info-value">{{ $triageData->kedatangan_asal_rujukan }}</td>
-                            </tr>
-                        </table>
-                    @endif
+                    <table class="form-table">
+                        <tr>
+                            <td class="info-label">Cara Datang</td>
+                            <td class="info-value">
+                                {{ ($triageData->kedatangan_datang_sendiri ?? false) ? '[✓]' : '[ ]' }} Datang Sendiri<br>
+                                <strong>Pengantar:</strong> {{ $triageData->kedatangan_pengantar ?? '-' }}<br>
+                                <strong>Alat Transportasi:</strong> {{ $triageData->kedatangan_alat_transportasi ?? '-' }}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="info-label">Rujukan</td>
+                            <td class="info-value">
+                                <strong>Rujukan Dari:</strong> {{ $triageData->kedatangan_asal_rujukan ?? '-' }}<br>
+                                {{ ($triageData->kedatangan_polisi ?? false) ? '[✓]' : '[ ]' }} Rujukan Dari Polisi
+                            </td>
+                        </tr>
+                    </table>
                 </div>
             </div>
 
@@ -447,26 +441,25 @@
             <div class="section">
                 <h4>B. JENIS KASUS</h4>
                 <div class="section-content">
-                    <div style="margin-bottom: 10px;">
-                        <div style="display: inline-block; margin-right: 12px; font-size: 9px; margin-bottom: 3px;">
-                            {{ ($triageData->kasus_jenis_kasus ?? false) ? '[V]' : '[ ]' }} Trauma
-                        </div>
-                        <div style="display: inline-block; margin-right: 12px; font-size: 9px; margin-bottom: 3px;">
-                            {{ ($triageData->kasus_laka_lantas ?? false) ? '[V]' : '[ ]' }} Laka Lantas
-                        </div>
-                        <div style="display: inline-block; margin-right: 12px; font-size: 9px; margin-bottom: 3px;">
-                            {{ ($triageData->kasus_kecelakaan_kerja ?? false) ? '[V]' : '[ ]' }} Kecelakaan Kerja
-                        </div>
-                    </div>
-                    
-                    @if ($triageData->kasus_lokasi)
-                        <table class="form-table" style="margin-top: 10px;">
-                            <tr>
-                                <td class="info-label">Lokasi Kejadian</td>
-                                <td class="info-value">{{ $triageData->kasus_lokasi }}</td>
-                            </tr>
-                        </table>
-                    @endif
+                    <table class="form-table">
+                        <tr>
+                            <td class="info-label">Jenis Kasus</td>
+                            <td class="info-value">
+                                @if ($triageData->kasus_jenis_kasus ?? false)
+                                    [✓] Trauma<br>
+                                    @if ($triageData->kasus_kecelakaan_kerja ?? false)
+                                        [✓] Kecelakaan Kerja<br>
+                                    @endif
+                                    @if ($triageData->kasus_laka_lantas ?? false)
+                                        [✓] Kecelakaan Lalu Lintas<br>
+                                    @endif
+                                @else
+                                    [✓] Non Trauma
+                                @endif
+                                <strong>Lokasi:</strong> {{ $triageData->kasus_lokasi ?? '-' }}
+                            </td>
+                        </tr>
+                    </table>
                 </div>
             </div>
 
@@ -512,37 +505,46 @@
             <div class="section">
                 <h4>E. KATEGORI TRIAGE</h4>
                 <div class="section-content">
+                    @php
+                        // Determine selected triage based on savedData
+                        $selectedTriage = null;
+                        if (isset($triageData->kategori_triage)) {
+                            $selectedTriage = $triageData->kategori_triage;
+                        } else {
+                            // Fallback to boolean fields
+                            if ($triageData->triage_resusitasi ?? false) $selectedTriage = 'P1';
+                            elseif ($triageData->triage_emergency ?? false) $selectedTriage = 'P2';
+                            elseif ($triageData->triage_urgent ?? false) $selectedTriage = 'P3';
+                            elseif ($triageData->triage_less_urgent ?? false) $selectedTriage = 'P4';
+                            elseif ($triageData->triage_non_urgent ?? false) $selectedTriage = 'P5';
+                            elseif ($triageData->triage_doa ?? false) $selectedTriage = 'DOA';
+                        }
+                        
+                        $triageOptions = [
+                            'P1' => ['title' => 'RESUSITASI', 'color' => '#000', 'colorName' => 'Hitam'],
+                            'P2' => ['title' => 'EMERGENCY', 'color' => '#e74c3c', 'colorName' => 'Merah'],  
+                            'P3' => ['title' => 'URGENT', 'color' => '#f39c12', 'colorName' => 'Kuning'],
+                            'P4' => ['title' => 'LESS URGENT', 'color' => '#27ae60', 'colorName' => 'Hijau'],
+                            'P5' => ['title' => 'NON URGENT', 'color' => '#3498db', 'colorName' => 'Biru'],
+                            'DOA' => ['title' => 'DOA', 'color' => '#95a5a6', 'colorName' => 'Abu-abu']
+                        ];
+                    @endphp
+                    
                     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin-bottom: 10px;">
-                        <div class="triage-level-box {{ ($triageData->triage_resusitasi ?? false) ? 'triage-resusitasi' : '' }}" style="background-color: #000; color: white;">
-                            {{ ($triageData->triage_resusitasi ?? false) ? '[V]' : '[ ]' }} RESUSITASI (Hitam)
-                        </div>
-                        
-                        <div class="triage-level-box {{ ($triageData->triage_emergency ?? false) ? 'triage-emergency' : '' }}" style="background-color: #e74c3c; color: white;">
-                            {{ ($triageData->triage_emergency ?? false) ? '[V]' : '[ ]' }} EMERGENCY (Merah)
-                        </div>
-                        
-                        <div class="triage-level-box {{ ($triageData->triage_urgent ?? false) ? 'triage-urgent' : '' }}" style="background-color: #f39c12; color: white;">
-                            {{ ($triageData->triage_urgent ?? false) ? '[V]' : '[ ]' }} URGENT (Kuning)
-                        </div>
-                        
-                        <div class="triage-level-box {{ ($triageData->triage_less_urgent ?? false) ? 'triage-less-urgent' : '' }}" style="background-color: #27ae60; color: white;">
-                            {{ ($triageData->triage_less_urgent ?? false) ? '[V]' : '[ ]' }} LESS URGENT (Hijau)
-                        </div>
-                        
-                        <div class="triage-level-box {{ ($triageData->triage_non_urgent ?? false) ? 'triage-non-urgent' : '' }}" style="background-color: #3498db; color: white;">
-                            {{ ($triageData->triage_non_urgent ?? false) ? '[V]' : '[ ]' }} NON URGENT (Biru)
-                        </div>
-                        
-                        <div class="triage-level-box {{ ($triageData->triage_doa ?? false) ? 'triage-doa' : '' }}" style="background-color: #95a5a6; color: white;">
-                            {{ ($triageData->triage_doa ?? false) ? '[V]' : '[ ]' }} DOA (Abu-abu)
-                        </div>
+                        @foreach ($triageOptions as $key => $option)
+                            <div class="triage-level-box" style="background-color: {{ $option['color'] }}; color: white; {{ $selectedTriage === $key ? 'font-weight: bold; border: 3px solid #000;' : '' }}">
+                                {{ $selectedTriage === $key ? '[✓]' : '[ ]' }} {{ $option['title'] }} ({{ $option['colorName'] }})
+                            </div>
+                        @endforeach
                     </div>
                     
-                    @if ($triageData->kategori_triage)
+                    @if ($selectedTriage)
                         <table class="form-table">
                             <tr>
                                 <td class="info-label">Kategori Triage Terpilih</td>
-                                <td class="info-value" style="font-weight: bold; color: #e74c3c;">{{ $triageData->kategori_triage }}</td>
+                                <td class="info-value" style="font-weight: bold; color: {{ $triageOptions[$selectedTriage]['color'] }};">
+                                    {{ $triageOptions[$selectedTriage]['title'] }} ({{ $triageOptions[$selectedTriage]['colorName'] }})
+                                </td>
                             </tr>
                         </table>
                     @endif
@@ -553,9 +555,12 @@
             <table class="footer-table">
                 <tr>
                     <td class="footer-left-cell">
+                        
+                    </td>
+                    <td class="footer-right-cell">
                         <div class="date-location">BOJONEGORO, {{ \Carbon\Carbon::now()->locale('id')->isoFormat('D MMMM Y') }}</div>
                         <div style="font-weight: bold;">Perawat Triage</div>
-                        <div style="margin: 25px 0 8px;">
+                        <div style="margin: 8px 0 8px;">
                             @if (isset($perawatQR))
                                 <img src="{{ $perawatQR }}" style="width: 40px; height: 40px;" alt="QR Code Perawat">
                             @else
@@ -563,18 +568,6 @@
                             @endif
                         </div>
                         <div class="doctor-name">( {{ $triageData->petugas ?? '.............................' }} )</div>
-                    </td>
-                    <td class="footer-right-cell">
-                        <div class="date-location">BOJONEGORO, {{ \Carbon\Carbon::now()->locale('id')->isoFormat('D MMMM Y') }}</div>
-                        <div class="doctor-title">Dokter Jaga UGD</div>
-                        <div style="margin: 25px 0 8px;">
-                            @if (isset($dokterTriageQR))
-                                <img src="{{ $dokterTriageQR }}" style="width: 40px; height: 40px;" alt="QR Code Dokter Triage">
-                            @else
-                                <div class="qr-placeholder">[QR Code]</div>
-                            @endif
-                        </div>
-                        <div class="doctor-name">{{ $triageData->dokter ?? 'dr. ILHAM MUNANIDAR, Sp.PD' }}</div>
                     </td>
                 </tr>
             </table>

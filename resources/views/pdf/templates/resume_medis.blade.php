@@ -500,25 +500,213 @@
                     </tr>
                 </table>
 
+                {{-- DATA MEDIS --}}
+                <table class="form-table">
+                    <tr>
+                        <td class="info-label">Penanggung Jawab</td>
+                        <td class="info-value">{{ $item->penanggung_jawab ?? '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="info-label">Indikasi Rawat Inap</td>
+                        <td class="info-value">{{ $item->indikasi_rawat_inap ?? '-' }}</td>
+                    </tr>
+                </table>
+
                 {{-- SECTIONS --}}
                 @php
                     $sections = [
-                        ['Ringkasan Penyakit Sekarang', $item->riwayat_penyakit_sekarang ?? '-', $item->is_fiktif ?? false],
-                        ['Ringkasan Penyakit Dahulu', $item->riwayat_penyakit_dahulu ?? '-', false],
+                        ['Ringkasan Riwayat Penyakit', '', false],
                         ['Pemeriksaan Fisik', $item->pemeriksaan_fisik ?? '-', false],
                         ['Hasil Konsultasi', $item->hasil_konsultasi ?? 'Tidak ada hasil konsultasi', false],
                     ];
                 @endphp
 
                 @foreach ($sections as $i => [$title, $content, $fiktif])
-                    <div class="result-section">
-                        <h4>{{ $i + 1 }}. {{ $title }} @if ($fiktif) <span class="fiktif-indicator">FIKTIF</span> @endif</h4>
-                        <div class="result-content">{{ $content }}</div>
-                    </div>
+                    @if ($i == 0)
+                        {{-- Section khusus untuk riwayat penyakit --}}
+                        <div class="result-section">
+                            <h4>{{ $i + 1 }}. {{ $title }} @if ($fiktif) <span class="fiktif-indicator">FIKTIF</span> @endif</h4>
+                            <div class="result-content">
+                                <strong>Riwayat Penyakit Sekarang:</strong><br>
+                                {{ $item->riwayat_penyakit_sekarang ?? '-' }}
+                                <br><br>
+                                <strong>Riwayat Penyakit Dahulu:</strong><br>
+                                {{ $item->riwayat_penyakit_dahulu ?? '-' }}
+                            </div>
+                        </div>
+                    @else
+                        <div class="result-section">
+                            <h4>{{ $i + 1 }}. {{ $title }} @if ($fiktif) <span class="fiktif-indicator">FIKTIF</span> @endif</h4>
+                            <div class="result-content">{{ $content }}</div>
+                        </div>
+                    @endif
                 @endforeach
 
-                {{-- BAGIAN LAINNYA (Diagnosa, Prosedur, Obat, Kondisi Pulang, Footer) --}}
-                {{-- ... (sama seperti sebelumnya, tidak diubah fungsinya) --}}
+                {{-- DIAGNOSA --}}
+                <div class="result-section">
+                    <h4>5. Diagnosa Utama & Sekunder</h4>
+                    <div class="result-content">
+                        @if (!empty($item->selected_diagnosa))
+                            @if (is_array($item->selected_diagnosa))
+                                @foreach ($item->selected_diagnosa as $index => $diagnosa)
+                                    <strong>{{ $index + 1 }}.</strong> {{ $diagnosa['code'] ?? '' }} - {{ $diagnosa['name'] ?? '' }}<br>
+                                @endforeach
+                            @else
+                                {{ $item->selected_diagnosa }}
+                            @endif
+                        @else
+                            Tidak ada diagnosa yang tercatat
+                        @endif
+                    </div>
+                </div>
+
+                {{-- PROSEDUR --}}
+                <div class="result-section">
+                    <h4>6. Prosedur/Tindakan</h4>
+                    <div class="result-content">
+                        @if (!empty($item->selected_procedures))
+                            @if (is_array($item->selected_procedures))
+                                @foreach ($item->selected_procedures as $index => $prosedur)
+                                    <strong>{{ $index + 1 }}.</strong> {{ $prosedur['code'] ?? '' }} - {{ $prosedur['name'] ?? '' }}<br>
+                                @endforeach
+                            @else
+                                {{ $item->selected_procedures }}
+                            @endif
+                        @else
+                            Tidak ada tindakan/prosedur yang tercatat
+                        @endif
+                    </div>
+                </div>
+
+                {{-- TANDA VITAL --}}
+                <table class="vital-table">
+                    <thead>
+                        <tr>
+                            <th colspan="8" class="table-title">TANDA VITAL SAAT KELUAR</th>
+                        </tr>
+                        <tr>
+                            <th>Keadaan Umum</th>
+                            <th>Kesadaran</th>
+                            <th>TD Sistole</th>
+                            <th>TD Diastole</th>
+                            <th>Nadi</th>
+                            <th>Napas</th>
+                            <th>Suhu</th>
+                            <th>SpO2</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>{{ $item->tanda_vital_keadaan_umum ?? '-' }}</td>
+                            <td>{{ $item->tanda_vital_kesadaran ?? '-' }}</td>
+                            <td>{{ $item->tanda_vital_sistolik ?? '-' }}</td>
+                            <td>{{ $item->tanda_vital_distolik ?? '-' }}</td>
+                            <td>{{ $item->tanda_vital_frekuensi_nadi ?? '-' }}</td>
+                            <td>{{ $item->tanda_vital_frekuensi_nafas ?? '-' }}</td>
+                            <td>{{ $item->tanda_vital_suhu ?? '-' }}</td>
+                            <td>{{ $item->tanda_vital_saturasi_o2 ?? '-' }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {{-- GCS --}}
+                <table class="vital-table">
+                    <thead>
+                        <tr>
+                            <th colspan="4" class="table-title">GLASGOW COMA SCALE (GCS)</th>
+                        </tr>
+                        <tr>
+                            <th>Eye (E)</th>
+                            <th>Motorik (M)</th>
+                            <th>Verbal (V)</th>
+                            <th>Total GCS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>{{ $item->tanda_vital_eye ?? '-' }}</td>
+                            <td>{{ $item->tanda_vital_motorik ?? '-' }}</td>
+                            <td>{{ $item->tanda_vital_verbal ?? '-' }}</td>
+                            <td><strong>{{ $item->tanda_vital_gcs ?? '-' }}</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {{-- KEADAAN KELUAR --}}
+                <div class="result-section">
+                    <h4>7. Keadaan Waktu Keluar</h4>
+                    <div class="result-content">
+                        <strong>Cara Keluar:</strong> {{ $item->cara_keluar ?? '-' }}<br>
+                        <strong>Keadaan Keluar:</strong> {{ $item->keadaan_keluar ?? '-' }}
+                    </div>
+                </div>
+
+                {{-- JADWAL KONTROL --}}
+                <div class="result-section">
+                    <h4>8. Jadwal Kontrol</h4>
+                    <div class="result-content">
+                        <strong>Tanggal:</strong> {{ $item->jadwal_kontrol_tanggal ? \Carbon\Carbon::parse($item->jadwal_kontrol_tanggal)->locale('id')->isoFormat('D MMMM Y') : '-' }}<br>
+                        <strong>Jam:</strong> {{ $item->jadwal_kontrol_jam ?? '-' }}<br>
+                        <strong>Tujuan:</strong> {{ $item->jadwal_kontrol_tujuan ?? '-' }}<br>
+                        <strong>No. BPJS:</strong> {{ $item->jadwal_kontrol_nomor_bpjs ?? '-' }}
+                    </div>
+                </div>
+
+                {{-- RESEP PULANG --}}
+                <table class="med-table">
+                    <thead>
+                        <tr>
+                            <th colspan="5" class="table-title">RESEP PULANG</th>
+                        </tr>
+                        <tr>
+                            <th class="med-col-no">No</th>
+                            <th class="med-col-obat">Nama Obat</th>
+                            <th class="med-col-takaran">Frekuensi</th>
+                            <th class="med-col-cara">Jumlah</th>
+                            <th class="med-col-ket">Cara Pemberian</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!empty($item->resep_pulang) && is_array($item->resep_pulang))
+                            @foreach ($item->resep_pulang as $index => $resep)
+                                <tr>
+                                    <td class="med-col-no">{{ $index + 1 }}</td>
+                                    <td class="med-col-obat">{{ $resep['nama_obat'] ?? '-' }}</td>
+                                    <td class="med-col-takaran">{{ $resep['frekuensi'] ?? '-' }}</td>
+                                    <td class="med-col-cara">{{ $resep['jumlah'] ?? '-' }}</td>
+                                    <td class="med-col-ket">{{ $resep['cara_pemberian'] ?? '-' }}</td>
+                                </tr>
+                            @endforeach
+                        @else
+                            <tr>
+                                <td colspan="5" style="text-align: center; font-style: italic; padding: 20px;">
+                                    Tidak ada resep pulang
+                                </td>
+                            </tr>
+                        @endif
+                    </tbody>
+                </table>
+
+                {{-- FOOTER SIGNATURE --}}
+                <table class="footer-table">
+                    <tr>
+                        <td class="footer-left-cell">
+                            
+                        </td>
+                        <td class="footer-right-cell">
+                            <div class="doctor-title">Dokter Penanggung Jawab</div>
+                            
+                            @if ($dokterQR)
+                                <img src="{{ $dokterQR }}" style="width: 50px; height: 50px; margin: 8px auto; display: block;">
+                            @else
+                                <div class="qr-placeholder">[QR]</div>
+                            @endif
+                            
+                            <div class="doctor-name">{{ $dokterNama }}</div>
+                            <div class="date-location">{{ $tanggalTtd }}</div>
+                        </td>
+                    </tr>
+                </table>
             </div>
         @endforeach
     @else

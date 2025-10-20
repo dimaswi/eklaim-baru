@@ -1,11 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Check, ChevronsUpDown } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useState, useEffect } from 'react';
+import { Search, X } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 
 interface ParameterTindakanLab {
   PARAMETER: string;
@@ -38,17 +35,26 @@ interface Props {
 export default function ModalTambahHasilLab({ open, onClose, onSubmit, tindakanList }: Props) {
   const [selectedTindakan, setSelectedTindakan] = useState<Tindakan | null>(null);
   const [tanggal, setTanggal] = useState('');
-  const [openTindakan, setOpenTindakan] = useState(false);
+  const [searchTindakan, setSearchTindakan] = useState('');
+  const [showTindakanList, setShowTindakanList] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
-  // fokus otomatis ke input pencarian saat popover dibuka
+  // Filter tindakan berdasarkan pencarian
+  const filteredTindakan = tindakanList.filter(tindakan =>
+    tindakan.NAMA.toLowerCase().includes(searchTindakan.toLowerCase())
+  );
+
+  // Close dropdown when clicking outside
   useEffect(() => {
-    if (openTindakan) {
-      setTimeout(() => {
-        const input = document.querySelector('[cmdk-input]');
-        if (input) (input as HTMLInputElement).focus();
-      }, 100);
-    }
-  }, [openTindakan]);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowTindakanList(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Set tanggal default ketika modal dibuka
   useEffect(() => {
@@ -59,7 +65,22 @@ export default function ModalTambahHasilLab({ open, onClose, onSubmit, tindakanL
 
   const handleTindakanSelect = (tindakan: Tindakan) => {
     setSelectedTindakan(tindakan);
-    setOpenTindakan(false);
+    setSearchTindakan(tindakan.NAMA);
+    setShowTindakanList(false);
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTindakan(e.target.value);
+    setShowTindakanList(true);
+    if (!e.target.value) {
+      setSelectedTindakan(null);
+    }
+  };
+
+  const clearTindakan = () => {
+    setSelectedTindakan(null);
+    setSearchTindakan('');
+    setShowTindakanList(false);
   };
 
   const handleSubmit = () => {
@@ -81,7 +102,8 @@ export default function ModalTambahHasilLab({ open, onClose, onSubmit, tindakanL
   const handleReset = () => {
     setSelectedTindakan(null);
     setTanggal('');
-    setOpenTindakan(false);
+    setSearchTindakan('');
+    setShowTindakanList(false);
   };
 
   const handleClose = () => {
@@ -107,100 +129,59 @@ export default function ModalTambahHasilLab({ open, onClose, onSubmit, tindakanL
                   Pilih Tindakan
                 </td>
                 <td className="border border-gray-300 p-3">
-                  <Popover open={openTindakan} onOpenChange={setOpenTindakan}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={openTindakan}
-                        className="w-full justify-between h-10 text-left"
-                      >
-                        <span className={selectedTindakan ? 'text-black' : 'text-gray-500'}>
-                          {selectedTindakan
-                            ? selectedTindakan.NAMA
-                            : 'Pilih tindakan laboratorium...'}
-                        </span>
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-
-                    <PopoverContent className="w-[400px] p-0" align="start">
-                      <Command shouldFilter={true}>
-                        <CommandInput
-                          placeholder="Ketik untuk mencari tindakan..."
-                          className="h-10"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Escape') {
-                              setOpenTindakan(false);
-                            }
-                          }}
-                        />
-
-                        <CommandEmpty>Tidak ada tindakan ditemukan.</CommandEmpty>
-
-                        <CommandGroup className="max-h-48 overflow-auto">
-                          {tindakanList && tindakanList.length > 0 ? (
-                            tindakanList.map((tindakan, index) => (
-                              <CommandItem
-                                key={tindakan.ID}
-                                value={tindakan.NAMA}
-                                onSelect={() => handleTindakanSelect(tindakan)}
-                                className={cn(
-                                  'flex items-center py-2 px-3 cursor-pointer hover:bg-gray-100',
-                                  selectedTindakan?.ID === tindakan.ID && 'bg-gray-100'
-                                )}
-                                onKeyDown={(e) => {
-                                  // ENTER untuk memilih
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleTindakanSelect(tindakan);
-                                  }
-                                  // PANAH BAWAH
-                                  else if (e.key === 'ArrowDown') {
-                                    e.preventDefault();
-                                    const next =
-                                      tindakanList[(index + 1) % tindakanList.length];
-                                    setSelectedTindakan(next);
-                                  }
-                                  // PANAH ATAS
-                                  else if (e.key === 'ArrowUp') {
-                                    e.preventDefault();
-                                    const prev =
-                                      tindakanList[
-                                        (index - 1 + tindakanList.length) %
-                                        tindakanList.length
-                                      ];
-                                    setSelectedTindakan(prev);
-                                  }
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    'mr-2 h-4 w-4',
-                                    selectedTindakan?.ID === tindakan.ID
-                                      ? 'opacity-100'
-                                      : 'opacity-0'
-                                  )}
-                                />
-                                <div>
-                                  <div className="font-medium">{tindakan.NAMA}</div>
-                                  {tindakan.parameter_tindakan_lab && (
-                                    <div className="text-xs text-gray-500 mt-1">
-                                      {tindakan.parameter_tindakan_lab.length} parameter
-                                    </div>
-                                  )}
+                  <div className="relative" ref={dropdownRef}>
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        value={searchTindakan}
+                        onChange={handleSearchChange}
+                        onFocus={() => setShowTindakanList(true)}
+                        placeholder="Ketik untuk mencari tindakan laboratorium..."
+                        className="w-full h-10 pr-10"
+                      />
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                        {searchTindakan ? (
+                          <button
+                            type="button"
+                            onClick={clearTindakan}
+                            className="text-gray-400 hover:text-gray-600"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <Search className="h-4 w-4 text-gray-400" />
+                        )}
+                      </div>
+                    </div>
+                    
+                    {showTindakanList && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-auto">
+                        {filteredTindakan.length > 0 ? (
+                          filteredTindakan.map((tindakan) => (
+                            <div
+                              key={tindakan.ID}
+                              onClick={() => handleTindakanSelect(tindakan)}
+                              className={`px-3 py-2 cursor-pointer hover:bg-green-100 ${
+                                selectedTindakan?.ID === tindakan.ID ? 'bg-green-50' : ''
+                              }`}
+                            >
+                              <div className="font-medium">{tindakan.NAMA}
+                              {tindakan.parameter_tindakan_lab && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  Parameter: {tindakan.parameter_tindakan_lab.length} item
                                 </div>
-                              </CommandItem>
-                            ))
-                          ) : (
-                            <div className="p-4 text-center text-gray-500">
-                              Data tindakan tidak tersedia
+                              )}
+                              </div>
                             </div>
-                          )}
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                          ))
+                        ) : (
+                          <div className="px-3 py-2 text-gray-500 text-center">
+                            Tidak ada tindakan ditemukan
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </td>
               </tr>
 

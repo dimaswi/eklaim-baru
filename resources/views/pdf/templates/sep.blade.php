@@ -219,8 +219,8 @@
                     <tr>
                         <td class="info-label">Nama Peserta</td>
                         <td class="info-colon">:</td>
-                        <td class="info-value">{{ $pengajuanKlaim->nama_pasien ?? 'JAMALIAH' }}</td>
-                        <td class="right-info">Jns. Rawat : {{ $pengajuanKlaim->jenis_rawat ?? 'R.Jalan' }}</td>
+                        <td class="info-value">{{ $pengajuanKlaim->nama_pasien ?? '-' }}</td>
+                        <td class="right-info">Jns. Rawat : {{ $pengajuanKlaim->jenis_kunjungan ?? '-' }}</td>
                     </tr>
                     <tr>
                         <td class="info-label">Tgl. Lahir</td>
@@ -231,31 +231,31 @@
                     <tr>
                         <td class="info-label">No. Telepon</td>
                         <td class="info-colon">:</td>
-                        <td class="info-value">{{ $pengajuanKlaim->no_telepon ?? '085648110012' }}</td>
+                        <td class="info-value">{{ $pengajuanKlaim->no_telepon ?? '-' }}</td>
                         <td class="right-info">: -</td>
                     </tr>
                     <tr>
                         <td class="info-label">Sub/Spesialis</td>
                         <td class="info-colon">:</td>
-                        <td class="info-value">{{ $pengajuanKlaim->sub_spesialis ?? 'IGD' }}</td>
+                        <td class="info-value">{{ $dataKunjungan->poliTujuan ?? 'IGD' }}</td>
                         <td class="right-info">Poli Perujuk :</td>
                     </tr>
                     <tr>
                         <td class="info-label">Dokter</td>
                         <td class="info-colon">:</td>
-                        <td class="info-value">{{ $pengajuanKlaim->nama_dpjp ?? 'dr. ASTU ANINDYAJATI, Sp.PD' }}</td>
-                        <td class="right-info">Kls. Hak : {{ $pengajuanKlaim->kelas_hak ?? 'Kelas 3' }}</td>
+                        <td class="info-value">{{ $dataKunjungan->user ?? '-' }}</td>
+                        <td class="right-info">Kls. Hak : {{ $dataKunjungan->klsRawat ?? '-' }}</td>
                     </tr>
                     <tr>
                         <td class="info-label">Faskes Perujuk</td>
                         <td class="info-colon">:</td>
                         <td class="info-value">{{ $pengajuanKlaim->faskes_perujuk ?? 'R10 - Abdominal and pelvic pain' }}</td>
-                        <td class="right-info">Kls. Rawat :</td>
+                        <td class="right-info">Kls. Rawat : {{ $dataKunjungan->klsRawat ?? '-' }}</td>
                     </tr>
                     <tr>
                         <td class="info-label">Diagnosa Awal</td>
                         <td class="info-colon">:</td>
-                        <td class="info-value">{{ $pengajuanKlaim->diagnosa_awal ?? 'R10 - Abdominal and pelvic pain' }}</td>
+                        <td class="info-value">{{ $dataKunjungan->diagAwal ?? '-' }}</td>
                         <td class="right-info">Penjamin :</td>
                     </tr>
                     <tr>

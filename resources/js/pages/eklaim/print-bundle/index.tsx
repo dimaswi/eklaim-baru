@@ -18,7 +18,10 @@ import {
     ChevronRight,
     ChevronUp,
     Loader,
-    GripVertical
+    GripVertical,
+    Settings,
+    Save,
+    RotateCcw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BreadcrumbItem } from '@/types';
@@ -48,6 +51,9 @@ interface MedicalRecord {
     records?: any[];
     count: number;
     available: boolean;
+    default_order?: number;
+    is_default_selected?: boolean;
+    priority?: number;
 }
 
 interface MedicalRecords {
@@ -82,8 +88,8 @@ export default function PrintBundleIndex() {
             type: key,
             title: record.title,
             icon: record.icon,
-            isSelected: false,
-            selectionOrder: null,
+            isSelected: record.is_default_selected || false,
+            selectionOrder: record.is_default_selected ? (record.default_order || null) : null,
             available: record.available,
             count: record.count,
             hasRecords: key === 'laboratorium' || key === 'radiologi' || key === 'resume_medis' || key === 'pengkajian_awal',
@@ -91,13 +97,80 @@ export default function PrintBundleIndex() {
         }));
     });
     
-    const [selectionOrder, setSelectionOrder] = useState<string[]>([]);
+    const [selectionOrder, setSelectionOrder] = useState<string[]>(() => {
+        // Initialize with default selected documents in order
+        const defaultSelected = Object.entries(medicalRecords)
+            .filter(([key, record]) => record.is_default_selected && record.available)
+            .sort((a, b) => (a[1].default_order || 999) - (b[1].default_order || 999))
+            .map(([key]) => key);
+        return defaultSelected;
+    });
     const [isGenerating, setIsGenerating] = useState(false);
     const [previewDocument, setPreviewDocument] = useState<PDFDocument | null>(null);
-    const [expandedRows, setExpandedRows] = useState<string[]>([]);
+    const [expandedRows, setExpandedRows] = useState<string[]>(() => {
+        // Auto-expand rows for documents that require record selection but have none selected
+        const requiresRecordSelection = ['laboratorium', 'radiologi', 'resume_medis', 'pengkajian_awal'];
+        return Object.entries(medicalRecords)
+            .filter(([key, record]) => requiresRecordSelection.includes(key) && record.available && record.count > 0)
+            .map(([key]) => key);
+    });
     const [loadingStates, setLoadingStates] = useState<{ [key: string]: 'preview' | 'download' | null }>({});
     const [draggedItem, setDraggedItem] = useState<string | null>(null);
     const [draggedOverItem, setDraggedOverItem] = useState<string | null>(null);
+    const [showSettings, setShowSettings] = useState(false);
+    const [isLoadingSettings, setIsLoadingSettings] = useState(false);
+    const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+    // CSRF Token Helper Functions
+    const getCSRFToken = () => {
+        return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    };
+
+    const refreshCSRFToken = async () => {
+        try {
+            const response = await fetch('/csrf-token', {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                // Update the meta tag with new token
+                const metaTag = document.querySelector('meta[name="csrf-token"]');
+                if (metaTag) {
+                    metaTag.setAttribute('content', data.csrf_token);
+                }
+                return data.csrf_token;
+            }
+        } catch (error) {
+            console.error('Failed to refresh CSRF token:', error);
+        }
+        return null;
+    };
+
+    const makeAuthenticatedRequest = async (url: string, options: RequestInit, retryOnCSRFError = true): Promise<Response> => {
+        const response = await fetch(url, {
+            ...options,
+            headers: {
+                ...options.headers,
+                'X-CSRF-TOKEN': getCSRFToken(),
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+
+        // Handle CSRF token mismatch
+        if (response.status === 419 && retryOnCSRFError) {
+            const newToken = await refreshCSRFToken();
+            if (newToken) {
+                // Retry the request with new token
+                return makeAuthenticatedRequest(url, options, false);
+            }
+        }
+
+        return response;
+    };
 
     const toggleExpandRow = (docId: string) => {
         setExpandedRows(prev => 
@@ -142,6 +215,14 @@ export default function PrintBundleIndex() {
         return doc?.selectedRecords?.length || 0;
     };
 
+    const requiresRecordSelection = (docType: string) => {
+        return ['laboratorium', 'radiologi', 'resume_medis', 'pengkajian_awal'].includes(docType);
+    };
+
+    const hasRecordSelectionIssue = (doc: PDFDocument) => {
+        return requiresRecordSelection(doc.type) && doc.available && getSelectedRecordsCount(doc.id) === 0;
+    };
+
     const toggleDocument = (docId: string) => {
         setDocuments(prev => prev.map(doc => {
             if (doc.id === docId) {
@@ -153,6 +234,12 @@ export default function PrintBundleIndex() {
                     // Selecting - add to order
                     const newOrder = selectionOrder.length + 1;
                     setSelectionOrder(order => [...order, docId]);
+                    
+                    // Auto-expand if this document requires record selection and has no records selected
+                    if (requiresRecordSelection(doc.type) && getSelectedRecordsCount(docId) === 0) {
+                        setExpandedRows(prev => prev.includes(docId) ? prev : [...prev, docId]);
+                    }
+                    
                     return { ...doc, isSelected: true, selectionOrder: newOrder };
                 }
             }
@@ -219,6 +306,17 @@ export default function PrintBundleIndex() {
     };
 
     const handlePreview = async (doc: PDFDocument) => {
+        // Check if document requires record selection
+        const requiresRecordSelection = ['laboratorium', 'radiologi', 'resume_medis', 'pengkajian_awal'];
+        
+        if (requiresRecordSelection.includes(doc.type)) {
+            const selectedCount = getSelectedRecordsCount(doc.id);
+            if (selectedCount === 0) {
+                alert(`⚠️ Silakan pilih minimal satu record untuk ${doc.title} terlebih dahulu.\n\nKlik tombol "📋" untuk melihat dan memilih record yang tersedia.`);
+                return;
+            }
+        }
+
         setLoadingStates(prev => ({ ...prev, [doc.id]: 'preview' }));
         try {
 
@@ -240,12 +338,10 @@ export default function PrintBundleIndex() {
 
 
 
-            const response = await fetch(`/eklaim/print-bundle/${pengajuanKlaim.id}/preview?type=${doc.type}`, {
+            const response = await makeAuthenticatedRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/preview?type=${doc.type}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                    'X-Requested-With': 'XMLHttpRequest',
                 },
                 body: JSON.stringify(requestBody),
             });
@@ -295,6 +391,17 @@ export default function PrintBundleIndex() {
 
 
     const handleDownloadIndividual = async (doc: PDFDocument) => {
+        // Check if document requires record selection
+        const requiresRecordSelection = ['laboratorium', 'radiologi', 'resume_medis', 'pengkajian_awal'];
+        
+        if (requiresRecordSelection.includes(doc.type)) {
+            const selectedCount = getSelectedRecordsCount(doc.id);
+            if (selectedCount === 0) {
+                alert(`⚠️ Silakan pilih minimal satu record untuk ${doc.title} terlebih dahulu.\n\nKlik tombol "📋" untuk melihat dan memilih record yang tersedia.`);
+                return;
+            }
+        }
+
         setLoadingStates(prev => ({ ...prev, [doc.id]: 'download' }));
         try {
             
@@ -315,11 +422,10 @@ export default function PrintBundleIndex() {
                     selected_records: selectedRecordsData,
                 };
 
-            const response = await fetch(`/eklaim/print-bundle/${pengajuanKlaim.id}/pdf?type=${doc.type}`, {
+            const response = await makeAuthenticatedRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/pdf?type=${doc.type}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
                 },
                 body: JSON.stringify(requestBody),
             });
@@ -380,6 +486,25 @@ export default function PrintBundleIndex() {
     const handleGenerateBundle = async () => {
         if (selectionOrder.length === 0) return;
         
+        // Validate that documents requiring record selection have records selected
+        const requiresRecordSelection = ['laboratorium', 'radiologi', 'resume_medis', 'pengkajian_awal'];
+        const selectedDocs = getSelectedDocuments();
+        const invalidDocs: string[] = [];
+        
+        selectedDocs.forEach(doc => {
+            if (requiresRecordSelection.includes(doc.type)) {
+                const selectedCount = getSelectedRecordsCount(doc.id);
+                if (selectedCount === 0) {
+                    invalidDocs.push(doc.title);
+                }
+            }
+        });
+        
+        if (invalidDocs.length > 0) {
+            alert(`⚠️ Dokumen berikut belum memiliki record yang dipilih:\n\n• ${invalidDocs.join('\n• ')}\n\nSilakan pilih minimal satu record untuk setiap dokumen tersebut sebelum membuat bundle.`);
+            return;
+        }
+        
         setIsGenerating(true);
         try {
             
@@ -397,18 +522,39 @@ export default function PrintBundleIndex() {
                 selected_records: selectedRecordsData,
             };
 
-            const response = await fetch(`/eklaim/print-bundle/${pengajuanKlaim.id}/bundle`, {
+            const response = await makeAuthenticatedRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/bundle`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
                 },
                 body: JSON.stringify(requestBody),
             });
             
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                let errorMessage = `HTTP error! status: ${response.status}`;
+                
+                try {
+                    const errorData = await response.json();
+                    if (errorData.csrf_error) {
+                        errorMessage = 'Session expired. The page will refresh automatically.';
+                        // Auto-refresh the page after showing the error
+                        setTimeout(() => {
+                            if (errorData.redirect_url) {
+                                window.location.href = errorData.redirect_url;
+                            } else {
+                                window.location.reload();
+                            }
+                        }, 2000);
+                    } else {
+                        errorMessage = errorData.error || errorData.message || errorMessage;
+                    }
+                } catch {
+                    // If response is not JSON, get text
+                    const errorText = await response.text();
+                    errorMessage = errorText || errorMessage;
+                }
+                
+                throw new Error(errorMessage);
             }
 
             // Check if response is JSON (bundle_base64) or binary (fallback)
@@ -472,6 +618,112 @@ export default function PrintBundleIndex() {
 
     const availableDocuments = documents.filter(doc => doc.available);
     const unavailableDocuments = documents.filter(doc => !doc.available);
+
+    // Settings functions
+    const loadDefaultSettings = async () => {
+        setIsLoadingSettings(true);
+        try {
+            const response = await makeAuthenticatedRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/default-order`, {
+                method: 'GET',
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load settings');
+            }
+
+            const data = await response.json();
+            
+            // Apply loaded settings to documents
+            const updatedDocuments = documents.map(doc => {
+                const setting = data.default_order.find((item: any) => item.id === doc.id);
+                if (setting) {
+                    return {
+                        ...doc,
+                        isSelected: setting.is_default_selected,
+                        selectionOrder: setting.is_default_selected ? setting.order : null,
+                    };
+                }
+                return doc;
+            });
+
+            setDocuments(updatedDocuments);
+
+            // Update selection order
+            const newSelectionOrder = data.default_order
+                .filter((item: any) => item.is_default_selected)
+                .sort((a: any, b: any) => a.order - b.order)
+                .map((item: any) => item.id);
+            
+            setSelectionOrder(newSelectionOrder);
+
+            console.log('Default settings loaded successfully');
+        } catch (error) {
+            console.error('Error loading default settings:', error);
+            alert('Failed to load default settings');
+        } finally {
+            setIsLoadingSettings(false);
+        }
+    };
+
+    const saveDefaultSettings = async () => {
+        setIsSavingSettings(true);
+        try {
+            const documentOrder = documents.map(doc => ({
+                id: doc.id,
+                order: doc.selectionOrder || 999,
+                is_default_selected: doc.isSelected,
+            })).sort((a, b) => a.order - b.order);
+
+            const response = await makeAuthenticatedRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/default-order`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    document_order: documentOrder,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to save settings');
+            }
+
+            const data = await response.json();
+            console.log('Default settings saved successfully:', data);
+            alert('Default order settings saved successfully!');
+        } catch (error) {
+            console.error('Error saving default settings:', error);
+            alert('Failed to save default settings');
+        } finally {
+            setIsSavingSettings(false);
+        }
+    };
+
+    const resetToDefaults = () => {
+        // Reset to original defaults from medicalRecords
+        const resetDocuments = Object.entries(medicalRecords).map(([key, record]) => ({
+            id: key,
+            type: key,
+            title: record.title,
+            icon: record.icon,
+            isSelected: record.is_default_selected || false,
+            selectionOrder: record.is_default_selected ? (record.default_order || null) : null,
+            available: record.available,
+            count: record.count,
+            hasRecords: key === 'laboratorium' || key === 'radiologi' || key === 'resume_medis' || key === 'pengkajian_awal',
+            selectedRecords: [],
+        }));
+
+        setDocuments(resetDocuments);
+
+        // Reset selection order
+        const defaultSelected = Object.entries(medicalRecords)
+            .filter(([key, record]) => record.is_default_selected && record.available)
+            .sort((a, b) => (a[1].default_order || 999) - (b[1].default_order || 999))
+            .map(([key]) => key);
+        
+        setSelectionOrder(defaultSelected);
+    };
 
     const breadcrumbs: BreadcrumbItem[] = [
             {
@@ -546,12 +798,86 @@ export default function PrintBundleIndex() {
                     </CardContent>
                 </Card>
 
+                {/* Settings Panel */}
+                {showSettings && (
+                    <Card className='mb-4'>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Settings className="h-5 w-5" />
+                                Default Order Settings
+                            </CardTitle>
+                            <CardDescription>
+                                Configure the default selection and order of documents for all future print bundles.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                <div className="flex gap-3">
+                                    <Button 
+                                        onClick={saveDefaultSettings}
+                                        disabled={isSavingSettings}
+                                        className="flex items-center gap-2"
+                                        variant="default"
+                                    >
+                                        {isSavingSettings ? (
+                                            <Loader className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Save className="h-4 w-4" />
+                                        )}
+                                        Save Current as Default
+                                    </Button>
+                                    
+                                    <Button 
+                                        onClick={loadDefaultSettings}
+                                        disabled={isLoadingSettings}
+                                        variant="outline"
+                                        className="flex items-center gap-2"
+                                    >
+                                        {isLoadingSettings ? (
+                                            <Loader className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Download className="h-4 w-4" />
+                                        )}
+                                        Load Saved Defaults
+                                    </Button>
+                                    
+                                    <Button 
+                                        onClick={resetToDefaults}
+                                        variant="outline"
+                                        className="flex items-center gap-2"
+                                    >
+                                        <RotateCcw className="h-4 w-4" />
+                                        Reset to System Defaults
+                                    </Button>
+                                </div>
+                                
+                                <div className="text-sm text-gray-600">
+                                    <p><strong>Save Current as Default:</strong> Save the current selection and order as your default settings.</p>
+                                    <p><strong>Load Saved Defaults:</strong> Apply previously saved default settings.</p>
+                                    <p><strong>Reset to System Defaults:</strong> Restore original system default settings.</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
                 {/* Available Documents - Table Format */}
                 <Card className='mb-4'>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Package className="h-5 w-5" />
-                            Dokumen Tersedia ({availableDocuments.length})
+                        <CardTitle className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Package className="h-5 w-5" />
+                                Dokumen Tersedia ({availableDocuments.length})
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowSettings(!showSettings)}
+                                className="flex items-center gap-2"
+                            >
+                                <Settings className="h-4 w-4" />
+                                {showSettings ? 'Hide Settings' : 'Configure Defaults'}
+                            </Button>
                         </CardTitle>
                         <CardDescription>
                             Pilih dokumen untuk dimasukkan ke dalam bundel. Dokumen akan digabungkan sesuai urutan yang Anda pilih.
@@ -599,7 +925,8 @@ export default function PrintBundleIndex() {
                                             <tr 
                                                 className={cn(
                                                     "hover:bg-gray-50 transition-colors",
-                                                    doc.isSelected ? "bg-blue-50 border-blue-200" : ""
+                                                    doc.isSelected ? "bg-blue-50 border-blue-200" : "",
+                                                    hasRecordSelectionIssue(doc) ? "bg-red-50 border-red-200 border-2" : ""
                                                 )}
                                             >
                                                 <td className="border border-gray-200 p-3">
@@ -635,11 +962,29 @@ export default function PrintBundleIndex() {
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-2xl">{doc.icon}</span>
                                                         <div>
-                                                            <div className="font-medium text-gray-900 flex items-center gap-2">
+                                                            <div className={cn(
+                                                                "font-medium flex items-center gap-2",
+                                                                hasRecordSelectionIssue(doc) ? "text-red-700" : "text-gray-900"
+                                                            )}>
                                                                 {doc.title}
                                                                 {doc.type === 'berkas_klaim' && (
                                                                     <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
                                                                         INACBG API
+                                                                    </Badge>
+                                                                )}
+                                                                {doc.hasRecords && (
+                                                                    <Badge variant="secondary" className={cn(
+                                                                        "text-xs",
+                                                                        hasRecordSelectionIssue(doc) 
+                                                                            ? "bg-red-100 text-red-800" 
+                                                                            : "bg-blue-100 text-blue-800"
+                                                                    )}>
+                                                                        Perlu Pilih Record
+                                                                    </Badge>
+                                                                )}
+                                                                {hasRecordSelectionIssue(doc) && (
+                                                                    <Badge variant="destructive" className="text-xs animate-pulse">
+                                                                        ⚠️ Pilih Record!
                                                                     </Badge>
                                                                 )}
                                                             </div>
@@ -650,12 +995,20 @@ export default function PrintBundleIndex() {
                                                                         Dari server INACBG • PDF siap download
                                                                     </span>
                                                                 )}
+                                                                {doc.hasRecords && (
+                                                                    <span className={cn(
+                                                                        "text-xs block font-medium",
+                                                                        getSelectedRecordsCount(doc.id) > 0 
+                                                                            ? "text-green-600"
+                                                                            : "text-red-600 animate-pulse"
+                                                                    )}>
+                                                                        {getSelectedRecordsCount(doc.id) > 0 
+                                                                            ? `✅ ${getSelectedRecordsCount(doc.id)} record dipilih`
+                                                                            : '⚠️ WAJIB PILIH RECORD DULU!'
+                                                                        }
+                                                                    </span>
+                                                                )}
                                                             </div>
-                                                            {doc.hasRecords && doc.selectedRecords && doc.selectedRecords.length > 0 && (
-                                                                <div className="text-xs text-blue-600 mt-1">
-                                                                    {doc.selectedRecords.length} records selected
-                                                                </div>
-                                                            )}
                                                         </div>
                                                     </div>
                                                 </td>
@@ -668,10 +1021,17 @@ export default function PrintBundleIndex() {
                                                     <div className="flex gap-2 justify-center">
                                                         <Button
                                                             size="sm"
-                                                            variant="outline"
+                                                            variant={hasRecordSelectionIssue(doc) ? "destructive" : "outline"}
                                                             onClick={() => handlePreview(doc)}
-                                                            className="flex items-center gap-1"
+                                                            className={cn(
+                                                                "flex items-center gap-1",
+                                                                hasRecordSelectionIssue(doc) ? "animate-pulse" : ""
+                                                            )}
                                                             disabled={loadingStates[doc.id] === 'preview'}
+                                                            title={doc.hasRecords && getSelectedRecordsCount(doc.id) === 0 
+                                                                ? 'Pilih minimal satu record terlebih dahulu' 
+                                                                : 'Preview dokumen'
+                                                            }
                                                         >
                                                             {loadingStates[doc.id] === 'preview' ? (
                                                                 <Loader className="h-3 w-3 animate-spin" />
@@ -683,10 +1043,17 @@ export default function PrintBundleIndex() {
                                                         
                                                         <Button
                                                             size="sm"
-                                                            variant="outline"
+                                                            variant={hasRecordSelectionIssue(doc) ? "destructive" : "outline"}
                                                             onClick={() => handleDownloadIndividual(doc)}
-                                                            className="flex items-center gap-1"
+                                                            className={cn(
+                                                                "flex items-center gap-1",
+                                                                hasRecordSelectionIssue(doc) ? "animate-pulse" : ""
+                                                            )}
                                                             disabled={loadingStates[doc.id] === 'download'}
+                                                            title={doc.hasRecords && getSelectedRecordsCount(doc.id) === 0 
+                                                                ? 'Pilih minimal satu record terlebih dahulu' 
+                                                                : 'Download PDF'
+                                                            }
                                                         >
                                                             {loadingStates[doc.id] === 'download' ? (
                                                                 <Loader className="h-3 w-3 animate-spin" />
@@ -702,15 +1069,29 @@ export default function PrintBundleIndex() {
                                             {/* Expanded Row - Show individual records */}
                                             {expandedRows.includes(doc.id) && doc.hasRecords && medicalRecords[doc.type]?.data && (
                                                 <tr>
-                                                    <td colSpan={5} className="border border-gray-200 p-0">
-                                                        <div className="bg-gray-50 p-4">
+                                                    <td colSpan={5} className={cn(
+                                                        "border p-0",
+                                                        hasRecordSelectionIssue(doc) ? "" : "border-gray-200"
+                                                    )}>
+                                                        <div className={cn(
+                                                            "p-4",
+                                                            hasRecordSelectionIssue(doc) ? "" : "bg-gray-50"
+                                                        )}> 
                                                             <div className="flex items-center justify-between mb-3">
-                                                                <h4 className="font-medium text-gray-900">Select Individual Records:</h4>
+                                                                <h4 className={cn(
+                                                                    "font-medium",
+                                                                    hasRecordSelectionIssue(doc) ? "" : "text-gray-900"
+                                                                )}>
+                                                                    Select Individual Records:
+                                                                </h4>
                                                                 <Button
                                                                     size="sm"
-                                                                    variant="outline"
+                                                                    variant={hasRecordSelectionIssue(doc) ? "default" : "outline"}
                                                                     onClick={() => toggleAllRecordsForDocument(doc.id, medicalRecords[doc.type].data || [])}
-                                                                    className="text-xs"
+                                                                    className={cn(
+                                                                        "text-xs",
+                                                                        hasRecordSelectionIssue(doc) ? "text-white animate-pulse" : ""
+                                                                    )}
                                                                 >
                                                                     {(doc.selectedRecords?.length === medicalRecords[doc.type].data?.length) ? 'Deselect All' : 'Select All'}
                                                                 </Button>
@@ -718,11 +1099,17 @@ export default function PrintBundleIndex() {
                                                             
                                                             <div className="space-y-2 max-h-60 overflow-y-auto">
                                                                 {medicalRecords[doc.type].data?.map((record: any) => (
-                                                                    <div key={record.id} className="flex items-start gap-3 p-2 bg-white rounded border">
+                                                                    <div key={record.id} className={cn(
+                                                                        "flex items-start gap-3 p-2 bg-white rounded border transition-all",
+                                                                        hasRecordSelectionIssue(doc) ? "" : "border-gray-200 hover:border-gray-300"
+                                                                    )}>
                                                                         <Checkbox
                                                                             checked={doc.selectedRecords?.includes(record.id.toString()) || false}
                                                                             onCheckedChange={() => toggleRecordSelection(doc.id, record.id.toString())}
-                                                                            className="mt-0.5"
+                                                                            className={cn(
+                                                                                "mt-0.5",
+                                                                                hasRecordSelectionIssue(doc) ? "" : ""
+                                                                            )}
                                                                         />
                                                                         <div className="flex-1 text-sm">
                                                                             {doc.type === 'laboratorium' ? (
@@ -950,7 +1337,7 @@ export default function PrintBundleIndex() {
                             
                             <Separator className="my-4" />
                             
-                            <div className="flex gap-3">
+                            <div className="flex gap-3 flex-wrap">
                                 <Button 
                                     onClick={handleGenerateBundle}
                                     disabled={selectionOrder.length < 1 || isGenerating}
@@ -976,6 +1363,34 @@ export default function PrintBundleIndex() {
                                     }}
                                 >
                                     Clear All Selection
+                                </Button>
+
+                                <Button 
+                                    variant="outline"
+                                    onClick={loadDefaultSettings}
+                                    disabled={isLoadingSettings}
+                                    className="flex items-center gap-2"
+                                >
+                                    {isLoadingSettings ? (
+                                        <Loader className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <RotateCcw className="h-4 w-4" />
+                                    )}
+                                    Apply Default Order
+                                </Button>
+                                
+                                <Button 
+                                    variant="outline"
+                                    onClick={saveDefaultSettings}
+                                    disabled={isSavingSettings || selectionOrder.length === 0}
+                                    className="flex items-center gap-2"
+                                >
+                                    {isSavingSettings ? (
+                                        <Loader className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Save className="h-4 w-4" />
+                                    )}
+                                    Save as Default
                                 </Button>
                             </div>
                         </CardContent>

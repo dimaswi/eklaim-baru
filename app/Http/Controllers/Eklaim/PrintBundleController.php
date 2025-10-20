@@ -23,8 +23,10 @@ use setasign\Fpdi\Fpdi;
 use setasign\Fpdi\PdfParser\StreamReader;
 use App\Helpers\QRCodeHelper;
 use App\Helpers\InacbgHelper;
+use App\Models\SIMRS\KunjunganBPJS;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class PrintBundleController extends Controller
 {
@@ -57,6 +59,12 @@ class PrintBundleController extends Controller
             // Get all related medical records data
             $medicalRecords = $this->getAllMedicalRecords($pengajuanId, $pengajuanKlaim->status_pengiriman);
             
+            // Apply saved default order if available
+            $savedOrder = $this->loadSavedDefaultOrder($pengajuanId);
+            if ($savedOrder) {
+                $medicalRecords = $this->applyCustomDefaultOrder($medicalRecords, $savedOrder);
+            }
+            
             Log::info('Medical Records Retrieved', [
                 'pengajuan_id' => $pengajuanId,
                 'medical_records_count' => count($medicalRecords),
@@ -67,7 +75,8 @@ class PrintBundleController extends Controller
                 'available_count' => count(array_filter($medicalRecords, function($record) {
                     return $record['available'] ?? false;
                 })),
-                'total_types' => count($medicalRecords)
+                'total_types' => count($medicalRecords),
+                'has_custom_defaults' => $savedOrder !== null
             ]);
             
             return Inertia::render('eklaim/print-bundle/index', [
@@ -156,6 +165,8 @@ class PrintBundleController extends Controller
                 'available' => true,
                 'description' => 'Surat Elegibilitas Peserta BPJS Kesehatan',
                 'priority' => 0, // Highest priority to show first
+                'default_order' => 1, // Default ordering position
+                'is_default_selected' => true, // Auto-select by default
             ];
             Log::info('SEP record added to medical records', [
                 'pengajuan_id' => $pengajuanId,
@@ -173,6 +184,8 @@ class PrintBundleController extends Controller
                     'available' => true,
                     'description' => 'Berkas lengkap klaim yang telah difinalisasi',
                     'priority' => 1, // High priority to show first
+                    'default_order' => 2, // Default ordering position
+                    'is_default_selected' => true, // Auto-select by default
                 ];
                 Log::info('Berkas Klaim added to medical records', [
                     'pengajuan_id' => $pengajuanId,
@@ -187,7 +200,7 @@ class PrintBundleController extends Controller
                 ]);
             }
             
-            // Always include all medical records
+            // Always include all medical records with default ordering
             $medicalRecords = array_merge($medicalRecords, [
                 // Laboratorium Data - Count based on database rows, not JSON tindakan_medis_data
                 'laboratorium' => [
@@ -199,6 +212,8 @@ class PrintBundleController extends Controller
                     'count' => $labData->count(),
                     'available' => $labData->count() > 0,
                     'priority' => 2,
+                    'default_order' => 3,
+                    'is_default_selected' => $labData->count() > 0,
                 ],
                 
                 // Radiologi Data - Count based on database rows
@@ -211,6 +226,8 @@ class PrintBundleController extends Controller
                     'count' => $radioData->count(),
                     'available' => $radioData->count() > 0,
                     'priority' => 2,
+                    'default_order' => 4,
+                    'is_default_selected' => $radioData->count() > 0,
                 ],
                 
                 // Resume Medis - Unified for all types (Rawat Inap, Rawat Jalan, UGD)
@@ -223,6 +240,8 @@ class PrintBundleController extends Controller
                     'count' => $this->getResumeMedisData($pengajuanId)->count(),
                     'available' => $this->getResumeMedisData($pengajuanId)->count() > 0,
                     'priority' => 2,
+                    'default_order' => 5,
+                    'is_default_selected' => $this->getResumeMedisData($pengajuanId)->count() > 0,
                 ],
                 
                 // CPPT - Rawat Inap - Multiple records per pengajuan
@@ -243,6 +262,8 @@ class PrintBundleController extends Controller
                         return RawatInapCPPT::where('pengajuan_klaim_id', $pengajuanId)->exists();
                     }, 'rawat_inap_cppt_exists', $pengajuanId, false),
                     'priority' => 3,
+                    'default_order' => 6,
+                    'is_default_selected' => false, // Not selected by default
                 ],
                 
                 // Pengkajian Awal - Unified untuk semua jenis (Rawat Inap, Rawat Jalan, UGD) - MULTIPLE RECORDS
@@ -254,6 +275,8 @@ class PrintBundleController extends Controller
                     'count' => $this->getPengkajianAwalData($pengajuanId)->count(),
                     'available' => $this->getPengkajianAwalData($pengajuanId)->count() > 0,
                     'priority' => 3,
+                    'default_order' => 7,
+                    'is_default_selected' => false, // Not selected by default
                 ],
                 
                 // Triage UGD - Single record per pengajuan
@@ -265,6 +288,8 @@ class PrintBundleController extends Controller
                     'count' => UGDTriage::where('pengajuan_klaim_id', $pengajuanId)->exists() ? 1 : 0,
                     'available' => UGDTriage::where('pengajuan_klaim_id', $pengajuanId)->exists(),
                     'priority' => 4,
+                    'default_order' => 8,
+                    'is_default_selected' => false, // Not selected by default
                 ],
                 
                 // Balance Cairan - Rawat Inap - Multiple records per pengajuan
@@ -277,6 +302,8 @@ class PrintBundleController extends Controller
                     'count' => RawatInapBalanceCairan::where('pengajuan_klaim_id', $pengajuanId)->count(),
                     'available' => RawatInapBalanceCairan::where('pengajuan_klaim_id', $pengajuanId)->exists(),
                     'priority' => 4,
+                    'default_order' => 9,
+                    'is_default_selected' => false, // Not selected by default
                 ],
                 
                 // Tagihan - Single record per pengajuan
@@ -288,14 +315,27 @@ class PrintBundleController extends Controller
                     'count' => Tagihan::where('pengajuan_klaim_id', $pengajuanId)->exists() ? 1 : 0,
                     'available' => Tagihan::where('pengajuan_klaim_id', $pengajuanId)->exists(),
                     'priority' => 5,
+                    'default_order' => 10,
+                    'is_default_selected' => false, // Not selected by default
                 ],
             ]);
             
+            // Load saved default order and apply it to medical records
+            $savedOrder = $this->loadSavedDefaultOrder($pengajuanId);
+            if ($savedOrder) {
+                $medicalRecords = $this->applyCustomDefaultOrder($medicalRecords, $savedOrder);
+                Log::info('Applied saved default order to medical records', [
+                    'pengajuan_id' => $pengajuanId,
+                    'saved_order_count' => count($savedOrder)
+                ]);
+            }
+
             Log::info('All medical records compiled', [
                 'total_types' => count($medicalRecords),
                 'available_count' => count(array_filter($medicalRecords, function($record) {
                     return $record['available'] ?? false;
-                }))
+                })),
+                'has_saved_order' => !is_null($savedOrder)
             ]);
 
             return $medicalRecords;
@@ -400,6 +440,34 @@ class PrintBundleController extends Controller
             $data = $this->getDocumentData($documentType, $pengajuanId, $selectedRecords);
             
             if (!$data || $data->isEmpty()) {
+                // Check if document type requires record selection
+                $requiresRecordSelection = ['laboratorium', 'radiologi', 'resume_medis', 'pengkajian_awal'];
+                
+                if (in_array($documentType, $requiresRecordSelection)) {
+                    $hasSelectedRecords = !empty($selectedRecords[$documentType]);
+                    
+                    if (!$hasSelectedRecords) {
+                        Log::warning('No records selected for document type that requires selection', [
+                            'type' => $documentType, 
+                            'pengajuan_id' => $pengajuanId,
+                            'requires_selection' => true
+                        ]);
+                        
+                        $documentTitles = [
+                            'laboratorium' => 'Hasil Laboratorium',
+                            'radiologi' => 'Hasil Radiologi',
+                            'resume_medis' => 'Resume Medis',
+                            'pengkajian_awal' => 'Pengkajian Awal Keperawatan'
+                        ];
+                        
+                        return response()->json([
+                            'error' => "Silakan pilih minimal satu record untuk {$documentTitles[$documentType]} terlebih dahulu.",
+                            'error_type' => 'no_records_selected',
+                            'document_type' => $documentType
+                        ], 400);
+                    }
+                }
+                
                 Log::warning('No data found', [
                     'type' => $documentType, 
                     'pengajuan_id' => $pengajuanId,
@@ -473,9 +541,12 @@ class PrintBundleController extends Controller
                 'logo_type' => ($documentType === 'sep') ? 'bpjs' : 'regular'
             ]);
 
+            $dataKunjungan = KunjunganBPJS::where('noSEP', $pengajuanKlaim->nomor_sep)->first();
+
             // Return HTML preview using same Blade template as PDF
             return view("pdf.templates.{$documentType}", array_merge([
                 'pengajuanKlaim' => $pengajuanKlaim,
+                'dataKunjungan' => $dataKunjungan,
                 'data' => $data,
                 'selectedRecords' => $selectedRecords,
                 'logoBase64' => $logoBase64,
@@ -778,7 +849,7 @@ class PrintBundleController extends Controller
             return response()->json([
                 'type' => 'bundle_base64',
                 'documents' => $pdfDocuments,
-                'bundle_filename' => 'medical-records-' . $pengajuanKlaim->nomor_sep . '-' . date('Y-m-d-H-i-s') . '.pdf',
+                'bundle_filename' => $pengajuanKlaim->nomor_sep .'.pdf',
                 'patient_info' => [
                     'nomor_sep' => $pengajuanKlaim->nomor_sep,
                     'nama_pasien' => $pengajuanKlaim->nama_pasien,
@@ -1628,6 +1699,450 @@ class PrintBundleController extends Controller
             return 'app_connection_ok';
         } catch (\Exception $e) {
             return 'app_connection_failed: ' . $e->getMessage();
+        }
+    }
+
+    /**
+     * Get default document order settings
+     */
+    public function getDefaultOrder(Request $request, $pengajuanId)
+    {
+        try {
+            $pengajuanKlaim = PengajuanKlaim::findOrFail($pengajuanId);
+            $medicalRecords = $this->getAllMedicalRecords($pengajuanId, $pengajuanKlaim->status_pengiriman);
+            
+            // Get default ordering from database or use predefined defaults
+            $defaultOrder = $this->getDefaultDocumentOrder($medicalRecords);
+            
+            return response()->json([
+                'default_order' => $defaultOrder,
+                'available_documents' => array_keys(array_filter($medicalRecords, function($record) {
+                    return $record['available'];
+                }))
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Get Default Order Error: ' . $e->getMessage(), [
+                'pengajuan_id' => $pengajuanId,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json(['error' => 'Failed to get default order'], 500);
+        }
+    }
+
+    /**
+     * Update default document order settings
+     */
+    public function updateDefaultOrder(Request $request, $pengajuanId)
+    {
+        try {
+            $request->validate([
+                'document_order' => 'required|array',
+                'document_order.*.id' => 'required|string',
+                'document_order.*.order' => 'required|integer|min:1',
+                'document_order.*.is_default_selected' => 'required|boolean',
+            ]);
+
+            $pengajuanKlaim = PengajuanKlaim::findOrFail($pengajuanId);
+            $documentOrder = $request->input('document_order');
+            
+            // Save default order settings (text file storage only)
+            try {
+                $this->saveDefaultDocumentOrder($pengajuanId, $documentOrder);
+                $saveSuccess = true;
+            } catch (\Exception $saveError) {
+                Log::error('Failed to save to text file', [
+                    'pengajuan_id' => $pengajuanId,
+                    'save_error' => $saveError->getMessage()
+                ]);
+                $saveSuccess = false;
+            }
+            
+            Log::info('Default order update attempt completed', [
+                'pengajuan_id' => $pengajuanId,
+                'document_order_count' => count($documentOrder),
+                'user_id' => Auth::id(),
+                'save_success' => $saveSuccess
+            ]);
+            
+            if ($saveSuccess) {
+                return response()->json([
+                    'message' => 'Default order updated successfully',
+                    'document_order' => $documentOrder,
+                    'saved_to_file' => true,
+                    'storage_method' => 'text_file_only'
+                ]);
+            } else {
+                return response()->json([
+                    'error' => 'Failed to save settings to file',
+                    'saved_to_file' => false
+                ], 500);
+            }
+            
+        } catch (\Exception $e) {
+            Log::error('Update Default Order Error: ' . $e->getMessage(), [
+                'pengajuan_id' => $pengajuanId,
+                'error_file' => $e->getFile(),
+                'error_line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'error' => 'Failed to update default order: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Clear saved settings for a specific pengajuan
+     */
+    public function clearDefaultOrder(Request $request, $pengajuanId)
+    {
+        try {
+            $pengajuanKlaim = PengajuanKlaim::findOrFail($pengajuanId);
+            
+            // Clear from text file only
+            $cleared = $this->clearTextFileSettings($pengajuanId);
+            
+            Log::info('Default order cleared', [
+                'pengajuan_id' => $pengajuanId,
+                'user_id' => Auth::id(),
+                'cleared_from_file' => $cleared
+            ]);
+            
+            return response()->json([
+                'message' => 'Default order cleared successfully',
+                'pengajuan_id' => $pengajuanId,
+                'cleared_from_file' => $cleared
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Clear Default Order Error: ' . $e->getMessage(), [
+                'pengajuan_id' => $pengajuanId,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json(['error' => 'Failed to clear default order'], 500);
+        }
+    }
+
+    /**
+     * Get all saved settings (admin/debug endpoint)
+     */
+    public function getAllSavedSettingsApi(Request $request)
+    {
+        try {
+            $settings = $this->getAllSavedSettings();
+            
+            return response()->json([
+                'settings' => $settings,
+                'count' => count($settings),
+                'file_path' => base_path('print_bundle_settings.txt')
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Get All Saved Settings Error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json(['error' => 'Failed to get saved settings'], 500);
+        }
+    }
+
+    /**
+     * Get default document ordering based on medical records
+     */
+    private function getDefaultDocumentOrder($medicalRecords)
+    {
+        $defaultOrder = [];
+        
+        // Sort by default_order if available, otherwise by priority
+        $sortedRecords = collect($medicalRecords)
+            ->filter(function($record) { return $record['available']; })
+            ->sortBy(function($record) {
+                return $record['default_order'] ?? $record['priority'] ?? 999;
+            });
+            
+        foreach ($sortedRecords as $key => $record) {
+            $defaultOrder[] = [
+                'id' => $key,
+                'title' => $record['title'],
+                'icon' => $record['icon'],
+                'order' => $record['default_order'] ?? count($defaultOrder) + 1,
+                'is_default_selected' => $record['is_default_selected'] ?? false,
+                'available' => $record['available'],
+                'count' => $record['count']
+            ];
+        }
+        
+        return $defaultOrder;
+    }
+
+    /**
+     * Save default document order settings
+     * Uses text file storage only
+     */
+    private function saveDefaultDocumentOrder($pengajuanId, $documentOrder)
+    {
+        // Save to text file for persistence
+        $this->saveToTextFile($pengajuanId, $documentOrder);
+        
+        // Optional: Save to database table for global defaults
+        // DB::table('print_bundle_settings')->updateOrInsert(
+        //     ['pengajuan_klaim_id' => $pengajuanId],
+        //     ['document_order' => json_encode($documentOrder), 'updated_at' => now()]
+        // );
+    }
+
+    /**
+     * Load saved default document order settings
+     * Uses text file storage only
+     */
+    private function loadSavedDefaultOrder($pengajuanId)
+    {
+        // Load directly from text file
+        $savedOrder = $this->loadFromTextFile($pengajuanId);
+        
+        // Optional: Load from database
+        // if (!$savedOrder) {
+        //     $saved = DB::table('print_bundle_settings')
+        //         ->where('pengajuan_klaim_id', $pengajuanId)
+        //         ->first();
+        //     $savedOrder = $saved ? json_decode($saved->document_order, true) : null;
+        // }
+        
+        return $savedOrder;
+    }
+
+    /**
+     * Apply custom default order to medical records
+     */
+    private function applyCustomDefaultOrder($medicalRecords, $savedOrder)
+    {
+        foreach ($savedOrder as $orderItem) {
+            $documentId = $orderItem['id'];
+            if (isset($medicalRecords[$documentId])) {
+                $medicalRecords[$documentId]['default_order'] = $orderItem['order'];
+                $medicalRecords[$documentId]['is_default_selected'] = $orderItem['is_default_selected'];
+            }
+        }
+        
+        return $medicalRecords;
+    }
+
+    /**
+     * Save document order settings to text file
+     */
+    private function saveToTextFile($pengajuanId, $documentOrder)
+    {
+        try {
+            $filePath = base_path('print_bundle_settings.txt');
+            $settings = [];
+            
+            // Load existing settings if file exists
+            if (file_exists($filePath)) {
+                $existingContent = file_get_contents($filePath);
+                if (!empty($existingContent)) {
+                    $existingSettings = json_decode($existingContent, true);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $settings = $existingSettings;
+                        Log::info('Loaded existing settings from text file', [
+                            'pengajuan_id' => $pengajuanId,
+                            'existing_settings_count' => count($settings)
+                        ]);
+                    } else {
+                        Log::warning('Invalid JSON in existing settings file, starting fresh', [
+                            'pengajuan_id' => $pengajuanId,
+                            'json_error' => json_last_error_msg()
+                        ]);
+                    }
+                }
+            } else {
+                Log::info('Creating new print bundle settings file', [
+                    'pengajuan_id' => $pengajuanId,
+                    'file_path' => $filePath
+                ]);
+            }
+            
+            // Update or add settings for this pengajuan
+            $settings[$pengajuanId] = [
+                'document_order' => $documentOrder,
+                'updated_at' => now()->toDateTimeString(),
+                'user_id' => Auth::id() ?? 'system'
+            ];
+            
+            // Save back to file
+            $jsonContent = json_encode($settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            $bytesWritten = file_put_contents($filePath, $jsonContent);
+            
+            if ($bytesWritten === false) {
+                throw new \Exception('Failed to write to file');
+            }
+            
+            Log::info('Document order successfully saved to text file', [
+                'pengajuan_id' => $pengajuanId,
+                'file_path' => $filePath,
+                'document_count' => count($documentOrder),
+                'total_settings' => count($settings),
+                'bytes_written' => $bytesWritten,
+                'user_id' => Auth::id() ?? 'system'
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Failed to save document order to text file', [
+                'pengajuan_id' => $pengajuanId,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            // Rethrow the exception so the calling method knows it failed
+            throw $e;
+        }
+    }
+
+    /**
+     * Load document order settings from text file
+     */
+    private function loadFromTextFile($pengajuanId)
+    {
+        try {
+            $filePath = base_path('print_bundle_settings.txt');
+            
+            if (!file_exists($filePath)) {
+                Log::info('Print bundle settings file not found, creating new one', [
+                    'file_path' => $filePath,
+                    'pengajuan_id' => $pengajuanId
+                ]);
+                return null;
+            }
+            
+            $content = file_get_contents($filePath);
+            if (empty($content)) {
+                Log::info('Print bundle settings file is empty', [
+                    'file_path' => $filePath,
+                    'pengajuan_id' => $pengajuanId
+                ]);
+                return null;
+            }
+            
+            $settings = json_decode($content, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::error('Failed to parse print bundle settings JSON', [
+                    'file_path' => $filePath,
+                    'pengajuan_id' => $pengajuanId,
+                    'json_error' => json_last_error_msg(),
+                    'content_sample' => substr($content, 0, 200)
+                ]);
+                return null;
+            }
+            
+            if (!isset($settings[$pengajuanId])) {
+                Log::info('No settings found for pengajuan_id in text file', [
+                    'pengajuan_id' => $pengajuanId,
+                    'available_ids' => array_keys($settings),
+                    'total_settings' => count($settings)
+                ]);
+                return null;
+            }
+            
+            $documentOrder = $settings[$pengajuanId]['document_order'] ?? null;
+            
+            Log::info('Document order successfully loaded from text file', [
+                'pengajuan_id' => $pengajuanId,
+                'file_path' => $filePath,
+                'document_count' => is_array($documentOrder) ? count($documentOrder) : 0,
+                'last_updated' => $settings[$pengajuanId]['updated_at'] ?? 'unknown',
+                'user_id' => $settings[$pengajuanId]['user_id'] ?? 'unknown'
+            ]);
+            
+            return $documentOrder;
+            
+        } catch (\Exception $e) {
+            Log::error('Failed to load document order from text file', [
+                'pengajuan_id' => $pengajuanId,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return null;
+        }
+    }
+
+    /**
+     * Get all saved settings from text file (for debugging/management)
+     */
+    private function getAllSavedSettings()
+    {
+        try {
+            $filePath = base_path('print_bundle_settings.txt');
+            
+            if (!file_exists($filePath)) {
+                return [];
+            }
+            
+            $content = file_get_contents($filePath);
+            if (empty($content)) {
+                return [];
+            }
+            
+            $settings = json_decode($content, true);
+            return $settings ?? [];
+            
+        } catch (\Exception $e) {
+            Log::error('Failed to get all saved settings', [
+                'error' => $e->getMessage()
+            ]);
+            
+            return [];
+        }
+    }
+
+    /**
+     * Clear settings for a specific pengajuan (cleanup method)
+     */
+    private function clearTextFileSettings($pengajuanId)
+    {
+        try {
+            $filePath = base_path('print_bundle_settings.txt');
+            
+            if (!file_exists($filePath)) {
+                return true;
+            }
+            
+            $content = file_get_contents($filePath);
+            if (empty($content)) {
+                return true;
+            }
+            
+            $settings = json_decode($content, true) ?? [];
+            
+            if (isset($settings[$pengajuanId])) {
+                unset($settings[$pengajuanId]);
+                
+                // Save updated settings back to file
+                $jsonContent = json_encode($settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+                file_put_contents($filePath, $jsonContent);
+                
+                Log::info('Settings cleared for pengajuan_id', [
+                    'pengajuan_id' => $pengajuanId,
+                    'remaining_count' => count($settings)
+                ]);
+            }
+            
+            return true;
+            
+        } catch (\Exception $e) {
+            Log::error('Failed to clear settings for pengajuan_id', [
+                'pengajuan_id' => $pengajuanId,
+                'error' => $e->getMessage()
+            ]);
+            
+            return false;
         }
     }
 

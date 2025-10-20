@@ -233,8 +233,14 @@
         .physexam-table th {
             background-color: #e0e0e0;
             font-weight: bold;
-            text-align: center;
-            width: 25%;
+            text-align: left;
+            width: 20%;
+            padding-left: 8px;
+        }
+
+        .physexam-table td {
+            width: 30%;
+            padding-left: 8px;
         }
 
         .footer-table {
@@ -506,12 +512,10 @@
                                 <td class="info-label">Faktor Risiko</td>
                                 <td class="info-value">{{ $item->faktor_resiko ?? 'Tidak ada faktor risiko yang teridentifikasi' }}</td>
                             </tr>
-                            @if (isset($item->riwayat_alergi))
-                                <tr>
-                                    <td class="info-label">Riwayat Alergi</td>
-                                    <td class="info-value">{{ $item->riwayat_alergi ?? '-' }}</td>
-                                </tr>
-                            @endif
+                            <tr>
+                                <td class="info-label">Riwayat Alergi</td>
+                                <td class="info-value">{{ $item->riwayat_alergi ?? 'Tidak ada riwayat alergi' }}</td>
+                            </tr>
                         </table>
                     </div>
                 </div>
@@ -547,124 +551,437 @@
                 <div class="section">
                     <h4>C. PEMERIKSAAN FISIK</h4>
                     <table class="physexam-table">
+                        {{-- Mata --}}
                         <tr>
                             <th>Mata</th>
-                            <td>{{ $item->mata ?? '-' }}
-                                @if (isset($item->pupil))
-                                    <br><strong>Pupil:</strong> {{ $item->pupil ?? '-' }}
-                                @endif
-                                @if (isset($item->diameter_pupil))
-                                    <br><strong>Diameter:</strong> {{ $item->diameter_pupil ?? '-' }}
-                                @endif
-                            </td>
-                            <th>THT</th>
-                            <td>{{ $item->tht ?? '-' }}
-                                @if (isset($item->faring))
-                                    <br><strong>Faring:</strong> {{ $item->faring ?? '-' }}
-                                @endif
-                                @if (isset($item->tongsil))
-                                    <br><strong>Tonsil:</strong> {{ $item->tongsil ?? '-' }}
-                                @endif
-                            </td>
+                            <td>{{ $item->mata ?? '-' }}</td>
+                            <th>Pupil</th>
+                            <td>{{ $item->pupil ?? '-' }}</td>
                         </tr>
+                        <tr>
+                            <th>Diameter Pupil</th>
+                            <td>{{ $item->diameter_pupil ?? '-' }}</td>
+                            <th>Ikterus</th>
+                            <td>{{ $item->ikterus ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Udem Palpebrae</th>
+                            <td>{{ $item->udem_palpebrae ?? '-' }}</td>
+                            <th>THT</th>
+                            <td>{{ $item->tht ?? '-' }}</td>
+                        </tr>
+                        
+                        {{-- THT --}}
+                        <tr>
+                            <th>Faring</th>
+                            <td>{{ $item->faring ?? '-' }}</td>
+                            <th>Tonsil</th>
+                            <td>{{ $item->tongsil ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Lidah</th>
+                            <td>{{ $item->lidah ?? '-' }}</td>
+                            <th>Bibir</th>
+                            <td>{{ $item->bibir ?? '-' }}</td>
+                        </tr>
+                        
+                        {{-- Leher --}}
                         <tr>
                             <th>Leher</th>
-                            <td>{{ $item->leher ?? '-' }}
-                                @if (isset($item->jvp))
-                                    <br><strong>JVP:</strong> {{ $item->jvp ?? '-' }}
-                                @endif
-                            </td>
+                            <td>{{ $item->leher ?? '-' }}</td>
+                            <th>JVP</th>
+                            <td>{{ $item->jvp ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Limfe</th>
+                            <td>{{ $item->limfe ?? '-' }}</td>
+                            <th>Kaku Kuduk</th>
+                            <td>{{ $item->kaku_kuduk ?? '-' }}</td>
+                        </tr>
+                        
+                        {{-- Thoraks --}}
+                        <tr>
                             <th>Thoraks</th>
                             <td>{{ $item->thoraks ?? '-' }}</td>
-                        </tr>
-                        <tr>
                             <th>Cor</th>
-                            <td>{{ $item->cor ?? '-' }}
-                                @if (isset($item->s1s2))
-                                    <br><strong>S1S2:</strong> {{ $item->s1s2 ?? '-' }}
-                                @endif
-                                @if (isset($item->mur_mur))
-                                    <br><strong>Murmur:</strong> {{ $item->mur_mur ?? '-' }}
-                                @endif
-                            </td>
+                            <td>{{ $item->cor ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>S1S2</th>
+                            <td>{{ $item->s1s2 ?? '-' }}</td>
+                            <th>Murmur</th>
+                            <td>{{ $item->mur_mur ?? '-' }}</td>
+                        </tr>
+                        
+                        {{-- Pulmo --}}
+                        <tr>
                             <th>Pulmo</th>
-                            <td>{{ $item->pulmo ?? '-' }}
-                                @if (isset($item->ronchi))
-                                    <br><strong>Ronchi:</strong> {{ $item->ronchi ?? '-' }}
-                                @endif
-                                @if (isset($item->wheezing))
-                                    <br><strong>Wheezing:</strong> {{ $item->wheezing ?? '-' }}
+                            <td>{{ $item->pulmo ?? '-' }}</td>
+                            <th>Ronchi</th>
+                            <td>{{ $item->ronchi ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Wheezing</th>
+                            <td>{{ $item->wheezing ?? '-' }}</td>
+                            <th>Abdomen</th>
+                            <td>{{ $item->abdomen ?? '-' }}</td>
+                        </tr>
+                        
+                        {{-- Abdomen --}}
+                        <tr>
+                            <th>Meteorismus</th>
+                            <td>{{ $item->meteorismus ?? '-' }}</td>
+                            <th>Peristaltik</th>
+                            <td>{{ $item->peristaltik ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Asites</th>
+                            <td>{{ $item->asites ?? '-' }}</td>
+                            <th>Nyeri Tekan</th>
+                            <td>{{ $item->nyeri_tekan ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Hepar</th>
+                            <td>{{ $item->hepar ?? '-' }}</td>
+                            <th>Lien</th>
+                            <td>{{ $item->lien ?? '-' }}</td>
+                        </tr>
+                        
+                        {{-- Extremitas --}}
+                        <tr>
+                            <th>Extremitas</th>
+                            <td>{{ $item->extremitas ?? '-' }}</td>
+                            <th>Udem</th>
+                            <td>{{ $item->udem ?? '-' }}</td>
+                        </tr>
+                        
+                        {{-- Lainnya --}}
+                        <tr>
+                            <th>Defeksesi</th>
+                            <td>{{ $item->defeksesi ?? '-' }}</td>
+                            <th>Urin</th>
+                            <td>{{ $item->urin ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Kelainan</th>
+                            <td>{{ $item->kelainan ?? '-' }}</td>
+                            <th>Lain-lain</th>
+                            <td>{{ $item->lainnya ?? '-' }}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                {{-- Status Psikososial Spiritual Section --}}
+                <div class="section">
+                    <h4>D. STATUS PSIKOSOSIAL SPIRITUAL</h4>
+                    
+                    {{-- Status Psikologi --}}
+                    <table class="form-table" style="margin-bottom: 10px;">
+                        <tr>
+                            <td class="info-label">Status Psikologi</td>
+                            <td class="info-value">
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->status_psikologi_tidak_ada_kelainan ?? false) ? 'checked' : '' }}">{{ ($item->status_psikologi_tidak_ada_kelainan ?? false) ? '✓' : '' }}</span>
+                                    Tidak ada kelainan
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->status_psikologi_cemas ?? false) ? 'checked' : '' }}">{{ ($item->status_psikologi_cemas ?? false) ? '✓' : '' }}</span>
+                                    Cemas
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->status_psikologi_takut ?? false) ? 'checked' : '' }}">{{ ($item->status_psikologi_takut ?? false) ? '✓' : '' }}</span>
+                                    Takut
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->status_psikologi_marah ?? false) ? 'checked' : '' }}">{{ ($item->status_psikologi_marah ?? false) ? '✓' : '' }}</span>
+                                    Marah
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->status_psikologi_sedih ?? false) ? 'checked' : '' }}">{{ ($item->status_psikologi_sedih ?? false) ? '✓' : '' }}</span>
+                                    Sedih
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->status_psikologi_kecenderungan_bunuh_diri ?? false) ? 'checked' : '' }}">{{ ($item->status_psikologi_kecenderungan_bunuh_diri ?? false) ? '✓' : '' }}</span>
+                                    Kecenderungan Bunuh Diri
+                                </div>
+                                @if ($item->status_psikologi_lainnya ?? false)
+                                    <div class="checkbox-group">
+                                        <span class="checkbox checked">✓</span>
+                                        Lainnya: {{ $item->status_psikologi_lainnya_text ?? '-' }}
+                                    </div>
                                 @endif
                             </td>
                         </tr>
                         <tr>
-                            <th>Abdomen</th>
-                            <td>{{ $item->abdomen ?? '-' }}
-                                @if (isset($item->meteorismus))
-                                    <br><strong>Meteorismus:</strong> {{ $item->meteorismus ?? '-' }}
-                                @endif
-                                @if (isset($item->asites))
-                                    <br><strong>Asites:</strong> {{ $item->asites ?? '-' }}
-                                @endif
-                                @if (isset($item->hepar))
-                                    <br><strong>Hepar:</strong> {{ $item->hepar ?? '-' }}
-                                @endif
-                                @if (isset($item->lien))
-                                    <br><strong>Lien:</strong> {{ $item->lien ?? '-' }}
-                                @endif
-                            </td>
-                            <th>Extremitas</th>
-                            <td>{{ $item->extremitas ?? '-' }}
-                                @if (isset($item->udem))
-                                    <br><strong>Udem:</strong> {{ $item->udem ?? '-' }}
+                            <td class="info-label">Status Mental</td>
+                            <td class="info-value">
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->status_mental_sadar_orientasi_baik ?? false) ? 'checked' : '' }}">{{ ($item->status_mental_sadar_orientasi_baik ?? false) ? '✓' : '' }}</span>
+                                    Sadar, Orientasi baik
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->status_mental_ada_masalah_perilaku ?? false) ? 'checked' : '' }}">{{ ($item->status_mental_ada_masalah_perilaku ?? false) ? '✓' : '' }}</span>
+                                    Ada masalah perilaku
+                                </div>
+                                @if ($item->status_mental_perilaku_kekerasan)
+                                    <br><strong>Perilaku kekerasan:</strong> {{ $item->status_mental_perilaku_kekerasan }}
                                 @endif
                             </td>
                         </tr>
-                        @if (isset($item->lainnya))
-                            <tr>
-                                <th>Lain-lain</th>
-                                <td colspan="3">{{ $item->lainnya ?? '-' }}</td>
-                            </tr>
-                        @endif
+                        <tr>
+                            <td class="info-label">Hubungan Keluarga</td>
+                            <td class="info-value">
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->hubungan_keluarga_baik ?? false) ? 'checked' : '' }}">{{ ($item->hubungan_keluarga_baik ?? false) ? '✓' : '' }}</span>
+                                    Hubungan baik
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->hubungan_keluarga_tidak_baik ?? false) ? 'checked' : '' }}">{{ ($item->hubungan_keluarga_tidak_baik ?? false) ? '✓' : '' }}</span>
+                                    Hubungan tidak baik
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="info-label">Tempat Tinggal</td>
+                            <td class="info-value">
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->tempat_tinggal_rumah ?? false) ? 'checked' : '' }}">{{ ($item->tempat_tinggal_rumah ?? false) ? '✓' : '' }}</span>
+                                    Rumah
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->tempat_tinggal_panti ?? false) ? 'checked' : '' }}">{{ ($item->tempat_tinggal_panti ?? false) ? '✓' : '' }}</span>
+                                    Panti
+                                </div>
+                                @if ($item->tempat_tinggal_lainnya ?? false)
+                                    <div class="checkbox-group">
+                                        <span class="checkbox checked">✓</span>
+                                        Lainnya: {{ $item->tempat_tinggal_lainnya_text ?? '-' }}
+                                    </div>
+                                @endif
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="info-label">Agama</td>
+                            <td class="info-value">
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->spiritual_agama_islam ?? false) ? 'checked' : '' }}">{{ ($item->spiritual_agama_islam ?? false) ? '✓' : '' }}</span>
+                                    Islam
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->spiritual_agama_katolik ?? false) ? 'checked' : '' }}">{{ ($item->spiritual_agama_katolik ?? false) ? '✓' : '' }}</span>
+                                    Katolik
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->spiritual_agama_protestan ?? false) ? 'checked' : '' }}">{{ ($item->spiritual_agama_protestan ?? false) ? '✓' : '' }}</span>
+                                    Protestan
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->spiritual_agama_hindu ?? false) ? 'checked' : '' }}">{{ ($item->spiritual_agama_hindu ?? false) ? '✓' : '' }}</span>
+                                    Hindu
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->spiritual_agama_budha ?? false) ? 'checked' : '' }}">{{ ($item->spiritual_agama_budha ?? false) ? '✓' : '' }}</span>
+                                    Buddha
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->spiritual_agama_konghucu ?? false) ? 'checked' : '' }}">{{ ($item->spiritual_agama_konghucu ?? false) ? '✓' : '' }}</span>
+                                    Konghucu
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->spiritual_agama_lain_lain ?? false) ? 'checked' : '' }}">{{ ($item->spiritual_agama_lain_lain ?? false) ? '✓' : '' }}</span>
+                                    Lainnya
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="info-label">Kebiasaan Ibadah</td>
+                            <td class="info-value">
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->spiritual_kebiasaan_berbadah_teratur_ya ?? false) ? 'checked' : '' }}">{{ ($item->spiritual_kebiasaan_berbadah_teratur_ya ?? false) ? '✓' : '' }}</span>
+                                    Ya, teratur
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->spiritual_kebiasaan_berbadah_teratur_tidak ?? false) ? 'checked' : '' }}">{{ ($item->spiritual_kebiasaan_berbadah_teratur_tidak ?? false) ? '✓' : '' }}</span>
+                                    Tidak teratur
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="info-label">Nilai Kepercayaan</td>
+                            <td class="info-value">
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->spiritual_nilai_kepercayaan_tidak_ada ?? false) ? 'checked' : '' }}">{{ ($item->spiritual_nilai_kepercayaan_tidak_ada ?? false) ? '✓' : '' }}</span>
+                                    Tidak ada masalah
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->spiritual_nilai_kepercayaan_ada ?? false) ? 'checked' : '' }}">{{ ($item->spiritual_nilai_kepercayaan_ada ?? false) ? '✓' : '' }}</span>
+                                    Ada konflik
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="info-label">Pengambilan Keputusan</td>
+                            <td class="info-value">
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->pengambilan_keputusan_keluarga ?? false) ? 'checked' : '' }}">{{ ($item->pengambilan_keputusan_keluarga ?? false) ? '✓' : '' }}</span>
+                                    Keluarga terlibat dalam pengambilan keputusan
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+
+                    {{-- Status Ekonomi --}}
+                    <table class="form-table">
+                        <tr>
+                            <td class="info-label">Pekerjaan</td>
+                            <td class="info-value">
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->ekonomi_pekerjaan_asn ?? false) ? 'checked' : '' }}">{{ ($item->ekonomi_pekerjaan_asn ?? false) ? '✓' : '' }}</span>
+                                    ASN
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->ekonomi_pekerjaan_wiraswasta ?? false) ? 'checked' : '' }}">{{ ($item->ekonomi_pekerjaan_wiraswasta ?? false) ? '✓' : '' }}</span>
+                                    Wiraswasta
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->ekonomi_pekerjaan_tni_polri ?? false) ? 'checked' : '' }}">{{ ($item->ekonomi_pekerjaan_tni_polri ?? false) ? '✓' : '' }}</span>
+                                    TNI/POLRI
+                                </div>
+                                @if ($item->ekonomi_pekerjaan_lain_lain ?? false)
+                                    <div class="checkbox-group">
+                                        <span class="checkbox checked">✓</span>
+                                        Lainnya: {{ $item->ekonomi_pekerjaan_lain_lain_text ?? '-' }}
+                                    </div>
+                                @endif
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="info-label">Penghasilan per bulan</td>
+                            <td class="info-value">
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->ekonomi_penghasilan_kurang_5jt ?? false) ? 'checked' : '' }}">{{ ($item->ekonomi_penghasilan_kurang_5jt ?? false) ? '✓' : '' }}</span>
+                                    < Rp 5 juta
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->ekonomi_penghasilan_5_10jt ?? false) ? 'checked' : '' }}">{{ ($item->ekonomi_penghasilan_5_10jt ?? false) ? '✓' : '' }}</span>
+                                    Rp 5-10 juta
+                                </div>
+                                <div class="checkbox-group">
+                                    <span class="checkbox {{ ($item->ekonomi_penghasilan_lebih_10jt ?? false) ? 'checked' : '' }}">{{ ($item->ekonomi_penghasilan_lebih_10jt ?? false) ? '✓' : '' }}</span>
+                                    > Rp 10 juta
+                                </div>
+                            </td>
+                        </tr>
                     </table>
                 </div>
 
                 {{-- Penilaian Nyeri Section --}}
-                @if (isset($item->nyeri) || isset($item->skala_nyeri))
-                    <div class="section">
-                        <h4>D. PENILAIAN NYERI</h4>
-                        <table class="form-table">
-                            <tr>
-                                <td class="info-label">Nyeri</td>
-                                <td class="info-value">{{ $item->nyeri ?? '-' }}</td>
-                                <td class="info-label">Skala Nyeri</td>
-                                <td class="info-value">{{ $item->skala_nyeri ?? '-' }}/10</td>
-                            </tr>
-                            <tr>
-                                <td class="info-label">Lokasi</td>
-                                <td class="info-value">{{ $item->lokasi_nyeri ?? '-' }}</td>
-                                <td class="info-label">Onset</td>
-                                <td class="info-value">{{ $item->onset ?? '-' }}</td>
-                            </tr>
-                            <tr>
-                                <td class="info-label">Pencetus</td>
-                                <td class="info-value">{{ $item->pencetus ?? '-' }}</td>
-                                <td class="info-label">Durasi</td>
-                                <td class="info-value">{{ $item->durasi_nyeri ?? '-' }}</td>
-                            </tr>
-                            <tr>
-                                <td class="info-label">Gambaran Nyeri</td>
-                                <td class="info-value">{{ $item->gambaran_nyeri ?? '-' }}</td>
-                                <td class="info-label">Metode</td>
-                                <td class="info-value">{{ $item->metode_nyeri ?? '-' }}</td>
-                            </tr>
-                        </table>
+                <div class="section">
+                    <h4>E. PENILAIAN NYERI</h4>
+                    <table class="form-table">
+                        <tr>
+                            <td class="info-label">Nyeri</td>
+                            <td class="info-value">{{ $item->nyeri ?? '-' }}</td>
+                            <td class="info-label">Onset</td>
+                            <td class="info-value">{{ $item->onset ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="info-label">Pencetus</td>
+                            <td class="info-value">{{ $item->pencetus ?? '-' }}</td>
+                            <td class="info-label">Lokasi Nyeri</td>
+                            <td class="info-value">{{ $item->lokasi_nyeri ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="info-label">Gambaran Nyeri</td>
+                            <td class="info-value">{{ $item->gambaran_nyeri ?? '-' }}</td>
+                            <td class="info-label">Durasi</td>
+                            <td class="info-value">{{ $item->durasi_nyeri ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="info-label">Skala Nyeri</td>
+                            <td class="info-value">{{ $item->skala_nyeri ?? '-' }}/10</td>
+                            <td class="info-label">Metode</td>
+                            <td class="info-value">{{ $item->metode_nyeri ?? '-' }}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                {{-- Edukasi Pasien Section --}}
+                <div class="section">
+                    <h4>F. EDUKASI PASIEN</h4>
+                    <div class="section-content">
+                        <div class="two-column">
+                            <div class="left-column">
+                                <div class="checkbox-group" style="display: block; margin-bottom: 5px;">
+                                    <span class="checkbox {{ ($item->edukasi_hak_berpartisipasi ?? false) ? 'checked' : '' }}">{{ ($item->edukasi_hak_berpartisipasi ?? false) ? '✓' : '' }}</span>
+                                    Hak untuk berpartisipasi pada pelayanan
+                                </div>
+                                <div class="checkbox-group" style="display: block; margin-bottom: 5px;">
+                                    <span class="checkbox {{ ($item->edukasi_prosedure_penunjang ?? false) ? 'checked' : '' }}">{{ ($item->edukasi_prosedure_penunjang ?? false) ? '✓' : '' }}</span>
+                                    Prosedur pemeriksaan penunjang
+                                </div>
+                                <div class="checkbox-group" style="display: block; margin-bottom: 5px;">
+                                    <span class="checkbox {{ ($item->edukasi_diagnosa ?? false) ? 'checked' : '' }}">{{ ($item->edukasi_diagnosa ?? false) ? '✓' : '' }}</span>
+                                    Kondisi kesehatan dan diagnosa pasti
+                                </div>
+                                <div class="checkbox-group" style="display: block; margin-bottom: 5px;">
+                                    <span class="checkbox {{ ($item->edukasi_pemberian_informed_consent ?? false) ? 'checked' : '' }}">{{ ($item->edukasi_pemberian_informed_consent ?? false) ? '✓' : '' }}</span>
+                                    Proses pemberian informed consent
+                                </div>
+                                <div class="checkbox-group" style="display: block; margin-bottom: 5px;">
+                                    <span class="checkbox {{ ($item->edukasi_penundaan_pelayanan ?? false) ? 'checked' : '' }}">{{ ($item->edukasi_penundaan_pelayanan ?? false) ? '✓' : '' }}</span>
+                                    Penundaan Pelayanan
+                                </div>
+                                <div class="checkbox-group" style="display: block; margin-bottom: 5px;">
+                                    <span class="checkbox {{ ($item->edukasi_kelambatan_pelayanan ?? false) ? 'checked' : '' }}">{{ ($item->edukasi_kelambatan_pelayanan ?? false) ? '✓' : '' }}</span>
+                                    Kelambatan Pelayanan
+                                </div>
+                                <div class="checkbox-group" style="display: block; margin-bottom: 5px;">
+                                    <span class="checkbox {{ ($item->edukasi_cuci_tangan ?? false) ? 'checked' : '' }}">{{ ($item->edukasi_cuci_tangan ?? false) ? '✓' : '' }}</span>
+                                    Cuci tangan yang benar
+                                </div>
+                                <div class="checkbox-group" style="display: block; margin-bottom: 5px;">
+                                    <span class="checkbox {{ ($item->edukasi_obat ?? false) ? 'checked' : '' }}">{{ ($item->edukasi_obat ?? false) ? '✓' : '' }}</span>
+                                    Penggunaan obat secara efektif
+                                </div>
+                            </div>
+                            <div class="right-column">
+                                <div class="checkbox-group" style="display: block; margin-bottom: 5px;">
+                                    <span class="checkbox {{ ($item->edukasi_bahaya_merokok ?? false) ? 'checked' : '' }}">{{ ($item->edukasi_bahaya_merokok ?? false) ? '✓' : '' }}</span>
+                                    Bahaya Merokok
+                                </div>
+                                <div class="checkbox-group" style="display: block; margin-bottom: 5px;">
+                                    <span class="checkbox {{ ($item->edukasi_rujukan_pasien ?? false) ? 'checked' : '' }}">{{ ($item->edukasi_rujukan_pasien ?? false) ? '✓' : '' }}</span>
+                                    Edukasi Rujukan Pasien
+                                </div>
+                                <div class="checkbox-group" style="display: block; margin-bottom: 5px;">
+                                    <span class="checkbox {{ ($item->edukasi_nutrisi ?? false) ? 'checked' : '' }}">{{ ($item->edukasi_nutrisi ?? false) ? '✓' : '' }}</span>
+                                    Diet dan Nutrisi
+                                </div>
+                                <div class="checkbox-group" style="display: block; margin-bottom: 5px;">
+                                    <span class="checkbox {{ ($item->edukasi_rehab_medik ?? false) ? 'checked' : '' }}">{{ ($item->edukasi_rehab_medik ?? false) ? '✓' : '' }}</span>
+                                    Teknik Rehabilitasi
+                                </div>
+                                <div class="checkbox-group" style="display: block; margin-bottom: 5px;">
+                                    <span class="checkbox {{ ($item->edukasi_nyeri ?? false) ? 'checked' : '' }}">{{ ($item->edukasi_nyeri ?? false) ? '✓' : '' }}</span>
+                                    Manajemen Nyeri
+                                </div>
+                                <div class="checkbox-group" style="display: block; margin-bottom: 5px;">
+                                    <span class="checkbox {{ ($item->edukasi_perencanaan_pulang ?? false) ? 'checked' : '' }}">{{ ($item->edukasi_perencanaan_pulang ?? false) ? '✓' : '' }}</span>
+                                    Edukasi Perencanaan Pulang
+                                </div>
+                                <div class="checkbox-group" style="display: block; margin-bottom: 5px;">
+                                    <span class="checkbox {{ ($item->edukasi_penggunaan_alat ?? false) ? 'checked' : '' }}">{{ ($item->edukasi_penggunaan_alat ?? false) ? '✓' : '' }}</span>
+                                    Penggunaan alat-alat medis yang aman
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                @endif
+                </div>
 
                 {{-- Assessment Section --}}
                 <div class="section">
-                    <h4>E. ASSESSMENT</h4>
+                    <h4>G. ASSESSMENT</h4>
                     <table class="form-table">
                         <tr>
                             <td class="info-label">Masalah Medis</td>
@@ -717,37 +1034,7 @@
                 <table class="footer-table">
                     <tr>
                         <td class="footer-left-cell">
-                            <div class="date-location">BOJONEGORO, {{ \Carbon\Carbon::now()->locale('id')->isoFormat('D MMMM Y') }}</div>
-                            <div style="margin-top: 10px; font-weight: bold;">Perawat</div>
                             
-                            @php
-                                $petugasNama = $item->petugas ?? '';
-                                $petugasQR = null;
-
-                                if (!empty($petugasNama)) {
-                                    try {
-                                        if (class_exists('\App\Helpers\QRCodeHelper')) {
-                                            $petugasQR = \App\Helpers\QRCodeHelper::generateForStaff(
-                                                $petugasNama,
-                                                'Perawat',
-                                            );
-                                        }
-                                    } catch (\Exception $e) {
-                                        // Log error dan lanjutkan tanpa QR
-                                        error_log('QR Code generation failed: ' . $e->getMessage());
-                                        $petugasQR = null;
-                                    }
-                                }
-                            @endphp
-                            
-                            <div style="margin: 40px 0 10px;">
-                                @if ($petugasQR)
-                                    <img src="{{ $petugasQR }}" style="width: 50px; height: 50px;" alt="QR Code Perawat">
-                                @else
-                                    <div class="qr-placeholder">[QR Code]</div>
-                                @endif
-                            </div>
-                            <div class="doctor-name">{{ $petugasNama ?: '( ............................ )' }}</div>
                         </td>
                         <td class="footer-right-cell">
                             <div class="date-location">BOJONEGORO, {{ \Carbon\Carbon::now()->locale('id')->isoFormat('D MMMM Y') }}</div>
@@ -771,7 +1058,7 @@
                                 }
                             @endphp
                             
-                            <div style="margin: 40px 0 10px;">
+                            <div style="margin: 10px 0 10px;">
                                 @if ($dokterQR)
                                     <img src="{{ $dokterQR }}" style="width: 50px; height: 50px;" alt="QR Code Dokter">
                                 @else
