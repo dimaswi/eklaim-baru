@@ -550,7 +550,7 @@ export default function PrintBundleIndex() {
                     }
                 } catch {
                     // If response is not JSON, get text
-                   errorMessage = errorText || errorMessage;
+                   errorMessage = 'Error!';
                 }
                 
                 throw new Error(errorMessage);
