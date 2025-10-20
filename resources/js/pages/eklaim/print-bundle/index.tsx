@@ -522,13 +522,13 @@ export default function PrintBundleIndex() {
                 selected_records: selectedRecordsData,
             };
 
-            // const response = await makeAuthenticatedRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/bundle`, {
-            //    method: 'POST',
-            //    headers: {
-            //        'Content-Type': 'application/json',
-            //    },
-            //    body: JSON.stringify(requestBody),
-            //});
+            const response = await makeAuthenticatedRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/bundle`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody),
+            });
 
             //console.log(response);
             
