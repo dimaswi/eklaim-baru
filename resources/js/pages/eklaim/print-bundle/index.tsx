@@ -529,6 +529,8 @@ export default function PrintBundleIndex() {
                 },
                 body: JSON.stringify(requestBody),
             });
+
+            console.log(response);
             
             if (!response.ok) {
                 let errorMessage = `HTTP error! status: ${response.status}`;
