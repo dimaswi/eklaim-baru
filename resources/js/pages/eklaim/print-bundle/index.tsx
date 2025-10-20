@@ -522,40 +522,40 @@ export default function PrintBundleIndex() {
                 selected_records: selectedRecordsData,
             };
 
-            const response = await makeAuthenticatedRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/bundle`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(requestBody),
-            });
+            // const response = await makeAuthenticatedRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/bundle`, {
+            //    method: 'POST',
+            //    headers: {
+            //        'Content-Type': 'application/json',
+            //    },
+            //    body: JSON.stringify(requestBody),
+            //});
 
-            console.log(response);
+            //console.log(response);
             
-            if (!response.ok) {
-                let errorMessage = `HTTP error! status: ${response.status}`;
+            //if (!response.ok) {
+            //    let errorMessage = `HTTP error! status: ${response.status}`;
                 
-                try {
-                    const errorData = await response.json();
-                    if (errorData.csrf_error) {
-                        errorMessage = 'Session expired. The page will refresh automatically.';
+            //    try {
+            //        const errorData = await response.json();
+            //        if (errorData.csrf_error) {
+            //            errorMessage = 'Session expired. The page will refresh automatically.';
                         // Auto-refresh the page after showing the error
-                        setTimeout(() => {
-                            if (errorData.redirect_url) {
-                                window.location.href = errorData.redirect_url;
-                            } else {
-                                window.location.reload();
-                            }
-                        }, 2000);
-                    } else {
-                        errorMessage = errorData.error || errorData.message || errorMessage;
-                    }
-                } catch {
+            //            setTimeout(() => {
+            //                if (errorData.redirect_url) {
+            //                    window.location.href = errorData.redirect_url;
+            //                } else {
+            //                   window.location.reload();
+            //                }
+            //           }, 2000);
+            //        } else {
+            //            errorMessage = errorData.error || errorData.message || errorMessage;
+            //        }
+            //    } catch {
                     // If response is not JSON, get text
-                   errorMessage = 'Error!';
-                }
+            //       errorMessage = 'Error!';
+            //    }
                 
-                throw new Error(errorMessage);
+             //   throw new Error(errorMessage);
             }
 
             // Check if response is JSON (bundle_base64) or binary (fallback)
