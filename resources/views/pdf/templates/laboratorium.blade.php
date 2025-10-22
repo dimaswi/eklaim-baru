@@ -250,9 +250,6 @@
                                 <tr>
                                     <th class="col-tindakan">
                                         Tindakan
-                                        @if($item->is_fiktif ?? false)
-                                            <span class="fiktif-indicator">FIKTIF</span>
-                                        @endif
                                     </th>
                                     <th class="col-parameter">Parameter</th>
                                     <th class="col-hasil">Hasil</th>
@@ -294,9 +291,6 @@
                                 <tr>
                                     <th class="col-tindakan">
                                         Tindakan
-                                        @if($item->is_fiktif ?? false)
-                                            <span class="fiktif-indicator">FIKTIF</span>
-                                        @endif
                                     </th>
                                     <th class="col-parameter">Parameter</th>
                                     <th class="col-hasil">Hasil</th>
@@ -381,9 +375,6 @@
                         </tr>
                     </table>
 
-                    @if ($item->is_fiktif ?? false)
-                        <div class="fiktif-watermark">DATA FIKTIF</div>
-                    @endif
                 </div>
                 
                     @php
