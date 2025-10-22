@@ -29,6 +29,7 @@ class PengajuanKlaim extends Model
         'ruangan',
         'jenis_kunjungan',
         'status_pengiriman',
+        'idrg',
     ];
 
     protected $casts = [
@@ -50,6 +51,13 @@ class PengajuanKlaim extends Model
     const STATUS_KIRIM = 5;            // Kirim
 
     /**
+     * Status constants for IDRG
+     */
+    const STATUS_DEFAULT_IDRG = 0;         // Default
+    const STATUS_GROUPING_IDRG = 1;        // Grouping
+    const STATUS_FINAL_IDRG = 2;           // Final
+
+    /**
      * Get status options
      */
     public static function getStatusOptions()
@@ -61,6 +69,18 @@ class PengajuanKlaim extends Model
             self::STATUS_GROUPER_STAGE2 => 'Grouper Stage 2',
             self::STATUS_FINAL => 'Final',
             self::STATUS_KIRIM => 'Kirim',
+        ];
+    }
+
+    /**
+     * Get status options for IDRG
+     */
+    public static function getStatusOptionsIDRG()
+    {
+        return [
+            self::STATUS_DEFAULT_IDRG => 'Default',
+            self::STATUS_GROUPING_IDRG => 'Grouping',
+            self::STATUS_FINAL_IDRG => 'Final',
         ];
     }
 
@@ -88,6 +108,17 @@ class PengajuanKlaim extends Model
         $statuses = self::getStatusOptions();
         return $statuses[$this->status_pengiriman] ?? $this->status_pengiriman;
     }
+
+    /**
+     * Get status label for IDRG
+     */
+    public function getStatusLabelIDRGAttribute()
+    {
+        $statuses = self::getStatusOptionsIDRG();
+        return $statuses[$this->status] ?? $this->status;
+    }
+
+
 
     /**
      * Check if submission was successful (Tersimpan or higher)
@@ -134,7 +165,7 @@ class PengajuanKlaim extends Model
      */
     public function getStatusBadgeClassAttribute()
     {
-        return match($this->status_pengiriman) {
+        return match ($this->status_pengiriman) {
             self::STATUS_DEFAULT => 'bg-gray-100 text-gray-800',
             self::STATUS_TERSIMPAN => 'bg-blue-100 text-blue-800',
             self::STATUS_GROUPER => 'bg-yellow-100 text-yellow-800',
@@ -143,6 +174,60 @@ class PengajuanKlaim extends Model
             self::STATUS_KIRIM => 'bg-green-100 text-green-800',
             default => 'bg-gray-100 text-gray-800',
         };
+    }
+
+    /**
+     * Get IDRG status badge class for UI
+     */
+    public function getIdrgStatusBadgeClassAttribute()
+    {
+        return match ($this->status) {
+            self::STATUS_DEFAULT_IDRG => 'bg-gray-100 text-gray-800',
+            self::STATUS_GROUPING_IDRG => 'bg-blue-100 text-blue-800',
+            self::STATUS_FINAL_IDRG => 'bg-green-100 text-green-800',
+            default => 'bg-gray-100 text-gray-800',
+        };
+    }
+
+    /**
+     * Accessor untuk IDRG status dalam bahasa Indonesia
+     */
+    public function getIdrgStatusLabelAttribute()
+    {
+        $statuses = self::getStatusOptionsIDRG();
+        return $statuses[$this->idrg] ?? $this->idrg;
+    }
+
+    /**
+     * Scope untuk filter berdasarkan IDRG status
+     */
+    public function scopeByIdrgStatus($query, $status)
+    {
+        return $query->where('idrg', $status);
+    }
+
+    /**
+     * Check if IDRG processing is complete (Final status)
+     */
+    public function isIdrgComplete()
+    {
+        return $this->idrg === self::STATUS_FINAL_IDRG;
+    }
+
+    /**
+     * Check if IDRG is in grouping process
+     */
+    public function isIdrgGrouping()
+    {
+        return $this->idrg === self::STATUS_GROUPING_IDRG;
+    }
+
+    /**
+     * Check if IDRG is in default state
+     */
+    public function isIdrgDefault()
+    {
+        return $this->idrg === self::STATUS_DEFAULT_IDRG;
     }
 
     public function penjamin()

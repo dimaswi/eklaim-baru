@@ -370,12 +370,10 @@ export default function RawatInapResumeMedisRawatJalan() {
 
             router.post(`/eklaim/rawat-jalan/resume-medis`, dataToSend, {
                 onSuccess: () => {
-                    toast.success('Data Resume Medis Rawat Jalan berhasil disimpan');
                     setLoading(null);
                 },
                 onError: (errors) => {
                     console.error('Validation errors:', errors);
-                    toast.error('Gagal menyimpan data. Periksa form dan coba lagi.');
                     setLoading(null);
                 },
                 onFinish: () => {
@@ -384,7 +382,6 @@ export default function RawatInapResumeMedisRawatJalan() {
             });
         } catch (error) {
             console.error('Error saving Resume Medis:', error);
-            toast.error('Gagal menyimpan data Resume Medis');
             setLoading(null);
         }
     };

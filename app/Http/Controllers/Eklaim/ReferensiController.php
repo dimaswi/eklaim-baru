@@ -95,4 +95,92 @@ class ReferensiController extends Controller
             return response()->json($errorResponse, 500);
         }
     }
+
+    public function getDiagnosisIDRG(Request $request)
+    {
+        $data = [
+            "metadata" => [
+                "method" => "search_diagnosis_inagrouper"
+            ],
+            "data" => [
+                "keyword" => $request->get('keyword'),
+            ]
+        ];
+
+        try {
+            $response = InacbgHelper::hitApi($data);
+
+            if ($response && isset($response['metadata']) && $response['metadata']['code'] == 200) {
+                return response()->json($response);
+            } else {
+                $responseKosong = [
+                    "metadata" => [
+                        "code" => 200,
+                        "message" => "Tidak Ada Data Diagnosis"
+                    ],
+                    "response" => [
+                        "count" => 0,
+                        "data" => []
+                    ]
+                ];
+                return response()->json($responseKosong);
+            }
+        } catch (\Exception $e) {
+            $errorResponse = [
+                "metadata" => [
+                    "code" => 500,
+                    "message" => "Error: " . $e->getMessage()
+                ],
+                "response" => [
+                    "count" => 0,
+                    "data" => []
+                ]
+            ];
+            return response()->json($errorResponse, 500);
+        }
+    }
+
+    public function getProsedurIDRG(Request $request)
+    {
+        $data = [
+            "metadata" => [
+                "method" => "search_procedures_inagrouper"
+            ],
+            "data" => [
+                "keyword" => $request->get('keyword')
+            ]
+        ];
+
+        try {
+            $response = InacbgHelper::hitApi($data);
+
+            if ($response && isset($response['metadata']) && $response['metadata']['code'] == 200) {
+                return response()->json($response);
+            } else {
+                $responseKosong = [
+                    "metadata" => [
+                        "code" => 200,
+                        "message" => "Tidak Ada Data Procedure"
+                    ],
+                    "response" => [
+                        "count" => 0,
+                        "data" => []
+                    ]
+                ];
+                return response()->json($responseKosong);
+            }
+        } catch (\Exception $e) {
+            $errorResponse = [
+                "metadata" => [
+                    "code" => 500,
+                    "message" => "Error: " . $e->getMessage()
+                ],
+                "response" => [
+                    "count" => 0,
+                    "data" => []
+                ]
+            ];
+            return response()->json($errorResponse, 500);
+        }
+    }
 }

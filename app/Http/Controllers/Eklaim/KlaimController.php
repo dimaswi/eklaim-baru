@@ -1306,4 +1306,190 @@ class KlaimController extends Controller
             return redirect()->back()->with('error', 'Gagal mengirim klaim ke INACBG: ' . $e->getMessage());
         }
     }
+
+
+    /**
+     * Complete IDRG Grouping workflow: Set diagnosis, set procedure (optional), then groupper
+     */
+    public function idrgGrouping(Request $request, PengajuanKlaim $pengajuanKlaim)
+    {
+        // Validasi input
+        $validator = Validator::make($request->all(), [
+            'selectedIdrgDiagnoses' => 'required|array|min:1',
+            'selectedIdrgDiagnoses.*.code' => 'required|string',
+            'selectedIdrgDiagnoses.*.name' => 'required|string',
+            'selectedIdrgProcedures' => 'nullable|array',
+            'selectedIdrgProcedures.*.code' => 'required_with:selectedIdrgProcedures|string',
+            'selectedIdrgProcedures.*.name' => 'required_with:selectedIdrgProcedures|string',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator)->withInput();
+        }
+
+        try {
+            // Parse diagnosis from frontend format
+            $selectedDiagnoses = $request->input('selectedIdrgDiagnoses', []);
+            $selectedProcedures = $request->input('selectedIdrgProcedures', []);
+
+            // Step 1: Set IDRG Diagnosis (required)
+            if (empty($selectedDiagnoses)) {
+                return redirect()->back()->with('error', 'Daftar diagnosis IDRG tidak boleh kosong.');
+            }
+
+            $diagnosisString = $this->formatDiagnosesToString($selectedDiagnoses);
+            
+            $diagnosisData = [
+                'metadata' => [
+                    'method' => 'idrg_diagnosa_set',
+                    'nomor_sep' => $pengajuanKlaim->nomor_sep,
+                ],
+                'data' => [
+                    'diagnosa' => $diagnosisString,
+                ]
+            ];
+
+            $diagnosisResponse = \App\Helpers\InacbgHelper::hitApi($diagnosisData, 'POST');
+
+            Log::info('IDRG Diagnosis Set Response', [
+                'nomor_sep' => $pengajuanKlaim->nomor_sep,
+                'diagnosis_string' => $diagnosisString,
+                'response' => $diagnosisResponse ?? null,
+            ]);
+            
+            if ($diagnosisResponse['metadata']['code'] != 200) {
+                return redirect()->back()->with('error', 'Gagal set diagnosa IDRG: ' . ($diagnosisResponse['metadata']['message'] ?? 'Unknown error'));
+            }
+
+            // Step 2: Set IDRG Procedure (optional)
+            $procedureResponse = null;
+            if (!empty($selectedProcedures)) {
+                $procedureString = $this->formatProceduresToString($selectedProcedures);
+                
+                $procedureData = [
+                    'metadata' => [
+                        'method' => 'idrg_prosedur_set',
+                        'nomor_sep' => $pengajuanKlaim->nomor_sep,
+                    ],
+                    'data' => [
+                        'prosedur' => $procedureString,
+                    ]
+                ];
+
+                $procedureResponse = \App\Helpers\InacbgHelper::hitApi($procedureData, 'POST');
+
+                Log::info('IDRG Procedure Set Response', [
+                    'nomor_sep' => $pengajuanKlaim->nomor_sep,
+                    'procedure_string' => $procedureString,
+                    'response' => $procedureResponse ?? null,
+                ]);
+                
+                if ($procedureResponse['metadata']['code'] != 200) {
+                    return redirect()->back()->with('error', 'Gagal set prosedur IDRG: ' . ($procedureResponse['metadata']['message'] ?? 'Unknown error'));
+                }
+            }
+
+            // Step 3: Run IDRG Groupper
+            $groupperData = [
+                'metadata' => [
+                    'method' => 'grouper',
+                    'stage' => '1',
+                    'groupper' => 'idrg',
+                ],
+                'data' => [
+                    'nomor_sep' => $pengajuanKlaim->nomor_sep,
+                ]
+            ];
+
+            $groupperResponse = \App\Helpers\InacbgHelper::hitApi($groupperData, 'POST');
+
+            Log::info('IDRG Groupper Response', [
+                'nomor_sep' => $pengajuanKlaim->nomor_sep,
+                'response' => $groupperResponse ?? null,
+            ]);
+            
+            if ($groupperResponse['metadata']['code'] != 200) {
+                return redirect()->back()->with('error', 'Gagal menjalankan IDRG grouping: ' . ($groupperResponse['metadata']['message'] ?? 'Unknown error'));
+            }
+
+            // Update pengajuan klaim dengan IDRG value dari response
+            // Store the IDRG code from the response - if no specific IDRG field exists, use status
+            $idrgCode = $groupperResponse['response']['cbg']['code'] ?? null;
+            
+            // Update the IDRG status - assume 1 means grouping completed successfully
+            $pengajuanKlaim->update(['idrg' => 1]);
+            
+            // Log the IDRG code for reference
+            Log::info('IDRG Grouping completed', [
+                'nomor_sep' => $pengajuanKlaim->nomor_sep,
+                'idrg_code' => $idrgCode,
+                'idrg_status' => 1
+            ]);
+
+            return redirect()->back()->with('success', 'IDRG Grouping berhasil dijalankan: ' . $groupperResponse['metadata']['message']);
+
+        } catch (\Exception $e) {
+            Log::error('IDRG Grouping failed', [
+                'nomor_sep' => $pengajuanKlaim->nomor_sep,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return redirect()->back()->with('error', 'Gagal menjalankan IDRG grouping: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Format diagnosis array to string format expected by INACBG
+     */
+    private function formatDiagnosesToString($diagnoses)
+    {
+        if (empty($diagnoses)) {
+            return '';
+        }
+
+        // Count occurrences of each code
+        $codeCount = [];
+        foreach ($diagnoses as $diagnosis) {
+            if (isset($diagnosis['code'])) {
+                $code = $diagnosis['code'];
+                $codeCount[$code] = ($codeCount[$code] ?? 0) + 1;
+            }
+        }
+
+        // Build formatted string
+        $formattedCodes = [];
+        foreach ($codeCount as $code => $count) {
+            $formattedCodes[] = $count > 1 ? "{$code}+{$count}" : $code;
+        }
+
+        return implode('#', $formattedCodes);
+    }
+
+    /**
+     * Format procedures array to string format expected by INACBG
+     */
+    private function formatProceduresToString($procedures)
+    {
+        if (empty($procedures)) {
+            return '';
+        }
+
+        // Count occurrences of each code
+        $codeCount = [];
+        foreach ($procedures as $procedure) {
+            if (isset($procedure['code'])) {
+                $code = $procedure['code'];
+                $codeCount[$code] = ($codeCount[$code] ?? 0) + 1;
+            }
+        }
+
+        // Build formatted string
+        $formattedCodes = [];
+        foreach ($codeCount as $code => $count) {
+            $formattedCodes[] = $count > 1 ? "{$code}+{$count}" : $code;
+        }
+
+        return implode('#', $formattedCodes);
+    }
 }

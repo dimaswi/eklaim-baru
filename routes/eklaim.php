@@ -58,6 +58,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/eklaim/klaim/{pengajuanKlaim}/final', [KlaimController::class, 'final'])->name('eklaim.klaim.final');
     Route::post('/eklaim/klaim/{pengajuanKlaim}/reedit', [KlaimController::class, 'reedit'])->name('eklaim.klaim.reedit');
     Route::post('/eklaim/klaim/{pengajuanKlaim}/kirim-inacbg', [KlaimController::class, 'kirimInacbg'])->name('eklaim.klaim.kirim-inacbg');
+    Route::post('/eklaim/klaim/{pengajuanKlaim}/idrg-grouping', [KlaimController::class, 'idrgGrouping'])->name('eklaim.klaim.idrg-grouping');
+    
     
     // Debug route for testing data storage
     Route::get('/eklaim/debug/test-storage/{pengajuanKlaim}', [KlaimController::class, 'testStorage'])->name('eklaim.debug.test-storage');
@@ -162,4 +164,6 @@ Route::middleware('auth')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::get('/eklaim/referensi/diagnosis', [ReferensiController::class, 'getDiagnosis'])->name('eklaim.referensi.diagnosis');
     Route::get('/eklaim/referensi/prosedur', [ReferensiController::class, 'getProsedur'])->name('eklaim.referensi.prosedur');
+    Route::get('/eklaim/referensi/diagnosis-idrg', [ReferensiController::class, 'getDiagnosisIDRG'])->name('eklaim.referensi.diagnosis-idrg');
+    Route::get('/eklaim/referensi/prosedur-idrg', [ReferensiController::class, 'getProsedurIDRG'])->name('eklaim.referensi.prosedur-idrg');
 });

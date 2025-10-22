@@ -172,6 +172,48 @@ export default function PrintBundleIndex() {
         return response;
     };
 
+    // Simplified API helper that automatically handles errors
+    const apiRequest = async (url: string, options: RequestInit = {}) => {
+        const response = await makeAuthenticatedRequest(url, {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers,
+            },
+        });
+
+        if (!response.ok) {
+            let errorMessage = `HTTP error! status: ${response.status}`;
+            
+            try {
+                const errorData = await response.json();
+                if (errorData.csrf_error) {
+                    errorMessage = 'Session expired. The page will refresh automatically.';
+                    setTimeout(() => {
+                        if (errorData.redirect_url) {
+                            window.location.href = errorData.redirect_url;
+                        } else {
+                            window.location.reload();
+                        }
+                    }, 2000);
+                } else {
+                    errorMessage = errorData.error || errorData.message || errorMessage;
+                }
+            } catch {
+                try {
+                    const errorText = await response.text();
+                    errorMessage = errorText || errorMessage;
+                } catch {
+                    errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                }
+            }
+            
+            throw new Error(errorMessage);
+        }
+
+        return response;
+    };
+
     const toggleExpandRow = (docId: string) => {
         setExpandedRows(prev => 
             prev.includes(docId) 
@@ -338,17 +380,10 @@ export default function PrintBundleIndex() {
 
 
 
-            const response = await makeAuthenticatedRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/preview?type=${doc.type}`, {
+            const response = await apiRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/preview?type=${doc.type}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify(requestBody),
             });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
 
             // Check if response is JSON (base64 PDF data) or HTML
             const contentType = response.headers.get('content-type');
@@ -422,17 +457,10 @@ export default function PrintBundleIndex() {
                     selected_records: selectedRecordsData,
                 };
 
-            const response = await makeAuthenticatedRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/pdf?type=${doc.type}`, {
+            const response = await apiRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/pdf?type=${doc.type}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify(requestBody),
             });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
 
             // Check if response is JSON (base64 PDF) or binary (fallback)
             const contentType = response.headers.get('content-type');
@@ -522,41 +550,10 @@ export default function PrintBundleIndex() {
                 selected_records: selectedRecordsData,
             };
 
-            const response = await makeAuthenticatedRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/bundle`, {
+            const response = await apiRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/bundle`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify(requestBody),
             });
-
-            //console.log(response);
-            
-            //if (!response.ok) {
-            //    let errorMessage = `HTTP error! status: ${response.status}`;
-                
-            //    try {
-            //        const errorData = await response.json();
-            //        if (errorData.csrf_error) {
-            //            errorMessage = 'Session expired. The page will refresh automatically.';
-                        // Auto-refresh the page after showing the error
-            //            setTimeout(() => {
-            //                if (errorData.redirect_url) {
-            //                    window.location.href = errorData.redirect_url;
-            //                } else {
-            //                   window.location.reload();
-            //                }
-            //           }, 2000);
-            //        } else {
-            //            errorMessage = errorData.error || errorData.message || errorMessage;
-            //        }
-            //    } catch {
-                    // If response is not JSON, get text
-            //       errorMessage = 'Error!';
-            //    }
-                
-             //   throw new Error(errorMessage);
-            //}
 
             // Check if response is JSON (bundle_base64) or binary (fallback)
             const contentType = response.headers.get('content-type');
@@ -624,13 +621,9 @@ export default function PrintBundleIndex() {
     const loadDefaultSettings = async () => {
         setIsLoadingSettings(true);
         try {
-            const response = await makeAuthenticatedRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/default-order`, {
+            const response = await apiRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/default-order`, {
                 method: 'GET',
             });
-
-            if (!response.ok) {
-                throw new Error('Failed to load settings');
-            }
 
             const data = await response.json();
             
@@ -675,19 +668,12 @@ export default function PrintBundleIndex() {
                 is_default_selected: doc.isSelected,
             })).sort((a, b) => a.order - b.order);
 
-            const response = await makeAuthenticatedRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/default-order`, {
+            const response = await apiRequest(`/eklaim/print-bundle/${pengajuanKlaim.id}/default-order`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify({
                     document_order: documentOrder,
                 }),
             });
-
-            if (!response.ok) {
-                throw new Error('Failed to save settings');
-            }
 
             const data = await response.json();
             console.log('Default settings saved successfully:', data);

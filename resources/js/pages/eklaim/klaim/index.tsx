@@ -1,17 +1,7 @@
 import DiagnosisModal from '@/components/eklaim/DiagnosisModal';
 import ProcedureModal from '@/components/eklaim/ProcedureModal';
-import { SearchableSelect } from '@/components/ui/searchable-select';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import AppLayout from '@/layouts/app-layout';
 import { BreadcrumbItem, SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -19,101 +9,107 @@ import { Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 // Import tab components
-import DataDiriTab from '@/components/eklaim/tabs/DataDiriTab';
-import ICUTab from '@/components/eklaim/tabs/ICUTab';
-import VentilatorTab from '@/components/eklaim/tabs/VentilatorTab';
-import UpgradeKelasTab from '@/components/eklaim/tabs/UpgradeKelasTab';
-import DataMedisTab from '@/components/eklaim/tabs/DataMedisTab';
-import TarifTab from '@/components/eklaim/tabs/TarifTab';
-import COVIDTab from '@/components/eklaim/tabs/COVIDTab';
 import APGARTab from '@/components/eklaim/tabs/APGARTab';
-import PersalinanTab from '@/components/eklaim/tabs/PersalinanTab';
-import LainLainTab from '@/components/eklaim/tabs/LainLainTab';
+import COVIDTab from '@/components/eklaim/tabs/COVIDTab';
+import DataDiriTab from '@/components/eklaim/tabs/DataDiriTab';
+import DataMedisTab from '@/components/eklaim/tabs/DataMedisTab';
 import DataRSTab from '@/components/eklaim/tabs/DataRSTab';
 import HasilGrouperTab from '@/components/eklaim/tabs/HasilGrouperTab';
+import ICUTab from '@/components/eklaim/tabs/ICUTab';
+import LainLainTab from '@/components/eklaim/tabs/LainLainTab';
+import PersalinanTab from '@/components/eklaim/tabs/PersalinanTab';
+import TarifTab from '@/components/eklaim/tabs/TarifTab';
+import UpgradeKelasTab from '@/components/eklaim/tabs/UpgradeKelasTab';
+import VentilatorTab from '@/components/eklaim/tabs/VentilatorTab';
+
+// Import IDRG modals
+import DiagnosisIDRGModal from '@/components/eklaim/DiagnosisIDRGModal';
+import IdrgLockModal from '@/components/eklaim/IdrgLockModal';
+import IdrgGroupingModal from '@/components/eklaim/IdrgGroupingModal';
+import ProcedureIDRGModal from '@/components/eklaim/ProcedureIDRGModal';
 
 // Helper functions for diagnosis and procedure formatting
 const formatDiagnosesToString = (diagnoses: { name: string; code: string }[]): string => {
     if (!diagnoses || diagnoses.length === 0) return '';
-    
+
     // Count occurrences of each code
     const codeCount: { [key: string]: number } = {};
-    diagnoses.forEach(diag => {
+    diagnoses.forEach((diag) => {
         if (diag.code) {
             codeCount[diag.code] = (codeCount[diag.code] || 0) + 1;
         }
     });
-    
+
     // Build formatted string
-    const formattedCodes = Object.keys(codeCount).map(code => {
+    const formattedCodes = Object.keys(codeCount).map((code) => {
         const count = codeCount[code];
         return count > 1 ? `${code}+${count}` : code;
     });
-    
+
     return formattedCodes.join('#');
 };
 
 const formatProceduresToString = (procedures: { name: string; code: string }[]): string => {
     if (!procedures || procedures.length === 0) return '';
-    
+
     // Count occurrences of each code
     const codeCount: { [key: string]: number } = {};
-    procedures.forEach(proc => {
+    procedures.forEach((proc) => {
         if (proc.code) {
             codeCount[proc.code] = (codeCount[proc.code] || 0) + 1;
         }
     });
-    
+
     // Build formatted string
-    const formattedCodes = Object.keys(codeCount).map(code => {
+    const formattedCodes = Object.keys(codeCount).map((code) => {
         const count = codeCount[code];
         return count > 1 ? `${code}+${count}` : code;
     });
-    
+
     return formattedCodes.join('#');
 };
 
 const parseStringToDiagnoses = (diagnosesString: string): { name: string; code: string }[] => {
     if (!diagnosesString) return [];
-    
-    const codes = diagnosesString.split('#').filter(code => code.trim() !== '');
+
+    const codes = diagnosesString.split('#').filter((code) => code.trim() !== '');
     const result: { name: string; code: string }[] = [];
-    
-    codes.forEach(codeWithCount => {
+
+    codes.forEach((codeWithCount) => {
         const [code, countStr] = codeWithCount.split('+');
         const count = countStr ? parseInt(countStr) : 1;
-        
+
         // Add multiple entries for repeated diagnoses
         for (let i = 0; i < count; i++) {
             result.push({
                 name: `Diagnosa ${code}`,
-                code: code
+                code: code,
             });
         }
     });
-    
+
     return result;
 };
 
 const parseStringToProcedures = (proceduresString: string): { name: string; code: string }[] => {
     if (!proceduresString) return [];
-    
-    const codes = proceduresString.split('#').filter(code => code.trim() !== '');
+
+    const codes = proceduresString.split('#').filter((code) => code.trim() !== '');
     const result: { name: string; code: string }[] = [];
-    
-    codes.forEach(codeWithCount => {
+
+    codes.forEach((codeWithCount) => {
         const [code, countStr] = codeWithCount.split('+');
         const count = countStr ? parseInt(countStr) : 1;
-        
+
         // Add multiple entries for repeated procedures
         for (let i = 0; i < count; i++) {
             result.push({
                 name: `Procedure ${code}`,
-                code: code
+                code: code,
             });
         }
     });
-    
+
     return result;
 };
 
@@ -127,6 +123,7 @@ interface Props extends SharedData {
         tanggal_sep: string;
         jenis_rawat: string;
         kelas_rawat: string;
+        idrg?: string | number | null;
         [key: string]: any;
     };
     referenceData: {
@@ -151,7 +148,18 @@ interface Props extends SharedData {
 }
 
 export default function Index() {
-    const { auth, referenceData, pengajuanKlaim, resumeMedisData, pengkajianAwalData, kunjunganbpjsData, dataTagihan, existingDataKlaim, dataGroupper, dataGrouperStage2 } = usePage<Props>().props;
+    const {
+        auth,
+        referenceData,
+        pengajuanKlaim,
+        resumeMedisData,
+        pengkajianAwalData,
+        kunjunganbpjsData,
+        dataTagihan,
+        existingDataKlaim,
+        dataGroupper,
+        dataGrouperStage2,
+    } = usePage<Props>().props;
     const [formData, setFormData] = useState<{ [key: string]: any }>({});
     const [isLoading, setIsLoading] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
@@ -170,16 +178,15 @@ export default function Index() {
             href: `#`,
         },
     ];
-    
+
     const [activeTab, setActiveTab] = useState(1);
-    
+
     // Force re-render of tab counters when formData changes
     const [counterUpdateKey, setCounterUpdateKey] = useState(0);
-    
-    useEffect(() => {
-        setCounterUpdateKey(prev => prev + 1);
-    }, [formData]);
 
+    useEffect(() => {
+        setCounterUpdateKey((prev) => prev + 1);
+    }, [formData]);
 
     // Alert dialog states
     const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false);
@@ -198,15 +205,22 @@ export default function Index() {
     // Check apakah klaim sudah final (status_pengiriman = 4 atau 5)
     const isKlaimFinal = pengajuanKlaim.status_pengiriman === 4 || pengajuanKlaim.status_pengiriman === 5;
 
+    // Check apakah IDRG grouping sudah dilakukan
+    const isIdrgGroupingRequired =
+        pengajuanKlaim.idrg === '0' ||
+        pengajuanKlaim.idrg === 0 ||
+        !pengajuanKlaim.idrg ||
+        pengajuanKlaim.idrg === null ||
+        pengajuanKlaim.idrg === undefined;
+    const shouldLockTabs = isIdrgGroupingRequired;
+
     // Helper function untuk check apakah ada special_cmg_option dan groupper stage 1 selesai
     const hasSpecialCmgOptions = (): boolean => {
         // Check dari dataGroupper apakah ada special_cmg_option
-        if (dataGroupper?.special_cmg_option && 
-            Array.isArray(dataGroupper.special_cmg_option) && 
-            dataGroupper.special_cmg_option.length > 0) {
+        if (dataGroupper?.special_cmg_option && Array.isArray(dataGroupper.special_cmg_option) && dataGroupper.special_cmg_option.length > 0) {
             return true;
         }
-        
+
         return false;
     };
 
@@ -236,53 +250,126 @@ export default function Index() {
     }
 
     const tabFieldMappings: { [key: number]: TabFieldMapping } = {
-        1: { // Data Diri
+        1: {
+            // Data Diri
             fields: ['nomor_sep', 'nomor_kartu', 'tgl_masuk', 'tgl_pulang', 'cara_masuk', 'jenis_rawat', 'kelas_rawat'],
-            required: ['nomor_sep', 'nomor_kartu', 'tgl_masuk', 'tgl_pulang', 'cara_masuk', 'jenis_rawat', 'kelas_rawat']
+            required: ['nomor_sep', 'nomor_kartu', 'tgl_masuk', 'tgl_pulang', 'cara_masuk', 'jenis_rawat', 'kelas_rawat'],
         },
-        2: { // ICU
+        2: {
+            // ICU
             fields: ['icu_indikator', 'adl_sub_acute', 'adl_chronic', 'icu_los'],
-            conditional: { dependsOn: 'icu_indikator', value: '1', fields: ['adl_sub_acute', 'adl_chronic', 'icu_los'] }
+            conditional: { dependsOn: 'icu_indikator', value: '1', fields: ['adl_sub_acute', 'adl_chronic', 'icu_los'] },
         },
-        3: { // Ventilator
+        3: {
+            // Ventilator
             fields: ['ventilator.use_ind', 'ventilator.start_dttm', 'ventilator.stop_dttm', 'ventilator_hour'],
-            conditional: { dependsOn: 'ventilator.use_ind', value: '1', fields: ['ventilator.start_dttm', 'ventilator.stop_dttm', 'ventilator_hour'] }
+            conditional: {
+                dependsOn: 'ventilator.use_ind',
+                value: '1',
+                fields: ['ventilator.start_dttm', 'ventilator.stop_dttm', 'ventilator_hour'],
+            },
         },
-        4: { // Upgrade Kelas
+        4: {
+            // Upgrade Kelas
             fields: ['upgrade_class_ind', 'upgrade_class_class', 'upgrade_class_los', 'upgrade_class_payor', 'add_payment_pct'],
-            conditional: { dependsOn: 'upgrade_class_ind', value: '1', fields: ['upgrade_class_class', 'upgrade_class_los', 'upgrade_class_payor', 'add_payment_pct'] }
+            conditional: {
+                dependsOn: 'upgrade_class_ind',
+                value: '1',
+                fields: ['upgrade_class_class', 'upgrade_class_los', 'upgrade_class_payor', 'add_payment_pct'],
+            },
         },
-        5: { // Data Medis
-            fields: ['birth_weight', 'sistole', 'diastole', 'discharge_status', 'nama_dokter', 'diagnosa', 'procedure', 'diagnosa_inagrouper', 'procedure_inagrouper'],
-            required: ['discharge_status', 'nama_dokter']
-        },
-        6: { // Tarif
+        5: {
+            // Data Medis
             fields: [
-                'tarif_rs.prosedur_non_bedah', 'tarif_rs.prosedur_bedah', 'tarif_rs.konsultasi', 'tarif_rs.tenaga_ahli',
-                'tarif_rs.keperawatan', 'tarif_rs.penunjang', 'tarif_rs.radiologi', 'tarif_rs.laboratorium',
-                'tarif_rs.pelayanan_darah', 'tarif_rs.rehabilitasi', 'tarif_rs.kamar', 'tarif_rs.rawat_intensif',
-                'tarif_rs.obat', 'tarif_rs.obat_kronis', 'tarif_rs.obat_kemoterapi', 'tarif_rs.alkes',
-                'tarif_rs.bmhp', 'tarif_rs.sewa_alat'
-            ]
+                'birth_weight',
+                'sistole',
+                'diastole',
+                'discharge_status',
+                'nama_dokter',
+                'diagnosa',
+                'procedure',
+                'diagnosa_inagrouper',
+                'procedure_inagrouper',
+            ],
+            required: ['discharge_status', 'nama_dokter'],
         },
-        7: { // COVID-19
-            fields: ['pemulasaraan_jenazah', 'kantong_jenazah', 'peti_jenazah', 'plastik_erat', 'desinfektan_jenazah', 'mobil_jenazah', 'desinfektan_mobil_jenazah', 'is_covid19_suspect', 'is_covid19_probable', 'is_covid19_confirmed']
+        6: {
+            // Tarif
+            fields: [
+                'tarif_rs.prosedur_non_bedah',
+                'tarif_rs.prosedur_bedah',
+                'tarif_rs.konsultasi',
+                'tarif_rs.tenaga_ahli',
+                'tarif_rs.keperawatan',
+                'tarif_rs.penunjang',
+                'tarif_rs.radiologi',
+                'tarif_rs.laboratorium',
+                'tarif_rs.pelayanan_darah',
+                'tarif_rs.rehabilitasi',
+                'tarif_rs.kamar',
+                'tarif_rs.rawat_intensif',
+                'tarif_rs.obat',
+                'tarif_rs.obat_kronis',
+                'tarif_rs.obat_kemoterapi',
+                'tarif_rs.alkes',
+                'tarif_rs.bmhp',
+                'tarif_rs.sewa_alat',
+            ],
         },
-        8: { // APGAR Score
-            fields: ['apgar.appearance_1', 'apgar.pulse_1', 'apgar.grimace_1', 'apgar.activity_1', 'apgar.respiration_1', 'apgar.appearance_5', 'apgar.pulse_5', 'apgar.grimace_5', 'apgar.activity_5', 'apgar.respiration_5']
+        7: {
+            // COVID-19
+            fields: [
+                'pemulasaraan_jenazah',
+                'kantong_jenazah',
+                'peti_jenazah',
+                'plastik_erat',
+                'desinfektan_jenazah',
+                'mobil_jenazah',
+                'desinfektan_mobil_jenazah',
+                'is_covid19_suspect',
+                'is_covid19_probable',
+                'is_covid19_confirmed',
+            ],
         },
-        9: { // Persalinan
-            fields: ['persalinan.usia_kehamilan', 'persalinan.gravida', 'persalinan.partus', 'persalinan.abortus', 'persalinan.onset_kontraksi']
+        8: {
+            // APGAR Score
+            fields: [
+                'apgar.appearance_1',
+                'apgar.pulse_1',
+                'apgar.grimace_1',
+                'apgar.activity_1',
+                'apgar.respiration_1',
+                'apgar.appearance_5',
+                'apgar.pulse_5',
+                'apgar.grimace_5',
+                'apgar.activity_5',
+                'apgar.respiration_5',
+            ],
         },
-        10: { // Lain-lain
-            fields: ['terapi_konvalesen', 'akses_naat', 'isoman_ind', 'bayi_lahir_status_cd', 'dializer_single_use', 'kantong_darah', 'alteplase_ind']
+        9: {
+            // Persalinan
+            fields: ['persalinan.usia_kehamilan', 'persalinan.gravida', 'persalinan.partus', 'persalinan.abortus', 'persalinan.onset_kontraksi'],
         },
-        11: { // Data RS
-            fields: ['tarif_poli_eks', 'nama_dokter', 'kode_tarif', 'payor_id', 'payor_cd', 'cob_cd', 'coder_nik']
+        10: {
+            // Lain-lain
+            fields: [
+                'terapi_konvalesen',
+                'akses_naat',
+                'isoman_ind',
+                'bayi_lahir_status_cd',
+                'dializer_single_use',
+                'kantong_darah',
+                'alteplase_ind',
+            ],
         },
-        12: { // Hasil Groupper (read-only tab)
-            fields: []
-        }
+        11: {
+            // Data RS
+            fields: ['tarif_poli_eks', 'nama_dokter', 'kode_tarif', 'payor_id', 'payor_cd', 'cob_cd', 'coder_nik'],
+        },
+        12: {
+            // Hasil Groupper (read-only tab)
+            fields: [],
+        },
     };
 
     // Function to get nested field value
@@ -299,7 +386,7 @@ export default function Index() {
     // Function to check if a field is filled (with proper handling for different data types)
     const isFieldFilled = (fieldPath: string): boolean => {
         const value = getFieldValue(fieldPath);
-        
+
         if (typeof value === 'string') {
             return value.trim() !== '' && value.trim() !== '0';
         }
@@ -315,14 +402,14 @@ export default function Index() {
         if (typeof value === 'object' && value !== null) {
             return Object.keys(value).length > 0;
         }
-        
+
         return value !== null && value !== undefined && value !== '';
     };
 
     // Special function for Data RS tab to handle auto-filled fields
     const isDataRSFieldFilled = (fieldPath: string): boolean => {
         const value = getFieldValue(fieldPath);
-        
+
         // For Data RS tab, treat any non-empty string as filled (including '0', 'DS', etc.)
         if (typeof value === 'string') {
             return value.trim() !== '';
@@ -339,7 +426,7 @@ export default function Index() {
         if (typeof value === 'object' && value !== null) {
             return Object.keys(value).length > 0;
         }
-        
+
         return value !== null && value !== undefined && value !== '';
     };
 
@@ -355,15 +442,15 @@ export default function Index() {
         if (tabMapping.conditional) {
             const { dependsOn, value: requiredValue, fields: conditionalFields } = tabMapping.conditional;
             const dependentFieldValue = getFieldValue(dependsOn);
-            
+
             if (dependentFieldValue !== requiredValue) {
                 // Remove conditional fields from counting if condition not met
-                fields = fields.filter(field => !conditionalFields.includes(field));
+                fields = fields.filter((field) => !conditionalFields.includes(field));
             }
         }
 
         // Count filled fields - use special logic for Data RS tab (tab 11)
-        fields.forEach(field => {
+        fields.forEach((field) => {
             if (tabId === 11) {
                 // Use special Data RS field checking logic
                 if (isDataRSFieldFilled(field)) {
@@ -401,10 +488,21 @@ export default function Index() {
     const [isInagrouperDiagnosisModalOpen, setIsInagrouperDiagnosisModalOpen] = useState(false);
     const [isInagrouperProcedureModalOpen, setIsInagrouperProcedureModalOpen] = useState(false);
 
+    // IDRG Form Modal States
+    const [isIdrgLockModalOpen, setIsIdrgLockModalOpen] = useState(false);
+    const [isIdrgGroupingModalOpen, setIsIdrgGroupingModalOpen] = useState(false);
+    const [isIdrgDiagnosisModalOpen, setIsIdrgDiagnosisModalOpen] = useState(false);
+    const [isIdrgProcedureModalOpen, setIsIdrgProcedureModalOpen] = useState(false);
+    const [isIdrgGroupingLoading, setIsIdrgGroupingLoading] = useState(false);
+
     const [selectedDiagnoses, setSelectedDiagnoses] = useState<{ name: string; code: string }[]>([]);
     const [selectedProcedures, setSelectedProcedures] = useState<{ name: string; code: string }[]>([]);
     const [selectedInagrouperDiagnoses, setSelectedInagrouperDiagnoses] = useState<{ name: string; code: string }[]>([]);
     const [selectedInagrouperProcedures, setSelectedInagrouperProcedures] = useState<{ name: string; code: string }[]>([]);
+
+    // IDRG Selected States
+    const [selectedIdrgDiagnoses, setSelectedIdrgDiagnoses] = useState<{ name: string; code: string }[]>([]);
+    const [selectedIdrgProcedures, setSelectedIdrgProcedures] = useState<{ name: string; code: string }[]>([]);
 
     // Load data otomatis saat komponen dimuat
     useEffect(() => {
@@ -423,7 +521,6 @@ export default function Index() {
         updateNestedField('ventilator', 'use_ind', '0');
         updateField('ventilator_hour', '0');
         updateField('upgrade_class_ind', '0');
-
 
         let jenisRawat = '';
         switch (pengajuanKlaim.jenis_kunjungan) {
@@ -517,7 +614,6 @@ export default function Index() {
             const diagnosesForUI = convertArrayToUIFormat(resumeMedisData.selected_diagnosa, 'diagnosa');
             setSelectedDiagnoses(diagnosesForUI);
             setSelectedInagrouperDiagnoses(diagnosesForUI); // Set juga untuk inagrouper
-
         }
 
         if (resumeMedisData?.selected_procedure && Array.isArray(resumeMedisData.selected_procedure)) {
@@ -528,7 +624,6 @@ export default function Index() {
             const proceduresForUI = convertArrayToUIFormat(resumeMedisData.selected_procedure, 'procedure');
             setSelectedProcedures(proceduresForUI);
             setSelectedInagrouperProcedures(proceduresForUI); // Set juga untuk inagrouper
-
         }
 
         // Handle selected_diagnosa_inagrouper jika ada data terpisah untuk inagrouper (akan override data di atas)
@@ -538,7 +633,6 @@ export default function Index() {
 
             const diagnosesForUI = convertArrayToUIFormat(resumeMedisData.selected_diagnosa_inagrouper, 'diagnosa');
             setSelectedInagrouperDiagnoses(diagnosesForUI);
-
         }
 
         // Handle selected_procedure_inagrouper jika ada data terpisah untuk inagrouper (akan override data di atas)
@@ -548,7 +642,6 @@ export default function Index() {
 
             const proceduresForUI = convertArrayToUIFormat(resumeMedisData.selected_procedure_inagrouper, 'procedure');
             setSelectedInagrouperProcedures(proceduresForUI);
-
         }
 
         // Mapping tarif RS berdasarkan data tagihan
@@ -575,7 +668,7 @@ export default function Index() {
         updateField('kode_tarif', 'DS');
         updateField('payor_id', '00003');
         updateField('payor_cd', 'JKN');
-        
+
         // Set coder_nik from current user if available
         if (auth?.user?.nik) {
             updateField('coder_nik', auth.user.nik);
@@ -591,11 +684,11 @@ export default function Index() {
 
     // Load existing data klaim if exists
     useEffect(() => {
-        if (existingDataKlaim) {    
+        if (existingDataKlaim) {
             // Load all basic fields from database
             // Exclude JSON fields from general loading (they're handled separately)
             const jsonFields = ['tarif_rs', 'apgar', 'ventilator', 'persalinan', 'covid19_penunjang_pengurang'];
-            Object.keys(existingDataKlaim).forEach(key => {
+            Object.keys(existingDataKlaim).forEach((key) => {
                 if (existingDataKlaim[key] !== null && existingDataKlaim[key] !== undefined && key !== 'id' && !jsonFields.includes(key)) {
                     updateField(key, existingDataKlaim[key]);
                 }
@@ -613,7 +706,7 @@ export default function Index() {
                     }
                 }
                 if (typeof tarifData === 'object' && tarifData) {
-                    Object.keys(tarifData).forEach(tariffKey => {
+                    Object.keys(tarifData).forEach((tariffKey) => {
                         updateNestedField('tarif_rs', tariffKey, tarifData[tariffKey]);
                     });
                 }
@@ -631,7 +724,7 @@ export default function Index() {
                     }
                 }
                 if (typeof apgarData === 'object' && apgarData) {
-                    Object.keys(apgarData).forEach(apgarKey => {
+                    Object.keys(apgarData).forEach((apgarKey) => {
                         updateNestedField('apgar', apgarKey, apgarData[apgarKey]);
                     });
                 }
@@ -649,7 +742,7 @@ export default function Index() {
                     }
                 }
                 if (typeof ventilatorData === 'object' && ventilatorData) {
-                    Object.keys(ventilatorData).forEach(ventilatorKey => {
+                    Object.keys(ventilatorData).forEach((ventilatorKey) => {
                         updateNestedField('ventilator', ventilatorKey, ventilatorData[ventilatorKey]);
                     });
                 }
@@ -667,7 +760,7 @@ export default function Index() {
                     }
                 }
                 if (typeof persalinanData === 'object' && persalinanData) {
-                    Object.keys(persalinanData).forEach(persalinanKey => {
+                    Object.keys(persalinanData).forEach((persalinanKey) => {
                         updateNestedField('persalinan', persalinanKey, persalinanData[persalinanKey]);
                     });
                 }
@@ -685,7 +778,7 @@ export default function Index() {
                     }
                 }
                 if (typeof covidData === 'object' && covidData) {
-                    Object.keys(covidData).forEach(covidKey => {
+                    Object.keys(covidData).forEach((covidKey) => {
                         updateNestedField('covid19_penunjang_pengurang', covidKey, covidData[covidKey]);
                     });
                 }
@@ -693,7 +786,7 @@ export default function Index() {
 
             // Load nested field: upgrade_class (if stored as JSON in database)
             if (existingDataKlaim.upgrade_class && typeof existingDataKlaim.upgrade_class === 'object') {
-                Object.keys(existingDataKlaim.upgrade_class).forEach(upgradeKey => {
+                Object.keys(existingDataKlaim.upgrade_class).forEach((upgradeKey) => {
                     updateNestedField('upgrade_class', upgradeKey, existingDataKlaim.upgrade_class[upgradeKey]);
                 });
             }
@@ -738,14 +831,28 @@ export default function Index() {
 
             // Special handling for currency/numeric fields with proper formatting
             const currencyFields = [
-                'akomodasi', 'asuhan_keperawatan', 'bahan_medis_habis_pakai', 
-                'kamar_operasi', 'konsultasi', 'obat', 'pelayanan_darah', 
-                'penunjang', 'prosedur_bedah', 'prosedur_non_bedah', 
-                'rehabilitasi', 'sewa_alat', 'visite', 'icu', 'iccu', 
-                'alat_kesehatan', 'transport_pasien', 'lain_lain', 'tarif_poli_eks'
+                'akomodasi',
+                'asuhan_keperawatan',
+                'bahan_medis_habis_pakai',
+                'kamar_operasi',
+                'konsultasi',
+                'obat',
+                'pelayanan_darah',
+                'penunjang',
+                'prosedur_bedah',
+                'prosedur_non_bedah',
+                'rehabilitasi',
+                'sewa_alat',
+                'visite',
+                'icu',
+                'iccu',
+                'alat_kesehatan',
+                'transport_pasien',
+                'lain_lain',
+                'tarif_poli_eks',
             ];
 
-            currencyFields.forEach(field => {
+            currencyFields.forEach((field) => {
                 if (existingDataKlaim[field] && existingDataKlaim[field] !== '0') {
                     updateField(field, existingDataKlaim[field].toString());
                 }
@@ -753,24 +860,32 @@ export default function Index() {
 
             // Load boolean fields properly
             const booleanFields = [
-                'case_death', 'upgrade_class_ind', 'add_payment_pct', 
-                'birth_weight_extreme', 'fetal_reduction', 'admission_weight',
-                'chronic_dialysis', 'acute_dialysis', 'ventilator_support',
-                'chemotherapy', 'is_covid19_suspect', 'is_covid19_probable',
-                'is_covid19_confirmed', 'is_persalinan'
+                'case_death',
+                'upgrade_class_ind',
+                'add_payment_pct',
+                'birth_weight_extreme',
+                'fetal_reduction',
+                'admission_weight',
+                'chronic_dialysis',
+                'acute_dialysis',
+                'ventilator_support',
+                'chemotherapy',
+                'is_covid19_suspect',
+                'is_covid19_probable',
+                'is_covid19_confirmed',
+                'is_persalinan',
             ];
 
-            booleanFields.forEach(field => {
+            booleanFields.forEach((field) => {
                 if (existingDataKlaim[field] !== null && existingDataKlaim[field] !== undefined) {
                     updateField(field, existingDataKlaim[field] ? '1' : '0');
                 }
             });
-            
+
             // Debug specific important fields
             const importantFields = ['sistole', 'diastole', 'nama_dokter', 'jenis_rawat', 'discharge_status'];
-            importantFields.forEach(field => {
-            });
-            
+            importantFields.forEach((field) => {});
+
             // Data loaded successfully - flash message will be handled by backend if needed
         }
     }, [existingDataKlaim]);
@@ -871,15 +986,14 @@ export default function Index() {
     // Helper function untuk format rupiah tanpa trailing zeros
     const formatRupiah = (amount: string | number) => {
         if (!amount || amount === '' || amount === '0') return 'Rp 0';
-        
+
         const num = typeof amount === 'string' ? parseFloat(amount.replace(/[^\d.-]/g, '')) : amount;
         if (isNaN(num)) return 'Rp 0';
-        
+
         // Format dengan pemisah ribuan, tanpa desimal jika nilai bulat
-        const formatted = num % 1 === 0 
-            ? num.toLocaleString('id-ID')
-            : num.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-        
+        const formatted =
+            num % 1 === 0 ? num.toLocaleString('id-ID') : num.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
         return `Rp ${formatted}`;
     };
 
@@ -894,24 +1008,39 @@ export default function Index() {
     // Function untuk menghitung total tarif
     const calculateTotalTarif = () => {
         const tarifFields = [
-            'prosedur_non_bedah', 'prosedur_bedah', 'konsultasi', 'tenaga_ahli', 'keperawatan', 'penunjang',
-            'radiologi', 'laboratorium', 'pelayanan_darah', 'rehabilitasi', 'kamar', 'rawat_intensif',
-            'obat', 'obat_kronis', 'obat_kemoterapi', 'alkes', 'bmhp', 'sewa_alat'
+            'prosedur_non_bedah',
+            'prosedur_bedah',
+            'konsultasi',
+            'tenaga_ahli',
+            'keperawatan',
+            'penunjang',
+            'radiologi',
+            'laboratorium',
+            'pelayanan_darah',
+            'rehabilitasi',
+            'kamar',
+            'rawat_intensif',
+            'obat',
+            'obat_kronis',
+            'obat_kemoterapi',
+            'alkes',
+            'bmhp',
+            'sewa_alat',
         ];
-        
+
         let total = 0;
-        
+
         // Hitung total dari tarif RS
-        tarifFields.forEach(field => {
+        tarifFields.forEach((field) => {
             const value = getNestedValue('tarif_rs', field);
             const numValue = parseFloat(value) || 0;
             total += numValue;
         });
-        
+
         // Tambahkan tarif tambahan
         const tarifPoliEks = parseFloat(formData.tarif_poli_eks) || 0;
         total += tarifPoliEks;
-        
+
         return total;
     };
 
@@ -1061,54 +1190,110 @@ export default function Index() {
         // Sync completed - could add flash message from backend if needed
     };
 
-    const handleSaveProgress = async () => {
+    // IDRG Diagnosis handlers
+    const handleSelectIdrgDiagnosis = (diagnosis: { name: string; code: string }) => {
+        setSelectedIdrgDiagnoses((prev) => [...prev, diagnosis]);
+    };
+
+    const handleRemoveIdrgDiagnosis = (code: string) => {
+        const indexToRemove = selectedIdrgDiagnoses.findIndex((d) => d.code === code);
+        if (indexToRemove > -1) {
+            const newSelected = [...selectedIdrgDiagnoses];
+            newSelected.splice(indexToRemove, 1);
+            setSelectedIdrgDiagnoses(newSelected);
+        }
+    };
+
+    // IDRG Procedure handlers
+    const handleSelectIdrgProcedure = (procedure: { name: string; code: string }) => {
+        setSelectedIdrgProcedures((prev) => [...prev, procedure]);
+    };
+
+    const handleRemoveIdrgProcedure = (code: string) => {
+        const indexToRemove = selectedIdrgProcedures.findIndex((p) => p.code === code);
+        if (indexToRemove > -1) {
+            const newSelected = [...selectedIdrgProcedures];
+            newSelected.splice(indexToRemove, 1);
+            setSelectedIdrgProcedures(newSelected);
+        }
+    };
+
+    // IDRG Grouping handler
+    const handleIdrgGrouping = async () => {
+        if (selectedIdrgDiagnoses.length === 0) {
+            setErrorMessage('Minimal satu diagnosis IDRG harus dipilih');
+            setIsErrorDialogOpen(true);
+            return;
+        }
+
+        setIsIdrgGroupingLoading(true);
+        
+        const requestData = {
+            selectedIdrgDiagnoses: selectedIdrgDiagnoses,
+            selectedIdrgProcedures: selectedIdrgProcedures, // Procedures are optional
+        };
+
+        // Pattern yang sama dengan handleSimpanResumeMedis yang BERHASIL
+        router.post(`/eklaim/klaim/${pengajuanKlaim.id}/idrg-grouping`, requestData, {
+            onSuccess: () => {
+                // Success handled by flash message in layout via useFlashMessages hook
+                setIsIdrgGroupingModalOpen(false);
+                
+                // Reset selections
+                setSelectedIdrgDiagnoses([]);
+                setSelectedIdrgProcedures([]);
+            },
+            onError: (errors) => {
+                // Error handled by flash message in layout via useFlashMessages hook
+                console.error('IDRG Grouping errors:', errors);
+            },
+            onFinish: () => {
+                setIsIdrgGroupingLoading(false);
+            }
+        });
+    };
+
+    const handleSaveProgress = () => {
         try {
             setIsLoading(true);
-            
+
             // Count total fields being saved
             const fieldCount = Object.keys(formData).length;
-            const filledFields = Object.keys(formData).filter(key => 
-                formData[key] !== null && 
-                formData[key] !== undefined && 
-                formData[key] !== ''
+            const filledFields = Object.keys(formData).filter(
+                (key) => formData[key] !== null && formData[key] !== undefined && formData[key] !== '',
             ).length;
 
             // For save progress, we can use original formData or transformed data
             // Using original formData for save progress to maintain flexibility
-            await router.post(
-                `/eklaim/klaim/${pengajuanKlaim.id}/store-progress`,
-                formData,
-                {
-                    preserveState: true,
-                    onSuccess: (response) => {
-                        
-                        // Show detailed success dialog
-                        setIsSuccessDialogOpen(true);
-                        setSuccessMessage(`Data berhasil disimpan!\n\nTotal field: ${fieldCount}\nField terisi: ${filledFields}\nStatus: Draft`);
-                        
-                        // Success message handled by useFlashMessages hook
-                    },
-                    onError: (errors) => {
-                        console.error('Save progress errors:', errors);
-                        
-                        // Show detailed error dialog
-                        setIsErrorDialogOpen(true);
-                        const errorMessages = Object.entries(errors).map(([key, value]) => 
-                            `${key}: ${Array.isArray(value) ? value.join(', ') : value}`
-                        ).join('\n');
-                        setErrorMessage(`Gagal menyimpan beberapa field:\n\n${errorMessages}`);
-                        
-                        // Error message handled by useFlashMessages hook
-                    },
+            router.post(`/eklaim/klaim/${pengajuanKlaim.id}/store-progress`, formData, {
+                preserveState: true,
+                onSuccess: (response) => {
+                    // Show detailed success dialog
+                    setIsSuccessDialogOpen(true);
+                    setSuccessMessage(`Data berhasil disimpan!\n\nTotal field: ${fieldCount}\nField terisi: ${filledFields}\nStatus: Draft`);
+
+                    // Success message handled by useFlashMessages hook
                 },
-            );
+                onError: (errors) => {
+                    console.error('Save progress errors:', errors);
+
+                    // Show detailed error dialog
+                    setIsErrorDialogOpen(true);
+                    const errorMessages = Object.entries(errors)
+                        .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+                        .join('\n');
+                    setErrorMessage(`Gagal menyimpan beberapa field:\n\n${errorMessages}`);
+
+                    // Error message handled by useFlashMessages hook
+                },
+            });
         } catch (error) {
             console.error('Error saving progress:', error);
-            
+
             // Show generic error dialog
             setIsErrorDialogOpen(true);
             setErrorMessage(`Terjadi kesalahan:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
-            
+
             // Error message handled by useFlashMessages hook
         } finally {
             setIsLoading(false);
@@ -1143,41 +1328,41 @@ export default function Index() {
             cara_masuk: formData.cara_masuk || '',
             jenis_rawat: formData.jenis_rawat || '',
             kelas_rawat: formData.kelas_rawat || '',
-            
+
             // ICU fields
             adl_sub_acute: formData.adl_sub_acute || '0',
             adl_chronic: formData.adl_chronic || '0',
             icu_indikator: formData.icu_indikator || '0',
             icu_los: formData.icu_los || '0',
-            
+
             // Ventilator fields
             ventilator_hour: formData.ventilator_hour || '0',
             ventilator: {
                 use_ind: formData.ventilator?.use_ind || '0',
                 start_dttm: formData.ventilator?.start_dttm || '',
-                stop_dttm: formData.ventilator?.stop_dttm || ''
+                stop_dttm: formData.ventilator?.stop_dttm || '',
             },
-            
+
             // Upgrade Class fields
             upgrade_class_ind: formData.upgrade_class_ind || '0',
             upgrade_class_class: formData.upgrade_class_class || '',
             upgrade_class_los: formData.upgrade_class_los || '',
             upgrade_class_payor: formData.upgrade_class_payor || '',
             add_payment_pct: formData.add_payment_pct || '',
-            
+
             // Medical data
             birth_weight: formData.birth_weight || '0',
             sistole: parseInt(formData.sistole) || 0,
             diastole: parseInt(formData.diastole) || 0,
             discharge_status: formData.discharge_status || '',
             nama_dokter: formData.nama_dokter || '',
-            
+
             // Diagnosis and procedures - format from selected arrays
             diagnosa: formatDiagnosesToString(selectedDiagnoses),
             procedure: formatProceduresToString(selectedProcedures),
             diagnosa_inagrouper: formatDiagnosesToString(selectedInagrouperDiagnoses),
             procedure_inagrouper: formatProceduresToString(selectedInagrouperProcedures),
-            
+
             // Tarif RS structure - convert all to integer
             tarif_rs: {
                 prosedur_non_bedah: formatTariffToInteger(formData.tarif_rs?.prosedur_non_bedah),
@@ -1197,9 +1382,9 @@ export default function Index() {
                 obat_kemoterapi: formatTariffToInteger(formData.tarif_rs?.obat_kemoterapi),
                 alkes: formatTariffToInteger(formData.tarif_rs?.alkes),
                 bmhp: formatTariffToInteger(formData.tarif_rs?.bmhp),
-                sewa_alat: formatTariffToInteger(formData.tarif_rs?.sewa_alat)
+                sewa_alat: formatTariffToInteger(formData.tarif_rs?.sewa_alat),
             },
-            
+
             // COVID-19 fields
             pemulasaraan_jenazah: formData.pemulasaraan_jenazah || '0',
             kantong_jenazah: formData.kantong_jenazah || '0',
@@ -1211,7 +1396,7 @@ export default function Index() {
             is_covid19_suspect: formData.is_covid19_suspect || '0',
             is_covid19_probable: formData.is_covid19_probable || '0',
             is_covid19_confirmed: formData.is_covid19_confirmed || '0',
-            
+
             // APGAR Score structure - sesuai dengan dokumentasi JSON
             apgar: {
                 menit_1: {
@@ -1219,17 +1404,17 @@ export default function Index() {
                     pulse: parseInt(formData.apgar?.pulse_1) || 0,
                     grimace: parseInt(formData.apgar?.grimace_1) || 0,
                     activity: parseInt(formData.apgar?.activity_1) || 0,
-                    respiration: parseInt(formData.apgar?.respiration_1) || 0
+                    respiration: parseInt(formData.apgar?.respiration_1) || 0,
                 },
                 menit_5: {
                     appearance: parseInt(formData.apgar?.appearance_5) || 0,
                     pulse: parseInt(formData.apgar?.pulse_5) || 0,
                     grimace: parseInt(formData.apgar?.grimace_5) || 0,
                     activity: parseInt(formData.apgar?.activity_5) || 0,
-                    respiration: parseInt(formData.apgar?.respiration_5) || 0
-                }
+                    respiration: parseInt(formData.apgar?.respiration_5) || 0,
+                },
             },
-            
+
             // COVID-19 Penunjang structure - sesuai dengan dokumentasi JSON
             covid19_penunjang_pengurang: {
                 lab_asam_laktat: formData.covid19_penunjang?.lab_asam_laktat || '0',
@@ -1243,9 +1428,9 @@ export default function Index() {
                 lab_anti_hiv: formData.covid19_penunjang?.lab_anti_hiv || '0',
                 lab_analisa_gas: formData.covid19_penunjang?.lab_analisa_gas || '0',
                 lab_albumin: formData.covid19_penunjang?.lab_albumin || '0',
-                rad_thorax_ap_pa: formData.covid19_penunjang?.rad_thorax_ap_pa || '0'
+                rad_thorax_ap_pa: formData.covid19_penunjang?.rad_thorax_ap_pa || '0',
             },
-            
+
             // Fields sesuai dengan dokumentasi JSON
             episodes: formData.episodes || '',
             covid19_cc_ind: formData.covid19_cc_ind || '0',
@@ -1253,16 +1438,16 @@ export default function Index() {
             covid19_co_insidense_ind: formData.covid19_co_insidense_ind || '0',
             covid19_status_cd: formData.covid19_status_cd || '0',
             nomor_kartu_t: formData.nomor_kartu_t || 'nik',
-            
+
             // Persalinan structure
             persalinan: {
                 usia_kehamilan: formData.persalinan?.usia_kehamilan || '',
                 gravida: formData.persalinan?.gravida || '',
                 partus: formData.persalinan?.partus || '',
                 abortus: formData.persalinan?.abortus || '',
-                onset_kontraksi: formData.persalinan?.onset_kontraksi || ''
+                onset_kontraksi: formData.persalinan?.onset_kontraksi || '',
             },
-            
+
             // Lain-lain fields
             terapi_konvalesen: formatTariffToInteger(formData.terapi_konvalesen),
             akses_naat: formData.akses_naat || '',
@@ -1271,14 +1456,14 @@ export default function Index() {
             dializer_single_use: parseInt(formData.dializer_single_use) || 0,
             kantong_darah: parseInt(formData.kantong_darah) || 0,
             alteplase_ind: parseInt(formData.alteplase_ind) || 0,
-            
+
             // Data RS fields
             tarif_poli_eks: formatTariffToInteger(formData.tarif_poli_eks),
             kode_tarif: formData.kode_tarif || 'DS',
             payor_id: formData.payor_id || '00003',
             payor_cd: formData.payor_cd || 'JKN',
             cob_cd: formData.cob_cd || '',
-            coder_nik: formData.coder_nik || auth?.user?.nik || ''
+            coder_nik: formData.coder_nik || auth?.user?.nik || '',
         };
 
         return transformedData;
@@ -1293,10 +1478,10 @@ export default function Index() {
         try {
             setIsLoading(true);
             setIsConfirmSubmitOpen(false);
-            
+
             // Transform data to match expected JSON structure
             const transformedData = transformDataForSubmission(formData);
-            
+
             await router.post(
                 `/eklaim/klaim/${pengajuanKlaim.id}/submit`,
                 transformedData, // Send direct data without wrapper
@@ -1306,10 +1491,10 @@ export default function Index() {
             );
         } catch (error) {
             console.error('Error submitting klaim:', error);
-            
+
             setIsErrorDialogOpen(true);
             setErrorMessage(`Terjadi kesalahan saat submit klaim:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
-            
+
             // Error message handled by useFlashMessages hook
         } finally {
             setIsLoading(false);
@@ -1319,20 +1504,16 @@ export default function Index() {
     const handleGroupper = async () => {
         try {
             setIsLoading(true);
-            
+
             // Transform data to match expected JSON structure for groupper
             const transformedData = transformDataForSubmission(formData);
-            
-            await router.post(
-                `/eklaim/klaim/${pengajuanKlaim.id}/groupper`,
-                transformedData,
-                {
-                    preserveState: true,
-                },
-            );
+
+            await router.post(`/eklaim/klaim/${pengajuanKlaim.id}/groupper`, transformedData, {
+                preserveState: true,
+            });
         } catch (error) {
             console.error('Error calling groupper:', error);
-            
+
             setIsErrorDialogOpen(true);
             setErrorMessage(`Terjadi kesalahan saat memanggil groupper:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
@@ -1344,20 +1525,16 @@ export default function Index() {
     const handleGrouperUlang = async (nomor_sep?: string) => {
         try {
             setIsLoadingGrouperUlang(true);
-            
+
             // Transform data to match expected JSON structure for groupper
             const transformedData = transformDataForSubmission(formData);
-            
-            await router.post(
-                `/eklaim/klaim/${pengajuanKlaim.id}/groupper`,
-                transformedData,
-                {
-                    preserveState: true,
-                },
-            );
+
+            await router.post(`/eklaim/klaim/${pengajuanKlaim.id}/groupper`, transformedData, {
+                preserveState: true,
+            });
         } catch (error) {
             console.error('Error calling groupper ulang:', error);
-            
+
             setIsErrorDialogOpen(true);
             setErrorMessage(`Terjadi kesalahan saat memanggil groupper ulang:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
@@ -1365,44 +1542,40 @@ export default function Index() {
         }
     };
 
-    // Handler untuk Final 
+    // Handler untuk Final
     const handleFinal = async (nomor_sep?: string, coder_nik?: string) => {
         try {
             setIsLoadingFinal(true);
-            
+
             // Data untuk final sesuai dengan format pada gambar
             const finalData = {
                 metadata: {
-                    method: "claim_final"
+                    method: 'claim_final',
                 },
                 data: {
                     nomor_sep: nomor_sep || formData.nomor_sep || pengajuanKlaim.nomor_sep,
-                    coder_nik: coder_nik || formData.coder_nik || auth?.user?.nik || ''
-                }
-            };
-            
-            await router.post(
-                `/eklaim/klaim/${pengajuanKlaim.id}/final`,
-                finalData,
-                {
-                    preserveState: true,
-                    onSuccess: (response) => {
-                        // Response akan dihandle oleh backend flash messages
-                        // Berdasarkan response['metadata']['message']
-                    },
-                    onError: (errors) => {
-                        console.error('Final errors:', errors);
-                        setIsErrorDialogOpen(true);
-                        const errorMessages = Object.entries(errors).map(([key, value]) => 
-                            `${key}: ${Array.isArray(value) ? value.join(', ') : value}`
-                        ).join('\n');
-                        setErrorMessage(`Gagal memfinalisasi klaim:\n\n${errorMessages}`);
-                    },
+                    coder_nik: coder_nik || formData.coder_nik || auth?.user?.nik || '',
                 },
-            );
+            };
+
+            await router.post(`/eklaim/klaim/${pengajuanKlaim.id}/final`, finalData, {
+                preserveState: true,
+                onSuccess: (response) => {
+                    // Response akan dihandle oleh backend flash messages
+                    // Berdasarkan response['metadata']['message']
+                },
+                onError: (errors) => {
+                    console.error('Final errors:', errors);
+                    setIsErrorDialogOpen(true);
+                    const errorMessages = Object.entries(errors)
+                        .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+                        .join('\n');
+                    setErrorMessage(`Gagal memfinalisasi klaim:\n\n${errorMessages}`);
+                },
+            });
         } catch (error) {
             console.error('Error calling final:', error);
-            
+
             setIsErrorDialogOpen(true);
             setErrorMessage(`Terjadi kesalahan saat memanggil final:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
@@ -1414,43 +1587,39 @@ export default function Index() {
     const handleReedit = async () => {
         try {
             setIsLoadingReedit(true);
-            
+
             const reeditData = {
                 metadata: {
-                    method: 'reedit_claim'
+                    method: 'reedit_claim',
                 },
                 data: {
-                    nomor_sep: pengajuanKlaim.nomor_sep
-                }
+                    nomor_sep: pengajuanKlaim.nomor_sep,
+                },
             };
 
-            await router.post(
-                `/eklaim/klaim/${pengajuanKlaim.id}/reedit`,
-                reeditData,
-                {
-                    preserveState: false, // Reload page after success
-                    onSuccess: (response) => {
-                        // Response akan dihandle oleh backend flash messages
-                        setSuccessMessage('Klaim berhasil dibuka untuk edit ulang');
-                        setIsSuccessDialogOpen(true);
-                        // Reload setelah 2 detik
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 2000);
-                    },
-                    onError: (errors) => {
-                        console.error('Reedit errors:', errors);
-                        setIsErrorDialogOpen(true);
-                        const errorMessages = Object.entries(errors).map(([key, value]) => 
-                            `${key}: ${Array.isArray(value) ? value.join(', ') : value}`
-                        ).join('\n');
-                        setErrorMessage(`Gagal membuka klaim untuk edit ulang:\n\n${errorMessages}`);
-                    },
+            await router.post(`/eklaim/klaim/${pengajuanKlaim.id}/reedit`, reeditData, {
+                preserveState: false, // Reload page after success
+                onSuccess: (response) => {
+                    // Response akan dihandle oleh backend flash messages
+                    setSuccessMessage('Klaim berhasil dibuka untuk edit ulang');
+                    setIsSuccessDialogOpen(true);
+                    // Reload setelah 2 detik
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
                 },
-            );
+                onError: (errors) => {
+                    console.error('Reedit errors:', errors);
+                    setIsErrorDialogOpen(true);
+                    const errorMessages = Object.entries(errors)
+                        .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+                        .join('\n');
+                    setErrorMessage(`Gagal membuka klaim untuk edit ulang:\n\n${errorMessages}`);
+                },
+            });
         } catch (error) {
             console.error('Error calling reedit:', error);
-            
+
             setIsErrorDialogOpen(true);
             setErrorMessage(`Terjadi kesalahan saat membuka klaim untuk edit ulang:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
@@ -1468,43 +1637,39 @@ export default function Index() {
         try {
             setIsLoadingKirimInacbg(true);
             setIsConfirmKirimOpen(false);
-            
+
             const kirimData = {
                 metadata: {
-                    method: 'send_claim_individual'
+                    method: 'send_claim_individual',
                 },
                 data: {
-                    nomor_sep: pengajuanKlaim.nomor_sep
-                }
+                    nomor_sep: pengajuanKlaim.nomor_sep,
+                },
             };
 
-            await router.post(
-                `/eklaim/klaim/${pengajuanKlaim.id}/kirim-inacbg`,
-                kirimData,
-                {
-                    preserveState: false, // Reload page after success
-                    onSuccess: (response) => {
-                        // Response akan dihandle oleh backend flash messages
-                        setSuccessMessage('Klaim berhasil dikirim ke INACBG! Status diubah menjadi "Selesai Proses Klaim"');
-                        setIsSuccessDialogOpen(true);
-                        // Reload setelah 2 detik
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 2000);
-                    },
-                    onError: (errors) => {
-                        console.error('Kirim INACBG errors:', errors);
-                        setIsErrorDialogOpen(true);
-                        const errorMessages = Object.entries(errors).map(([key, value]) => 
-                            `${key}: ${Array.isArray(value) ? value.join(', ') : value}`
-                        ).join('\n');
-                        setErrorMessage(`Gagal mengirim klaim ke INACBG:\n\n${errorMessages}`);
-                    },
+            await router.post(`/eklaim/klaim/${pengajuanKlaim.id}/kirim-inacbg`, kirimData, {
+                preserveState: false, // Reload page after success
+                onSuccess: (response) => {
+                    // Response akan dihandle oleh backend flash messages
+                    setSuccessMessage('Klaim berhasil dikirim ke INACBG! Status diubah menjadi "Selesai Proses Klaim"');
+                    setIsSuccessDialogOpen(true);
+                    // Reload setelah 2 detik
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
                 },
-            );
+                onError: (errors) => {
+                    console.error('Kirim INACBG errors:', errors);
+                    setIsErrorDialogOpen(true);
+                    const errorMessages = Object.entries(errors)
+                        .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+                        .join('\n');
+                    setErrorMessage(`Gagal mengirim klaim ke INACBG:\n\n${errorMessages}`);
+                },
+            });
         } catch (error) {
             console.error('Error calling kirim INACBG:', error);
-            
+
             setIsErrorDialogOpen(true);
             setErrorMessage(`Terjadi kesalahan saat mengirim klaim ke INACBG:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
@@ -1563,33 +1728,13 @@ export default function Index() {
 
         switch (activeTab) {
             case 1:
-                return (
-                    <DataDiriTab
-                        formData={formData}
-                        updateField={updateField}
-                        referenceData={referenceData}
-                    />
-                );
+                return <DataDiriTab formData={formData} updateField={updateField} referenceData={referenceData} />;
             case 2:
-                return (
-                    <ICUTab
-                        formData={formData}
-                        updateField={updateField}
-                    />
-                );
+                return <ICUTab formData={formData} updateField={updateField} />;
             case 3:
-                return (
-                    <VentilatorTab
-                        {...commonProps}
-                    />
-                );
+                return <VentilatorTab {...commonProps} />;
             case 4:
-                return (
-                    <UpgradeKelasTab
-                        formData={formData}
-                        updateField={updateField}
-                    />
-                );
+                return <UpgradeKelasTab formData={formData} updateField={updateField} />;
             case 5:
                 return (
                     <DataMedisTab
@@ -1624,39 +1769,16 @@ export default function Index() {
                 );
             case 7:
                 return (
-                    <COVIDTab
-                        formData={formData}
-                        updateField={updateField}
-                        getNestedValue={getNestedValue}
-                        updateNestedField={updateNestedField}
-                    />
+                    <COVIDTab formData={formData} updateField={updateField} getNestedValue={getNestedValue} updateNestedField={updateNestedField} />
                 );
             case 8:
-                return (
-                    <APGARTab
-                        {...commonProps}
-                    />
-                );
+                return <APGARTab {...commonProps} />;
             case 9:
-                return (
-                    <PersalinanTab
-                        {...commonProps}
-                    />
-                );
+                return <PersalinanTab {...commonProps} />;
             case 10:
-                return (
-                    <LainLainTab
-                        formData={formData}
-                        updateField={updateField}
-                    />
-                );
+                return <LainLainTab formData={formData} updateField={updateField} />;
             case 11:
-                return (
-                    <DataRSTab
-                        formData={formData}
-                        updateField={updateField}
-                    />
-                );
+                return <DataRSTab formData={formData} updateField={updateField} />;
             case 12:
                 return (
                     <HasilGrouperTab
@@ -1672,13 +1794,7 @@ export default function Index() {
                     />
                 );
             default:
-                return (
-                    <DataDiriTab
-                        formData={formData}
-                        updateField={updateField}
-                        referenceData={referenceData}
-                    />
-                );
+                return <DataDiriTab formData={formData} updateField={updateField} referenceData={referenceData} />;
         }
     };
 
@@ -1700,14 +1816,16 @@ export default function Index() {
                                     <span className="text-gray-400">•</span>
                                     <span>{pengajuanKlaim.nomor_kartu}</span>
                                     <span className="text-gray-400">•</span>
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getHeaderStatusInfo(pengajuanKlaim.status_pengiriman).color}`}>
+                                    <span
+                                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getHeaderStatusInfo(pengajuanKlaim.status_pengiriman).color}`}
+                                    >
                                         {getHeaderStatusInfo(pengajuanKlaim.status_pengiriman).label}
                                     </span>
                                 </div>
                             </div>
                             <div className="flex space-x-3">
-                                {/* Button Simpan Progress hanya muncul ketika status_pengiriman = 0 */}
-                                {pengajuanKlaim.status_pengiriman === 0 && (
+                                {/* Button Simpan Progress hanya muncul ketika status_pengiriman = 0 dan IDRG tidak diperlukan */}
+                                {pengajuanKlaim.status_pengiriman === 0 && !shouldLockTabs && (
                                     <Button
                                         onClick={handleSaveProgress}
                                         disabled={isLoading}
@@ -1717,63 +1835,67 @@ export default function Index() {
                                         {isLoading ? 'Menyimpan...' : 'Simpan Progress'}
                                     </Button>
                                 )}
-                                
-                                {/* Conditional button/indicator based on status_pengiriman */}
-                                {pengajuanKlaim.status_pengiriman === 0 ? (
+
+                                {/* Button untuk buka IDRG Lock Modal ketika IDRG diperlukan */}
+                                {pengajuanKlaim.status_pengiriman === 0 && shouldLockTabs && (
                                     <Button
-                                        onClick={handleSubmitKlaim}
+                                        onClick={() => setIsIdrgLockModalOpen(true)}
                                         disabled={isLoading}
-                                        className="bg-black text-white hover:bg-gray-800"
+                                        className="bg-yellow-600 text-white hover:bg-yellow-700"
                                     >
+                                        <span className="mr-2">🔒</span>
+                                        IDRG Grouping Diperlukan
+                                    </Button>
+                                )}
+
+                                {/* Conditional button/indicator based on status_pengiriman */}
+                                {pengajuanKlaim.status_pengiriman === 0 && !shouldLockTabs ? (
+                                    <Button onClick={handleSubmitKlaim} disabled={isLoading} className="bg-black text-white hover:bg-gray-800">
                                         {isLoading ? 'Mengirim...' : 'Submit Klaim'}
                                     </Button>
                                 ) : pengajuanKlaim.status_pengiriman === 1 ? (
-                                    <Button
-                                        onClick={handleGroupper}
-                                        disabled={isLoading}
-                                        className="bg-blue-600 text-white hover:bg-blue-700"
-                                    >
+                                    <Button onClick={handleGroupper} disabled={isLoading} className="bg-blue-600 text-white hover:bg-blue-700">
                                         {isLoading ? 'Memproses...' : 'Groupper'}
                                     </Button>
                                 ) : pengajuanKlaim.status_pengiriman === 2 ? (
                                     // Status 2: Grouper Stage 1 Selesai - Siap Difinalisasi
                                     !hasSpecialCmgOptions() ? (
-                                        <div className="inline-flex items-center px-3 py-1 bg-green-50 border border-green-200 rounded-md">
+                                        <div className="inline-flex items-center rounded-md border border-green-200 bg-green-50 px-3 py-1">
                                             <div className="flex items-center space-x-1">
-                                                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                                                <span className="text-green-700 text-sm font-medium">Siap Difinalisasi</span>
+                                                <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500"></div>
+                                                <span className="text-sm font-medium text-green-700">Siap Difinalisasi</span>
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="inline-flex items-center px-3 py-1 bg-blue-50 border border-blue-200 rounded-md">
+                                        <div className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-3 py-1">
                                             <div className="flex items-center space-x-1">
-                                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-                                                <span className="text-blue-700 text-sm font-medium">Groupper Selesai</span>
+                                                <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
+                                                <span className="text-sm font-medium text-blue-700">Groupper Selesai</span>
                                             </div>
                                         </div>
                                     )
                                 ) : pengajuanKlaim.status_pengiriman === 3 ? (
                                     // Status 3: Grouper Stage 2 Selesai - Siap Difinalisasi
-                                    <div className="inline-flex items-center px-3 py-1 bg-green-50 border border-green-200 rounded-md">
+                                    <div className="inline-flex items-center rounded-md border border-green-200 bg-green-50 px-3 py-1">
                                         <div className="flex items-center space-x-1">
-                                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                                            <span className="text-green-700 text-sm font-medium">Siap Difinalisasi</span>
+                                            <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500"></div>
+                                            <span className="text-sm font-medium text-green-700">Siap Difinalisasi</span>
                                         </div>
                                     </div>
                                 ) : pengajuanKlaim.status_pengiriman === 4 ? (
                                     // Status 4: Final - Siap Dikirim ke INACBG
-                                    <div className="inline-flex items-center px-3 py-1 bg-yellow-50 border border-yellow-200 rounded-md">
+                                    <div className="inline-flex items-center rounded-md border border-yellow-200 bg-yellow-50 px-3 py-1">
                                         <div className="flex items-center space-x-1">
-                                            <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-pulse"></div>
-                                            <span className="text-yellow-700 text-sm font-medium">Siap Dikirim</span>
+                                            <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-yellow-500"></div>
+                                            <span className="text-sm font-medium text-yellow-700">Siap Dikirim</span>
                                         </div>
                                     </div>
                                 ) : pengajuanKlaim.status_pengiriman === 5 ? (
                                     // Status 5: Selesai Proses Klaim
-                                    <div className="inline-flex items-center px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-md">
+                                    <div className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1">
                                         <div className="flex items-center space-x-1">
-                                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
-                                            <span className="text-emerald-700 text-sm font-medium">Proses Selesai</span>
+                                            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500"></div>
+                                            <span className="text-sm font-medium text-emerald-700">Proses Selesai</span>
                                         </div>
                                     </div>
                                 ) : null}
@@ -1790,24 +1912,25 @@ export default function Index() {
                                 const completionPercentage = fieldCount.total > 0 ? Math.round((fieldCount.filled / fieldCount.total) * 100) : 0;
                                 const isComplete = fieldCount.filled === fieldCount.total && fieldCount.total > 0;
                                 const isEmpty = fieldCount.filled === 0;
-                                
+
                                 return (
                                     <button
                                         key={tab.id}
-                                        onClick={() => setActiveTab(tab.id)}
-                                        className={`w-full flex items-stretch gap-3 px-4 py-3 text-left text-sm font-medium rounded-lg transition-colors ${
-                                            activeTab === tab.id
-                                                ? 'bg-black text-white'
-                                                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                                        onClick={() => !shouldLockTabs && setActiveTab(tab.id)}
+                                        disabled={shouldLockTabs}
+                                        className={`flex w-full items-stretch gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium transition-colors ${
+                                            shouldLockTabs
+                                                ? 'cursor-not-allowed border border-gray-200 bg-gray-100 text-gray-400'
+                                                : activeTab === tab.id
+                                                  ? 'bg-black text-white'
+                                                  : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
                                         }`}
                                     >
-                                        <div className="flex items-center gap-3 flex-1">
+                                        <div className="flex flex-1 items-center gap-3">
                                             <span className="text-lg">{tab.icon}</span>
                                             <div className="flex-1">
                                                 <div className="font-medium">{tab.name}</div>
-                                                <div className={`text-xs mt-0.5 ${
-                                                    activeTab === tab.id ? 'text-gray-300' : 'text-gray-500'
-                                                }`}>
+                                                <div className={`mt-0.5 text-xs ${activeTab === tab.id ? 'text-gray-300' : 'text-gray-500'}`}>
                                                     {fieldCount.filled}/{fieldCount.total} field
                                                     {fieldCount.total !== 1 ? 's' : ''}
                                                 </div>
@@ -1815,14 +1938,18 @@ export default function Index() {
                                         </div>
                                         <div className="flex flex-col items-end justify-center gap-1">
                                             {/* Progress indicator */}
-                                            <div className={`w-8 h-2 rounded-full overflow-hidden ${
-                                                activeTab === tab.id ? 'bg-gray-600' : 'bg-gray-200'
-                                            }`}>
-                                                <div 
+                                            <div
+                                                className={`h-2 w-8 overflow-hidden rounded-full ${
+                                                    shouldLockTabs ? 'bg-gray-300' : activeTab === tab.id ? 'bg-gray-600' : 'bg-gray-200'
+                                                }`}
+                                            >
+                                                <div
                                                     className={`h-full transition-all duration-300 ${
-                                                        isComplete 
-                                                            ? 'bg-green-500' 
-                                                            : isEmpty 
+                                                        shouldLockTabs
+                                                            ? 'bg-gray-400'
+                                                            : isComplete
+                                                              ? 'bg-green-500'
+                                                              : isEmpty
                                                                 ? 'bg-red-400'
                                                                 : 'bg-blue-500'
                                                     }`}
@@ -1830,15 +1957,19 @@ export default function Index() {
                                                 />
                                             </div>
                                             {/* Percentage */}
-                                            <span className={`text-xs font-medium ${
-                                                activeTab === tab.id 
-                                                    ? 'text-gray-300' 
-                                                    : isComplete 
-                                                        ? 'text-green-600' 
-                                                        : isEmpty 
-                                                            ? 'text-red-500'
-                                                            : 'text-blue-600'
-                                            }`}>
+                                            <span
+                                                className={`text-xs font-medium ${
+                                                    shouldLockTabs
+                                                        ? 'text-gray-400'
+                                                        : activeTab === tab.id
+                                                          ? 'text-gray-300'
+                                                          : isComplete
+                                                            ? 'text-green-600'
+                                                            : isEmpty
+                                                              ? 'text-red-500'
+                                                              : 'text-blue-600'
+                                                }`}
+                                            >
                                                 {completionPercentage}%
                                             </span>
                                         </div>
@@ -1848,61 +1979,98 @@ export default function Index() {
                         </div>
 
                         {/* Content Area - 80% */}
-                        <div className="flex-1 bg-white p-6 rounded-lg border border-gray-200 relative">
-                            {/* Jika klaim sudah final, tampilkan overlay hanya di content area */}
-                            {isKlaimFinal ? (
-                                <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
-                                    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 p-8 text-center max-w-md mx-4">
+                        <div className="relative flex-1 rounded-lg border border-gray-200 bg-white p-6">
+                            {/* Overlay untuk lock tabs ketika IDRG diperlukan */}
+                            {shouldLockTabs && (
+                                <div className="absolute inset-0 z-40 flex items-center justify-center rounded-lg bg-white/90 backdrop-blur-md">
+                                    <div className="mx-4 max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center shadow-2xl">
                                         <div className="mb-6">
-                                            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
-                                                pengajuanKlaim.status_pengiriman === 5 
-                                                    ? 'bg-emerald-100' 
-                                                    : 'bg-yellow-100'
-                                            }`}>
-                                                <span className="text-3xl">
-                                                    {pengajuanKlaim.status_pengiriman === 5 ? '✅' : '🔒'}
-                                                </span>
+                                            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-yellow-100">
+                                                <span className="text-3xl">🔒</span>
                                             </div>
-                                            <h3 className="text-xl font-bold text-gray-900 mb-2">
-                                                {pengajuanKlaim.status_pengiriman === 5 ? 'Klaim Selesai' : 'Tab Terkunci'}
-                                            </h3>
-                                            <p className="text-gray-600 text-sm leading-relaxed">
-                                                {pengajuanKlaim.status_pengiriman === 5 
-                                                    ? `Klaim untuk nomor SEP ${pengajuanKlaim.nomor_sep} telah berhasil dikirim ke INACBG dan proses klaim sudah selesai.`
-                                                    : `Konten tab ${tabs.find(tab => tab.id === activeTab)?.name} tidak dapat diedit karena klaim sudah difinalisasi.`
-                                                }
+                                            <h3 className="mb-2 text-xl font-bold text-gray-900">Tab Terkunci</h3>
+                                            <p className="text-sm leading-relaxed text-gray-600">
+                                                Konten form tidak dapat diakses karena IDRG Grouping belum dilakukan untuk pasien{' '}
+                                                <strong>{pengajuanKlaim.nama_pasien}</strong>.
                                             </p>
                                         </div>
-                                        
+
                                         <div className="space-y-3">
-                                            <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3">
+                                            <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-500">
+                                                <div className="flex items-center justify-between">
+                                                    <span>Nomor SEP:</span>
+                                                    <span className="font-medium">{pengajuanKlaim.nomor_sep}</span>
+                                                </div>
+                                                <div className="mt-1 flex items-center justify-between">
+                                                    <span>IDRG Status:</span>
+                                                    <span className="font-medium text-red-600">Belum Dilakukan</span>
+                                                </div>
+                                            </div>
+
+                                            <Button
+                                                onClick={() => setIsIdrgLockModalOpen(true)}
+                                                className="w-full bg-yellow-600 text-white hover:bg-yellow-700"
+                                            >
+                                                <span className="mr-2">🔄</span>
+                                                Lakukan IDRG Grouping
+                                            </Button>
+
+                                            <p className="text-xs text-gray-500">Klik tombol di atas untuk memulai proses IDRG Grouping</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            {/* Jika klaim sudah final, tampilkan overlay hanya di content area */}
+                            {isKlaimFinal ? (
+                                <div className="absolute inset-0 z-50 flex items-center justify-center rounded-lg bg-white/90 backdrop-blur-md">
+                                    <div className="mx-4 max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center shadow-2xl">
+                                        <div className="mb-6">
+                                            <div
+                                                className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full ${
+                                                    pengajuanKlaim.status_pengiriman === 5 ? 'bg-emerald-100' : 'bg-yellow-100'
+                                                }`}
+                                            >
+                                                <span className="text-3xl">{pengajuanKlaim.status_pengiriman === 5 ? '✅' : '🔒'}</span>
+                                            </div>
+                                            <h3 className="mb-2 text-xl font-bold text-gray-900">
+                                                {pengajuanKlaim.status_pengiriman === 5 ? 'Klaim Selesai' : 'Tab Terkunci'}
+                                            </h3>
+                                            <p className="text-sm leading-relaxed text-gray-600">
+                                                {pengajuanKlaim.status_pengiriman === 5
+                                                    ? `Klaim untuk nomor SEP ${pengajuanKlaim.nomor_sep} telah berhasil dikirim ke INACBG dan proses klaim sudah selesai.`
+                                                    : `Konten tab ${tabs.find((tab) => tab.id === activeTab)?.name} tidak dapat diedit karena klaim sudah difinalisasi.`}
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-500">
                                                 <div className="flex items-center justify-between">
                                                     <span>Status Klaim:</span>
-                                                    <span className={`font-medium ${
-                                                        pengajuanKlaim.status_pengiriman === 5 
-                                                            ? 'text-emerald-600' 
-                                                            : 'text-yellow-600'
-                                                    }`}>
+                                                    <span
+                                                        className={`font-medium ${
+                                                            pengajuanKlaim.status_pengiriman === 5 ? 'text-emerald-600' : 'text-yellow-600'
+                                                        }`}
+                                                    >
                                                         {getStatusInfo(pengajuanKlaim.status_pengiriman).label}
                                                     </span>
                                                 </div>
-                                                <div className="flex items-center justify-between mt-1">
+                                                <div className="mt-1 flex items-center justify-between">
                                                     <span>Nomor SEP:</span>
                                                     <span className="font-medium">{pengajuanKlaim.nomor_sep}</span>
                                                 </div>
                                             </div>
-                                            
+
                                             {/* Hanya tampilkan button jika status = 4 (Final), tidak untuk status = 5 (Selesai) */}
                                             {pengajuanKlaim.status_pengiriman === 4 && (
                                                 <>
                                                     <Button
                                                         onClick={handleReedit}
                                                         disabled={isLoadingReedit}
-                                                        className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                                                        className="w-full bg-orange-600 text-white hover:bg-orange-700"
                                                     >
                                                         {isLoadingReedit ? (
                                                             <div className="flex items-center justify-center space-x-2">
-                                                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                                                                 <span>Memproses...</span>
                                                             </div>
                                                         ) : (
@@ -1916,11 +2084,11 @@ export default function Index() {
                                                     <Button
                                                         onClick={handleKirimInacbg}
                                                         disabled={isLoadingKirimInacbg}
-                                                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                        className="w-full bg-emerald-600 text-white hover:bg-emerald-700"
                                                     >
                                                         {isLoadingKirimInacbg ? (
                                                             <div className="flex items-center justify-center space-x-2">
-                                                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                                                                 <span>Mengirim...</span>
                                                             </div>
                                                         ) : (
@@ -1930,23 +2098,24 @@ export default function Index() {
                                                             </div>
                                                         )}
                                                     </Button>
-                                                    
+
                                                     <p className="text-xs text-gray-500">
-                                                        Klik "Edit Ulang Klaim" untuk membuka kembali semua tab untuk pengeditan, atau klik "Kirim ke INACBG" untuk menyelesaikan proses klaim
+                                                        Klik "Edit Ulang Klaim" untuk membuka kembali semua tab untuk pengeditan, atau klik "Kirim ke
+                                                        INACBG" untuk menyelesaikan proses klaim
                                                     </p>
                                                 </>
                                             )}
 
                                             {/* Pesan untuk status = 5 (Selesai) */}
                                             {pengajuanKlaim.status_pengiriman === 5 && (
-                                                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                                                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
                                                     <div className="flex items-start gap-3">
-                                                        <div className="text-emerald-600 text-xl">🎉</div>
+                                                        <div className="text-xl text-emerald-600">🎉</div>
                                                         <div>
-                                                            <h4 className="font-semibold text-emerald-900 mb-1">Proses Selesai!</h4>
-                                                            <p className="text-emerald-700 text-sm">
-                                                                Klaim telah berhasil dikirim ke INACBG dan proses pengajuan klaim sudah selesai.
-                                                                Tidak ada tindakan lebih lanjut yang diperlukan.
+                                                            <h4 className="mb-1 font-semibold text-emerald-900">Proses Selesai!</h4>
+                                                            <p className="text-sm text-emerald-700">
+                                                                Klaim telah berhasil dikirim ke INACBG dan proses pengajuan klaim sudah selesai. Tidak
+                                                                ada tindakan lebih lanjut yang diperlukan.
                                                             </p>
                                                         </div>
                                                     </div>
@@ -1956,9 +2125,13 @@ export default function Index() {
                                     </div>
                                 </div>
                             ) : null}
-                            
-                            {/* Tab content - akan ter-blur jika final */}
-                            <div className={`transition-all duration-300 ${isKlaimFinal ? 'blur-sm pointer-events-none' : ''}`}>
+
+                            {/* Tab content - akan ter-blur jika final atau IDRG diperlukan */}
+                            <div
+                                className={`transition-all duration-300 ${
+                                    isKlaimFinal || shouldLockTabs ? 'pointer-events-none opacity-50 blur-md' : ''
+                                }`}
+                            >
                                 {renderTabContent()}
                             </div>
                         </div>
@@ -2003,27 +2176,21 @@ export default function Index() {
             {isConfirmSubmitOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     {/* Backdrop */}
-                    <div 
-                        className="fixed inset-0 bg-black/50 animate-in fade-in-0 duration-200"
-                        onClick={() => setIsConfirmSubmitOpen(false)}
-                    />
-                    
+                    <div className="fixed inset-0 bg-black/50 duration-200 animate-in fade-in-0" onClick={() => setIsConfirmSubmitOpen(false)} />
+
                     {/* Modal Content */}
-                    <div className="relative bg-white rounded-lg shadow-lg max-w-md w-full mx-auto animate-in fade-in-0 zoom-in-95 duration-200">
+                    <div className="relative mx-auto w-full max-w-md rounded-lg bg-white shadow-lg duration-200 animate-in fade-in-0 zoom-in-95">
                         <div className="p-6">
-                            <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                                Konfirmasi Submit Klaim
-                            </h2>
-                            <p className="text-sm text-gray-600 mb-6">
-                                Apakah Anda yakin ingin submit klaim ini ke INACBG? 
-                                Data yang sudah disubmit tidak dapat diubah lagi.
+                            <h2 className="mb-2 text-lg font-semibold text-gray-900">Konfirmasi Submit Klaim</h2>
+                            <p className="mb-6 text-sm text-gray-600">
+                                Apakah Anda yakin ingin submit klaim ini ke INACBG? Data yang sudah disubmit tidak dapat diubah lagi.
                             </p>
-                            
+
                             <div className="flex justify-end space-x-2">
                                 <button
                                     type="button"
                                     onClick={() => setIsConfirmSubmitOpen(false)}
-                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                    className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
                                 >
                                     Batal
                                 </button>
@@ -2031,7 +2198,7 @@ export default function Index() {
                                     type="button"
                                     onClick={handleConfirmSubmit}
                                     disabled={isLoading}
-                                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     Ya, Submit Klaim
                                 </button>
@@ -2045,33 +2212,26 @@ export default function Index() {
             {isSuccessDialogOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     {/* Backdrop */}
-                    <div 
-                        className="fixed inset-0 bg-black/50 animate-in fade-in-0 duration-200"
-                        onClick={() => setIsSuccessDialogOpen(false)}
-                    />
-                    
+                    <div className="fixed inset-0 bg-black/50 duration-200 animate-in fade-in-0" onClick={() => setIsSuccessDialogOpen(false)} />
+
                     {/* Modal Content */}
-                    <div className="relative bg-white rounded-lg shadow-lg max-w-md w-full mx-auto animate-in fade-in-0 zoom-in-95 duration-200">
+                    <div className="relative mx-auto w-full max-w-md rounded-lg bg-white shadow-lg duration-200 animate-in fade-in-0 zoom-in-95">
                         <div className="p-6">
-                            <div className="flex items-center mb-4">
+                            <div className="mb-4 flex items-center">
                                 <div className="flex-shrink-0">
                                     <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                     </svg>
                                 </div>
-                                <h2 className="ml-3 text-lg font-semibold text-gray-900">
-                                    Berhasil!
-                                </h2>
+                                <h2 className="ml-3 text-lg font-semibold text-gray-900">Berhasil!</h2>
                             </div>
-                            <p className="text-sm text-gray-600 mb-6 whitespace-pre-line">
-                                {successMessage}
-                            </p>
-                            
+                            <p className="mb-6 text-sm whitespace-pre-line text-gray-600">{successMessage}</p>
+
                             <div className="flex justify-end">
                                 <button
                                     type="button"
                                     onClick={() => setIsSuccessDialogOpen(false)}
-                                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                                    className="rounded-md border border-transparent bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:outline-none"
                                 >
                                     OK
                                 </button>
@@ -2085,33 +2245,26 @@ export default function Index() {
             {isErrorDialogOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     {/* Backdrop */}
-                    <div 
-                        className="fixed inset-0 bg-black/50 animate-in fade-in-0 duration-200"
-                        onClick={() => setIsErrorDialogOpen(false)}
-                    />
-                    
+                    <div className="fixed inset-0 bg-black/50 duration-200 animate-in fade-in-0" onClick={() => setIsErrorDialogOpen(false)} />
+
                     {/* Modal Content */}
-                    <div className="relative bg-white rounded-lg shadow-lg max-w-md w-full mx-auto animate-in fade-in-0 zoom-in-95 duration-200">
+                    <div className="relative mx-auto w-full max-w-md rounded-lg bg-white shadow-lg duration-200 animate-in fade-in-0 zoom-in-95">
                         <div className="p-6">
-                            <div className="flex items-center mb-4">
+                            <div className="mb-4 flex items-center">
                                 <div className="flex-shrink-0">
                                     <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                     </svg>
                                 </div>
-                                <h2 className="ml-3 text-lg font-semibold text-gray-900">
-                                    Error
-                                </h2>
+                                <h2 className="ml-3 text-lg font-semibold text-gray-900">Error</h2>
                             </div>
-                            <p className="text-sm text-gray-600 mb-6 whitespace-pre-line">
-                                {errorMessage}
-                            </p>
-                            
+                            <p className="mb-6 text-sm whitespace-pre-line text-gray-600">{errorMessage}</p>
+
                             <div className="flex justify-end">
                                 <button
                                     type="button"
                                     onClick={() => setIsErrorDialogOpen(false)}
-                                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                    className="rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none"
                                 >
                                     OK
                                 </button>
@@ -2125,29 +2278,22 @@ export default function Index() {
             {isConfirmKirimOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     {/* Backdrop */}
-                    <div 
-                        className="fixed inset-0 bg-black/50 animate-in fade-in-0 duration-200"
-                        onClick={() => setIsConfirmKirimOpen(false)}
-                    />
-                    
+                    <div className="fixed inset-0 bg-black/50 duration-200 animate-in fade-in-0" onClick={() => setIsConfirmKirimOpen(false)} />
+
                     {/* Modal Content */}
-                    <div className="relative bg-white rounded-lg shadow-lg max-w-2xl w-full mx-auto animate-in fade-in-0 zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+                    <div className="relative mx-auto max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-lg duration-200 animate-in fade-in-0 zoom-in-95">
                         <div className="p-6">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
+                            <div className="mb-4 flex items-center gap-3">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
                                     <span className="text-2xl">📤</span>
                                 </div>
-                                <h2 className="text-xl font-semibold text-gray-900">
-                                    Konfirmasi Pengiriman ke INACBG
-                                </h2>
+                                <h2 className="text-xl font-semibold text-gray-900">Konfirmasi Pengiriman ke INACBG</h2>
                             </div>
 
-                            <div className="space-y-4 mb-6">
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <p className="text-gray-700 mb-3">
-                                        Anda akan mengirim klaim individual ke sistem INACBG dengan data berikut:
-                                    </p>
-                                    
+                            <div className="mb-6 space-y-4">
+                                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                                    <p className="mb-3 text-gray-700">Anda akan mengirim klaim individual ke sistem INACBG dengan data berikut:</p>
+
                                     <div className="space-y-2 text-sm">
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
@@ -2159,8 +2305,8 @@ export default function Index() {
                                                 <div className="text-gray-700">{pengajuanKlaim.nama_pasien}</div>
                                             </div>
                                         </div>
-                                        
-                                        <div className="border-t pt-2 mt-3">
+
+                                        <div className="mt-3 border-t pt-2">
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <strong className="text-gray-900">Nomor Kartu:</strong>
@@ -2174,13 +2320,13 @@ export default function Index() {
                                         </div>
                                     </div>
                                 </div>
-                                
-                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+
+                                <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
                                     <div className="flex items-start gap-3">
-                                        <div className="text-yellow-600 text-xl">⚠️</div>
+                                        <div className="text-xl text-yellow-600">⚠️</div>
                                         <div>
-                                            <h4 className="font-semibold text-yellow-900 mb-2">Perhatian Penting:</h4>
-                                            <ul className="text-yellow-700 text-sm space-y-1 list-disc list-inside">
+                                            <h4 className="mb-2 font-semibold text-yellow-900">Perhatian Penting:</h4>
+                                            <ul className="list-inside list-disc space-y-1 text-sm text-yellow-700">
                                                 <li>Setelah dikirim ke INACBG, klaim akan berstatus "Selesai Proses Klaim"</li>
                                                 <li>Proses pengiriman tidak dapat dibatalkan</li>
                                                 <li>Pastikan semua data sudah benar dan final</li>
@@ -2190,9 +2336,9 @@ export default function Index() {
                                     </div>
                                 </div>
 
-                                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                                    <h4 className="font-semibold text-emerald-900 mb-2">Data Request yang akan dikirim:</h4>
-                                    <pre className="text-xs text-emerald-800 font-mono bg-white p-2 rounded border overflow-x-auto">
+                                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                                    <h4 className="mb-2 font-semibold text-emerald-900">Data Request yang akan dikirim:</h4>
+                                    <pre className="overflow-x-auto rounded border bg-white p-2 font-mono text-xs text-emerald-800">
                                         {`{
     "metadata": {
         "method": "send_claim_individual"
@@ -2204,12 +2350,12 @@ export default function Index() {
                                     </pre>
                                 </div>
                             </div>
-                            
+
                             <div className="flex justify-end gap-3">
                                 <button
                                     type="button"
                                     onClick={() => setIsConfirmKirimOpen(false)}
-                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                    className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
                                 >
                                     Batal
                                 </button>
@@ -2217,11 +2363,11 @@ export default function Index() {
                                     type="button"
                                     onClick={handleConfirmKirimInacbg}
                                     disabled={isLoadingKirimInacbg}
-                                    className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 border border-transparent rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="rounded-md border border-transparent bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     {isLoadingKirimInacbg ? (
                                         <div className="flex items-center gap-2">
-                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                                             <span>Mengirim...</span>
                                         </div>
                                     ) : (
@@ -2236,6 +2382,48 @@ export default function Index() {
                     </div>
                 </div>
             )}
+
+            {/* IDRG Lock Modal */}
+            <IdrgLockModal
+                isOpen={isIdrgLockModalOpen}
+                onClose={() => setIsIdrgLockModalOpen(false)}
+                onOpenIdrgGrouping={() => setIsIdrgGroupingModalOpen(true)}
+                pengajuanKlaim={pengajuanKlaim}
+            />
+
+            {/* IDRG Grouping Modal */}
+            <IdrgGroupingModal
+                isOpen={isIdrgGroupingModalOpen}
+                onClose={() => setIsIdrgGroupingModalOpen(false)}
+                selectedIdrgDiagnoses={selectedIdrgDiagnoses}
+                selectedIdrgProcedures={selectedIdrgProcedures}
+                onOpenDiagnosisModal={() => setIsIdrgDiagnosisModalOpen(true)}
+                onOpenProcedureModal={() => setIsIdrgProcedureModalOpen(true)}
+                onRemoveDiagnosis={handleRemoveIdrgDiagnosis}
+                onRemoveProcedure={handleRemoveIdrgProcedure}
+                onPerformGrouping={handleIdrgGrouping}
+                isLoading={isIdrgGroupingLoading}
+            />
+
+
+
+            {/* IDRG Diagnosis Modal */}
+            <DiagnosisIDRGModal
+                isOpen={isIdrgDiagnosisModalOpen}
+                onClose={() => setIsIdrgDiagnosisModalOpen(false)}
+                selectedDiagnosis={selectedIdrgDiagnoses}
+                onSelectDiagnosis={handleSelectIdrgDiagnosis}
+                onRemoveDiagnosis={handleRemoveIdrgDiagnosis}
+            />
+
+            {/* IDRG Procedure Modal */}
+            <ProcedureIDRGModal
+                isOpen={isIdrgProcedureModalOpen}
+                onClose={() => setIsIdrgProcedureModalOpen(false)}
+                selectedProcedures={selectedIdrgProcedures}
+                onSelectProcedure={handleSelectIdrgProcedure}
+                onRemoveProcedure={handleRemoveIdrgProcedure}
+            />
         </AppLayout>
     );
 }
