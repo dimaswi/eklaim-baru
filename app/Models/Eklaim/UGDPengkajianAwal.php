@@ -10,10 +10,12 @@ class UGDPengkajianAwal extends Model
 {
     use HasFactory;
 
+    protected $connection = 'app';
     protected $table = 'u_g_d_pengkajian_awals';
 
     protected $fillable = [
         'pengajuan_klaim_id',
+        'kunjungan_nomor',
         
         // Identitas Pasien
         'nama',
@@ -109,6 +111,7 @@ class UGDPengkajianAwal extends Model
         'masalah_medis',
         'diagnosis_medis',
         'rencana_terapi',
+        'selected_diagnosa',
         
         // Dokter dan Petugas
         'dokter',
@@ -127,6 +130,7 @@ class UGDPengkajianAwal extends Model
         'spiritual' => 'array',
         'ekonomi' => 'array',
         'edukasi' => 'array',
+        'selected_diagnosa' => 'array',
     ];
 
     public function pengajuanKlaim(): BelongsTo

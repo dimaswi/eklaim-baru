@@ -126,6 +126,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/eklaim/ugd/pengkajian-awal/{kunjungan}', [UGDPengkajianAwalController::class, 'getPengkajianAwalData'])->name('eklaim.UGD.pengkajian-awal')->middleware('permission:pengajuan-klaim.view');
         Route::post('/eklaim/ugd/pengkajian-awal/{kunjungan}/store', [UGDPengkajianAwalController::class, 'store'])->name('eklaim.ugd.pengkajian-awal.store')->middleware('permission:pengajuan-klaim.view');
         Route::post('/eklaim/ugd/pengkajian-awal', [UGDPengkajianAwalController::class, 'store'])->name('eklaim.ugd.pengkajian-awal.store.direct')->middleware('permission:pengajuan-klaim.view');
+        Route::post('/eklaim/ugd/pengkajian-awal', [UGDPengkajianAwalController::class, 'store'])->name('eklaim.ugd.pengkajian-awal.store.direct')->middleware('permission:pengajuan-klaim.view');
 });
 
 // Triage Awal UGD

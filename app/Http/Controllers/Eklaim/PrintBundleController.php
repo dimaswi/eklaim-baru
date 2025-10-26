@@ -541,6 +541,12 @@ class PrintBundleController extends Controller
                 'logo_type' => ($documentType === 'sep') ? 'bpjs' : 'regular'
             ]);
 
+            // Skip template rendering for document types that don't have templates
+            if ($documentType === 'berkas_klaim') {
+                // Berkas klaim already handled above with API data
+                return response()->json(['error' => 'Berkas klaim data not available from API'], 404);
+            }
+
             $dataKunjungan = KunjunganBPJS::where('noSEP', $pengajuanKlaim->nomor_sep)->first();
 
             // Return HTML preview using same Blade template as PDF
@@ -569,6 +575,13 @@ class PrintBundleController extends Controller
     public function generatePDF(Request $request, $pengajuanId)
     {
         try {
+            // Set memory and execution limits from config
+            $memoryLimit = config('print-bundle.memory_limit', '512M');
+            $executionTime = config('print-bundle.single_pdf_execution_time', 120);
+            
+            ini_set('memory_limit', $memoryLimit);
+            set_time_limit($executionTime);
+            
             // Handle potential CSRF token issues for POST requests
             if ($request->isMethod('POST')) {
                 // Check if CSRF token is valid
@@ -655,6 +668,12 @@ class PrintBundleController extends Controller
                 }
             }
             
+            // Skip template-based PDF generation for API-based documents
+            if ($documentType === 'berkas_klaim') {
+                // Berkas klaim already handled above with API data
+                return response()->json(['error' => 'Berkas klaim data not available from API'], 404);
+            }
+
             // Get base64 encoded logo (BPJS for SEP, regular for others)
             $logoBase64 = ($documentType === 'sep') ? $this->getBpjsLogoBase64() : $this->getLogoBase64();
             
@@ -680,7 +699,19 @@ class PrintBundleController extends Controller
             
             // NEW: Return all PDFs as base64 JSON for frontend merging
             $pdfContent = $pdf->output();
+            
+            // Log memory usage before base64 encoding
+            Log::info('PDF Memory Usage Before Base64', [
+                'pdf_size' => strlen($pdfContent),
+                'memory_usage' => memory_get_usage(true),
+                'memory_peak' => memory_get_peak_usage(true)
+            ]);
+            
             $base64Pdf = base64_encode($pdfContent);
+            
+            // Clear PDF content from memory immediately after encoding
+            unset($pdfContent);
+            gc_collect_cycles();
             
             // Return JSON with base64 data - let frontend handle everything
             return response()->json([
@@ -710,6 +741,38 @@ class PrintBundleController extends Controller
     public function generateBundle(Request $request, $pengajuanId)
     {
         try {
+            // Set memory and execution limits from config - NORMAL SETTINGS
+            $memoryLimit = config('print-bundle.memory_limit', '2048M');
+            $executionTime = config('print-bundle.execution_time', 300); // Normal 5 minutes
+            
+            // Set normal timeout configurations
+            ini_set('memory_limit', $memoryLimit);
+            ini_set('max_execution_time', $executionTime);
+            set_time_limit($executionTime);
+            
+            // Enable garbage collection
+            gc_enable();
+            
+            // Force ignore user abort to prevent timeout issues
+            ignore_user_abort(true);
+            
+            // Log initial memory usage and timeout settings
+            Log::info('Bundle Generation Started - Enhanced Timeout Settings', [
+                'pengajuan_id' => $pengajuanId,
+                'memory_usage' => memory_get_usage(true) / 1024 / 1024 . 'MB',
+                'memory_limit' => $memoryLimit,
+                'execution_time' => $executionTime,
+                'max_execution_time' => ini_get('max_execution_time'),
+                'max_input_time' => ini_get('max_input_time'),
+                'default_socket_timeout' => ini_get('default_socket_timeout'),
+                'request_data' => [
+                    'documents' => count($request->input('document_types', [])),
+                    'has_selected_records' => !empty($request->input('selected_records', []))
+                ],
+                'production_mode' => config('print-bundle.production_mode', false),
+                'start_time' => now()->toDateTimeString()
+            ]);
+            
             // Handle CSRF token validation for bundle generation
             $tokenValid = $request->session()->token() === $request->input('_token');
             
@@ -739,6 +802,13 @@ class PrintBundleController extends Controller
                 return response()->json(['error' => 'No document types selected'], 400);
             }
             
+            // Process all selected documents - no artificial limits
+            Log::info('Processing all selected documents', [
+                'requested_count' => count($documentTypes),
+                'document_types' => $documentTypes,
+                'execution_time_limit' => $executionTime . 's'
+            ]);
+            
             // Validate all document types
             foreach ($documentTypes as $type) {
                 if (!$this->isValidDocumentType($type)) {
@@ -749,8 +819,44 @@ class PrintBundleController extends Controller
             // NEW APPROACH: Generate all PDFs as base64 and send to frontend for merging
             $pdfDocuments = [];
             
-            foreach ($documentTypes as $type) {
+            // Process documents in chunks to prevent memory overflow
+            $chunkSize = config('print-bundle.chunk_size', 3);
+            $documentChunks = array_chunk($documentTypes, $chunkSize);
+            
+            $startTime = time();
+            $totalDocuments = count($documentTypes);
+            $processedCount = 0;
+            
+            // Use normal chunk size for processing
+            $chunkSize = config('print-bundle.chunk_size', 3);
+            $documentChunks = array_chunk($documentTypes, $chunkSize);
+            
+            Log::info('Starting normal document processing', [
+                'total_documents' => $totalDocuments,
+                'chunk_size' => $chunkSize,
+                'total_chunks' => count($documentChunks),
+                'execution_time_limit' => $executionTime . 's'
+            ]);
+            
+            foreach ($documentChunks as $chunkIndex => $chunk) {
+                // Check elapsed time for progress tracking
+                $elapsedTime = time() - $startTime;
+                
+                Log::info('Processing Document Chunk', [
+                    'chunk_index' => $chunkIndex + 1,
+                    'total_chunks' => count($documentChunks),
+                    'chunk_size' => count($chunk),
+                    'documents_in_chunk' => $chunk,
+                    'memory_before_chunk' => memory_get_usage(true) / 1024 / 1024 . 'MB',
+                    'elapsed_time' => $elapsedTime . 's',
+                    'estimated_completion' => round((($chunkIndex + 1) / count($documentChunks)) * 100, 1) . '%'
+                ]);
+                
+                foreach ($chunk as $type) {
                 try {
+                    // Track progress for each document
+                    $currentElapsed = time() - $startTime;
+                    $progressPercent = round(($processedCount / $totalDocuments) * 100, 1);
                     $data = $this->getDocumentData($type, $pengajuanId, $selectedRecords);
                     
                     if (!$data || $data->isEmpty()) {
@@ -762,15 +868,18 @@ class PrintBundleController extends Controller
                         continue; // Skip if no data
                     }
                     
-                    // Special handling for berkas_klaim from INACBG API
+                    // Special handling for berkas_klaim from INACBG API - WITH TIMEOUT
                     if ($type === 'berkas_klaim') {
+                        $berkasStartTime = time();
                         $berkasData = $data->first();
                         
                         if ($berkasData && isset($berkasData->is_api_data) && $berkasData->is_api_data && isset($berkasData->pdf_data)) {
+                            $berkasProcessTime = time() - $berkasStartTime;
                             Log::info('Adding berkas_klaim PDF data to bundle array', [
                                 'document_type' => $type,
                                 'pengajuan_id' => $pengajuanId,
-                                'pdf_data_length' => strlen($berkasData->pdf_data)
+                                'pdf_data_length' => strlen($berkasData->pdf_data),
+                                'process_time' => $berkasProcessTime . 's'
                             ]);
                             
                             // Add berkas_klaim base64 PDF data to documents array
@@ -781,8 +890,27 @@ class PrintBundleController extends Controller
                                 'data' => $berkasData->pdf_data, // Already base64
                                 'source' => 'inacbg_api'
                             ];
+                            
+                            $processedCount++;
+                            $progressPercent = round(($processedCount / $totalDocuments) * 100, 1);
+                            Log::info('Document processed successfully (API)', [
+                                'document_type' => $type,
+                                'progress' => $progressPercent . '%',
+                                'processed_count' => $processedCount,
+                                'total_documents' => $totalDocuments,
+                                'elapsed_time' => (time() - $startTime) . 's'
+                            ]);
                             continue;
                         }
+                    }
+                    
+                    // Skip template-based documents for API-only document types
+                    if ($type === 'berkas_klaim') {
+                        Log::warning("Berkas klaim skipped in bundle - should be handled by API", [
+                            'document_type' => $type,
+                            'pengajuan_id' => $pengajuanId
+                        ]);
+                        continue;
                     }
                     
                     // For regular documents, generate PDF and convert to base64
@@ -819,6 +947,17 @@ class PrintBundleController extends Controller
                         'source' => 'template_generated'
                     ];
                     
+                    $processedCount++;
+                    $progressPercent = round(($processedCount / $totalDocuments) * 100, 1);
+                    Log::info('Document processed successfully (Template)', [
+                        'document_type' => $type,
+                        'progress' => $progressPercent . '%',
+                        'processed_count' => $processedCount,
+                        'total_documents' => $totalDocuments,
+                        'elapsed_time' => (time() - $startTime) . 's',
+                        'pdf_size' => round(strlen($base64Pdf) / 1024, 2) . 'KB'
+                    ]);
+                    
                     Log::info('Successfully generated PDF for bundle document', [
                         'document_type' => $type,
                         'pdf_size' => strlen($pdfContent),
@@ -833,20 +972,47 @@ class PrintBundleController extends Controller
                     ]);
                     continue; // Skip this document and continue with others
                 }
+                }
+                
+                // Force garbage collection after each chunk if enabled
+                if (config('print-bundle.enable_garbage_collection', true)) {
+                    gc_collect_cycles();
+                }
+                
+                Log::info('Chunk Processed', [
+                    'chunk_index' => $chunkIndex,
+                    'memory_after_chunk' => memory_get_usage(true),
+                    'memory_peak' => memory_get_peak_usage(true),
+                    'documents_in_chunk' => count($chunk),
+                    'gc_enabled' => config('print-bundle.enable_garbage_collection', true)
+                ]);
             }
             
             if (empty($pdfDocuments)) {
                 return response()->json(['error' => 'No valid documents found for bundle generation'], 400);
             }
             
-            Log::info('Bundle PDF generation completed', [
+            $totalElapsedTime = time() - $startTime;
+            $finalProgress = round(($processedCount / $totalDocuments) * 100, 1);
+            $memoryUsed = memory_get_usage(true) / 1024 / 1024;
+            
+            Log::info('Bundle PDF generation completed successfully', [
                 'pengajuan_id' => $pengajuanId,
-                'document_count' => count($pdfDocuments),
-                'documents' => array_column($pdfDocuments, 'type')
+                'total_documents_requested' => $totalDocuments,
+                'documents_successfully_processed' => count($pdfDocuments),
+                'final_progress' => $finalProgress . '%',
+                'total_elapsed_time' => $totalElapsedTime . 's',
+                'memory_used' => round($memoryUsed, 2) . 'MB',
+                'documents' => array_column($pdfDocuments, 'type'),
+                'performance_metrics' => [
+                    'avg_time_per_document' => round($totalElapsedTime / max(1, count($pdfDocuments)), 2) . 's',
+                    'execution_time_limit' => $executionTime . 's',
+                    'total_elapsed_time' => $totalElapsedTime . 's'
+                ]
             ]);
             
             // Return JSON with all PDF documents as base64 for frontend merging
-            return response()->json([
+            $responseData = [
                 'type' => 'bundle_base64',
                 'documents' => $pdfDocuments,
                 'bundle_filename' => $pengajuanKlaim->nomor_sep .'.pdf',
@@ -854,18 +1020,58 @@ class PrintBundleController extends Controller
                     'nomor_sep' => $pengajuanKlaim->nomor_sep,
                     'nama_pasien' => $pengajuanKlaim->nama_pasien,
                     'pengajuan_id' => $pengajuanId
+                ],
+                'processing_stats' => [
+                    'total_requested' => $totalDocuments,
+                    'successfully_processed' => count($pdfDocuments),
+                    'completion_rate' => $finalProgress . '%',
+                    'elapsed_time' => $totalElapsedTime . 's',
+                    'timeout_optimized' => $processedCount < $totalDocuments
                 ]
-            ]);
+            ];
+            
+            // Add success message
+            if ($processedCount === $totalDocuments) {
+                $responseData['success_message'] = "Semua {$totalDocuments} dokumen berhasil diproses dalam {$totalElapsedTime} detik.";
+            } else {
+                $skippedCount = $totalDocuments - $processedCount;
+                $responseData['warning'] = "Berhasil memproses {$processedCount} dari {$totalDocuments} dokumen yang dipilih.";
+                $responseData['skipped_documents'] = $skippedCount;
+            }
+            
+            return response()->json($responseData);
             
         } catch (\Exception $e) {
+            // Clean up memory
+            gc_collect_cycles();
+            
             Log::error('Generate Bundle Error: ' . $e->getMessage(), [
                 'pengajuan_id' => $pengajuanId,
                 'selected_types' => $request->input('document_types', []),
+                'memory_usage' => memory_get_usage(true) / 1024 / 1024 . 'MB',
+                'memory_peak' => memory_get_peak_usage(true) / 1024 / 1024 . 'MB',
+                'error_type' => get_class($e),
+                'error_code' => $e->getCode(),
+                'error_line' => $e->getLine(),
+                'error_file' => $e->getFile(),
                 'trace' => $e->getTraceAsString()
             ]);
             
+            // Return detailed error for debugging
+            $errorMessage = 'Bundle generation failed';
+            if (config('app.debug')) {
+                $errorMessage .= ': ' . $e->getMessage() . ' (Line: ' . $e->getLine() . ')';
+            }
+            
             return response()->json([
-                'error' => 'Terjadi kesalahan saat generate bundle: ' . $e->getMessage()
+                'error' => $errorMessage,
+                'debug_info' => config('app.debug') ? [
+                    'memory_usage' => memory_get_usage(true) / 1024 / 1024 . 'MB',
+                    'memory_peak' => memory_get_peak_usage(true) / 1024 / 1024 . 'MB',
+                    'error_type' => get_class($e),
+                    'error_line' => $e->getLine(),
+                    'pengajuan_id' => $pengajuanId
+                ] : null
             ], 500);
         }
     }
@@ -912,10 +1118,10 @@ class PrintBundleController extends Controller
         if ($documentType === 'ugd_triage' && $data && $data->count() > 0) {
             $triageData = $data->first();
             if ($triageData && $triageData->petugas) {
-                $qrData['perawatQR'] = QRCodeHelper::generateDataURL($triageData->petugas);
+                $qrData['dokterTriageQR'] = QRCodeHelper::generateDataURL($triageData->petugas);
             }
             if ($triageData && $triageData->dokter) {
-                $qrData['dokterTriageQR'] = QRCodeHelper::generateDataURL($triageData->dokter);
+                $qrData['dokterQR'] = QRCodeHelper::generateDataURL($triageData->dokter);
             }
         }
         
@@ -924,6 +1130,9 @@ class PrintBundleController extends Controller
     
     private function getDocumentData($type, $pengajuanId, $selectedRecords = [])
     {
+        // Log query start for performance monitoring
+        $queryStart = microtime(true);
+        
         // Jika ada selected records, filter berdasarkan ID yang dipilih
         if (!empty($selectedRecords) && isset($selectedRecords[$type])) {
             $selectedIds = $selectedRecords[$type];
@@ -980,7 +1189,7 @@ class PrintBundleController extends Controller
         }
         
         // Fallback: ambil semua data jika tidak ada selected records
-        return match($type) {
+        $result = match($type) {
             'laboratorium' => HasilLaboratorium::where('pengajuan_klaim_id', $pengajuanId)->get(),
             'radiologi' => HasilRadiologi::where('pengajuan_klaim_id', $pengajuanId)->get(),
             'resume_medis' => $this->getResumeMedisData($pengajuanId),
@@ -999,6 +1208,18 @@ class PrintBundleController extends Controller
             'sep' => $this->getSepData($pengajuanId),
             default => collect([]),
         };
+        
+        // Log query performance
+        $queryTime = microtime(true) - $queryStart;
+        Log::info('Document Data Query Performance', [
+            'type' => $type,
+            'pengajuan_id' => $pengajuanId,
+            'query_time' => round($queryTime * 1000, 2) . 'ms',
+            'result_count' => $result ? $result->count() : 0,
+            'memory_usage' => memory_get_usage(true)
+        ]);
+        
+        return $result;
     }
     
     private function getResumeMedisData($pengajuanId, $selectedIds = [])
@@ -1248,6 +1469,9 @@ class PrintBundleController extends Controller
     private function getBerkasKlaimData($pengajuanId)
     {
         try {
+            // Set normal timeout for API call
+            $apiTimeout = config('print-bundle.inacbg_timeout', 60); // Normal API timeout
+            
             // Get pengajuan klaim data
             $pengajuanKlaim = PengajuanKlaim::find($pengajuanId);
             
@@ -1271,8 +1495,32 @@ class PrintBundleController extends Controller
                 'request_data' => $requestData
             ]);
             
-            // Hit INACBG API
-            $response = InacbgHelper::hitApi($requestData);
+            // Hit INACBG API with timeout handling
+            $apiStart = microtime(true);
+            $response = null;
+            
+            try {
+                // Use shorter timeout specifically for API call
+                $response = InacbgHelper::hitApi($requestData, $apiTimeout);
+            } catch (\Exception $apiException) {
+                $apiTime = microtime(true) - $apiStart;
+                Log::error('INACBG API Timeout/Error - FALLBACK TO LOCAL DATA', [
+                    'pengajuan_id' => $pengajuanId,
+                    'api_time' => round($apiTime, 2) . 's',
+                    'timeout_limit' => $apiTimeout . 's',
+                    'error' => $apiException->getMessage(),
+                    'fallback_strategy' => 'using_local_data'
+                ]);
+                
+                // Return fallback data immediately if API times out
+                return $this->getBerkasKlaimFallbackData($pengajuanId, $pengajuanKlaim);
+            }
+            
+            $apiTime = microtime(true) - $apiStart;
+            Log::info('INACBG API Call Completed', [
+                'pengajuan_id' => $pengajuanId,
+                'api_time' => round($apiTime, 2) . 's'
+            ]);
             
             Log::info('INACBG API Response for Berkas Klaim', [
                 'pengajuan_id' => $pengajuanId,
@@ -1737,6 +1985,15 @@ class PrintBundleController extends Controller
     public function updateDefaultOrder(Request $request, $pengajuanId)
     {
         try {
+            // Set limits for save operation
+            ini_set('memory_limit', '256M');
+            set_time_limit(60);
+            
+            Log::info('Update Default Order Request Started', [
+                'pengajuan_id' => $pengajuanId,
+                'request_size' => strlen(json_encode($request->all()))
+            ]);
+
             $request->validate([
                 'document_order' => 'required|array',
                 'document_order.*.id' => 'required|string',

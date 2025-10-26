@@ -9,6 +9,12 @@ import { format } from 'date-fns';
 import { useMemo, useState } from 'react';
 import { stat } from 'fs';
 
+// Import IDRG modals
+import DiagnosisIDRGModal from '@/components/eklaim/DiagnosisIDRGModal';
+import IdrgLockModal from '@/components/eklaim/IdrgLockModal';
+import IdrgGroupingModal from '@/components/eklaim/IdrgGroupingModal';
+import ProcedureIDRGModal from '@/components/eklaim/ProcedureIDRGModal';
+
 interface RincianTagihan {
     ID: number;
     TAGIHAN: string;
@@ -108,6 +114,10 @@ interface PengajuanKlaim {
     nama_pasien: string;
     norm: string;
     status_pengiriman: number;
+    idrg?: string | number | null;
+    idrg_diagnosa?: string;
+    idrg_procedure?: string;
+    idrg_response?: any;
 }
 
 interface ActionMessage {
@@ -157,6 +167,29 @@ export default function CompareBiayaIndex() {
     const stage2Options: Stage2Options = props.stage2Options;
 
     const [activeTab, setActiveTab] = useState<TabType>('semua');
+
+    // IDRG States dan Logic
+    // Check apakah IDRG grouping belum dilakukan (idrg = 0 atau null)
+    const isIdrgGroupingRequired =
+        pengajuanKlaim?.idrg === '0' ||
+        pengajuanKlaim?.idrg === 0 ||
+        !pengajuanKlaim?.idrg ||
+        pengajuanKlaim?.idrg === null ||
+        pengajuanKlaim?.idrg === undefined;
+    
+    // Check apakah IDRG grouping sudah selesai (idrg = 1)
+    const isIdrgGroupingComplete = pengajuanKlaim?.idrg === 1 || pengajuanKlaim?.idrg === '1';
+    
+    // Check apakah IDRG sudah final (idrg = 2)
+    const isIdrgFinal = pengajuanKlaim?.idrg === 2 || pengajuanKlaim?.idrg === '2';
+
+    const [isLoadingIdrg, setIsLoadingIdrg] = useState(false);
+    const [isIdrgLockModalOpen, setIsIdrgLockModalOpen] = useState(false);
+    const [isIdrgGroupingModalOpen, setIsIdrgGroupingModalOpen] = useState(false);
+    const [isIdrgDiagnosisModalOpen, setIsIdrgDiagnosisModalOpen] = useState(false);
+    const [isIdrgProcedureModalOpen, setIsIdrgProcedureModalOpen] = useState(false);
+    const [selectedIdrgDiagnoses, setSelectedIdrgDiagnoses] = useState<{ name: string; code: string }[]>([]);
+    const [selectedIdrgProcedures, setSelectedIdrgProcedures] = useState<{ name: string; code: string }[]>([]);
 
     const breadcrumbs: BreadcrumbItem[] = [
         {
@@ -375,6 +408,178 @@ export default function CompareBiayaIndex() {
         // Data tambahan bisa ditambahkan sesuai kebutuhan
     };
 
+    // IDRG Handler Functions
+    const handleBatalkanIdrgGrouping = async () => {
+        if (!pengajuanKlaim?.id) return;
+        
+        try {
+            setIsLoadingIdrg(true);
+
+            await router.post(`/biaya/compare/${pengajuanKlaim.id}/batalkan-idrg`, {}, {
+                preserveState: false,
+                onError: (errors) => {
+                    console.error('Batalkan IDRG errors:', errors);
+                },
+            });
+        } catch (error) {
+            console.error('Error calling batalkan IDRG:', error);
+        } finally {
+            setIsLoadingIdrg(false);
+        }
+    };
+
+    const handleFinalIdrg = async () => {
+        if (!pengajuanKlaim?.id) return;
+        
+        try {
+            setIsLoadingIdrg(true);
+
+            await router.post(`/biaya/compare/${pengajuanKlaim.id}/final-idrg`, {}, {
+                preserveState: false,
+                onError: (errors) => {
+                    console.error('Final IDRG errors:', errors);
+                },
+            });
+        } catch (error) {
+            console.error('Error calling final IDRG:', error);
+        } finally {
+            setIsLoadingIdrg(false);
+        }
+    };
+
+    const handleEditIdrg = async () => {
+        if (!pengajuanKlaim?.id) return;
+        
+        try {
+            setIsLoadingIdrg(true);
+
+            await router.post(`/biaya/compare/${pengajuanKlaim.id}/edit-idrg`, {}, {
+                preserveState: false,
+                onError: (errors) => {
+                    console.error('Edit IDRG errors:', errors);
+                },
+            });
+        } catch (error) {
+            console.error('Error calling edit IDRG:', error);
+        } finally {
+            setIsLoadingIdrg(false);
+        }
+    };
+
+    // Handler untuk IDRG Grouping - Langsung grouping dan final, lalu trigger INACBG grouping
+    const handlePerformIdrgGrouping = async () => {
+        if (!pengajuanKlaim?.id) return;
+        
+        try {
+            setIsLoadingIdrg(true);
+
+            // Format diagnoses dan procedures ke string
+            const formatDiagnosesToString = (diagnoses: { name: string; code: string }[]): string => {
+                if (!diagnoses || diagnoses.length === 0) return '';
+                const codeCount: { [key: string]: number } = {};
+                diagnoses.forEach((diag) => {
+                    if (diag.code) {
+                        codeCount[diag.code] = (codeCount[diag.code] || 0) + 1;
+                    }
+                });
+                const formattedCodes = Object.keys(codeCount).map((code) => {
+                    const count = codeCount[code];
+                    return count > 1 ? `${code}+${count}` : code;
+                });
+                return formattedCodes.join('#');
+            };
+
+            const formatProceduresToString = (procedures: { name: string; code: string }[]): string => {
+                if (!procedures || procedures.length === 0) return '';
+                const codeCount: { [key: string]: number } = {};
+                procedures.forEach((proc) => {
+                    if (proc.code) {
+                        codeCount[proc.code] = (codeCount[proc.code] || 0) + 1;
+                    }
+                });
+                const formattedCodes = Object.keys(codeCount).map((code) => {
+                    const count = codeCount[code];
+                    return count > 1 ? `${code}+${count}` : code;
+                });
+                return formattedCodes.join('#');
+            };
+
+            const idrgData = {
+                idrg_diagnosa: formatDiagnosesToString(selectedIdrgDiagnoses),
+                idrg_procedure: formatProceduresToString(selectedIdrgProcedures),
+                pengajuan_klaim_id: pengajuanKlaim.id,
+                nomor_sep: pengajuanKlaim.nomor_sep,
+            };
+
+            // Endpoint ini akan:
+            // 1. Save IDRG data
+            // 2. Set idrg = 2 (langsung final)
+            // 3. Trigger INACBG grouping
+            await router.post(`/biaya/compare/${pengajuanKlaim.id}/idrg-grouping-and-inacbg`, idrgData, {
+                preserveState: false,
+                onSuccess: () => {
+                    setIsIdrgGroupingModalOpen(false);
+                    setSelectedIdrgDiagnoses([]);
+                    setSelectedIdrgProcedures([]);
+                },
+                onError: (errors) => {
+                    console.error('IDRG Grouping errors:', errors);
+                },
+            });
+        } catch (error) {
+            console.error('Error performing IDRG grouping:', error);
+        } finally {
+            setIsLoadingIdrg(false);
+        }
+    };
+
+    const handleRemoveIdrgDiagnosis = (code: string) => {
+        setSelectedIdrgDiagnoses((prev) => {
+            const index = prev.findIndex((d) => d.code === code);
+            if (index !== -1) {
+                const newDiagnoses = [...prev];
+                newDiagnoses.splice(index, 1);
+                return newDiagnoses;
+            }
+            return prev;
+        });
+    };
+
+    const handleRemoveIdrgProcedure = (code: string) => {
+        setSelectedIdrgProcedures((prev) => {
+            const index = prev.findIndex((p) => p.code === code);
+            if (index !== -1) {
+                const newProcedures = [...prev];
+                newProcedures.splice(index, 1);
+                return newProcedures;
+            }
+            return prev;
+        });
+    };
+
+    // Helper functions for IDRG data parsing
+    const parseDiagnoses = (diagnosesString?: string): Array<{ code: string; count: number }> => {
+        if (!diagnosesString) return [];
+        
+        const codes = diagnosesString.split('#').filter((code) => code.trim() !== '');
+        return codes.map((codeWithCount) => {
+            const [code, countStr] = codeWithCount.split('+');
+            const count = countStr ? parseInt(countStr) : 1;
+            return { code, count };
+        });
+    };
+
+    const parseProcedures = (proceduresString?: string): Array<{ code: string; count: number }> => {
+        if (!proceduresString) return [];
+        
+        const codes = proceduresString.split('#').filter((code) => code.trim() !== '');
+        return codes.map((codeWithCount) => {
+            const [code, countStr] = codeWithCount.split('+');
+            const count = countStr ? parseInt(countStr) : 1;
+            return { code, count };
+        });
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Compare Biaya - ${kunjungan}`} />
@@ -476,10 +681,164 @@ export default function CompareBiayaIndex() {
                                 </div>
                             )}
 
-                            {/* Data Groupper Section */}
-                            {(dataGroupper || actionMessage || stage2Options) && (
+                            {/* IDRG Section */}
+                            {pengajuanKlaim && (
                                 <div className="border-b p-6">
-                                    <h3 className="mb-4 font-semibold text-gray-900">Data Groupper</h3>
+                                    <h3 className="mb-4 font-semibold text-gray-900">IDRG Status</h3>
+                                    
+                                    {/* IDRG Status Badge */}
+                                    <div className="mb-4">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-xs font-medium tracking-wide text-gray-500 uppercase">Status IDRG</span>
+                                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                                isIdrgGroupingRequired ? 'bg-gray-100 text-gray-800' :
+                                                isIdrgFinal ? 'bg-green-100 text-green-800' :
+                                                'bg-gray-100 text-gray-800'
+                                            }`}>
+                                                {isIdrgGroupingRequired ? 'Belum Grouping' :
+                                                 isIdrgFinal ? 'Selesai & Final' :
+                                                 'Unknown'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* IDRG Button - Hanya tampilkan jika idrg = 0 */}
+                                    {isIdrgGroupingRequired && (
+                                        <div className="space-y-2">
+                                            <Button
+                                                onClick={() => setIsIdrgLockModalOpen(true)}
+                                                className="w-full px-3 py-2 text-xs font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"
+                                            >
+                                                🔒 IDRG Grouping Diperlukan
+                                            </Button>
+                                            
+                                            <div className="mt-3 text-xs text-gray-500">
+                                                <p>⚠️ IDRG Grouping diperlukan sebelum melanjutkan ke INACBG Grouping.</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Info jika IDRG sudah selesai */}
+                                    {isIdrgFinal && (
+                                        <div className="text-xs text-gray-500">
+                                            <p>✓ IDRG sudah final. Lanjut ke INACBG Grouping.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Data IDRG Section - Tampilkan jika idrg = 2 (final) */}
+                            {pengajuanKlaim && isIdrgFinal && (
+                                <div className="border-b p-6">
+                                    <h3 className="mb-4 font-semibold text-gray-900">Data IDRG</h3>
+                                    
+                                    {/* Diagnosa IDRG */}
+                                    {pengajuanKlaim.idrg_diagnosa && (
+                                        <div className="mb-4">
+                                            <div className="text-xs font-medium tracking-wide text-gray-500 uppercase mb-2">Diagnosa IDRG</div>
+                                            <div className="space-y-2">
+                                                {parseDiagnoses(pengajuanKlaim.idrg_diagnosa).map((diag, index) => (
+                                                    <div
+                                                        key={`${diag.code}-${index}`}
+                                                        className="flex items-center justify-between p-2 bg-blue-50 border border-blue-200 rounded-md text-xs"
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="flex items-center justify-center w-6 h-6 bg-blue-500 text-white rounded-full text-xs font-semibold">
+                                                                {index + 1}
+                                                            </span>
+                                                            <span className="font-mono font-semibold text-blue-900">{diag.code}</span>
+                                                        </div>
+                                                        {diag.count > 1 && (
+                                                            <span className="px-2 py-0.5 bg-blue-200 text-blue-900 rounded text-xs">
+                                                                {diag.count}x
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Procedure IDRG */}
+                                    {pengajuanKlaim.idrg_procedure && (
+                                        <div>
+                                            <div className="text-xs font-medium tracking-wide text-gray-500 uppercase mb-2">Procedure IDRG</div>
+                                            <div className="space-y-2">
+                                                {parseProcedures(pengajuanKlaim.idrg_procedure).map((proc, index) => (
+                                                    <div
+                                                        key={`${proc.code}-${index}`}
+                                                        className="flex items-center justify-between p-2 bg-purple-50 border border-purple-200 rounded-md text-xs"
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="flex items-center justify-center w-6 h-6 bg-purple-500 text-white rounded-full text-xs font-semibold">
+                                                                {index + 1}
+                                                            </span>
+                                                            <span className="font-mono font-semibold text-purple-900">{proc.code}</span>
+                                                        </div>
+                                                        {proc.count > 1 && (
+                                                            <span className="px-2 py-0.5 bg-purple-200 text-purple-900 rounded text-xs">
+                                                                {proc.count}x
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Jika tidak ada data */}
+                                    {!pengajuanKlaim.idrg_diagnosa && !pengajuanKlaim.idrg_procedure && (
+                                        <div className="text-center py-4 text-gray-500 text-xs">
+                                            <p>Tidak ada data IDRG tersimpan</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Warning Section - Tampilkan jika belum ada pengajuan klaim */}
+                            {!pengajuanKlaim && (
+                                <div className="border-b p-6">
+                                    <div className="rounded-lg p-4 border border-yellow-200 bg-yellow-50">
+                                        <div className="flex items-start gap-3">
+                                            <div className="text-2xl">⚠️</div>
+                                            <div className="flex-1">
+                                                <h4 className="font-semibold text-yellow-900 mb-2">Belum Ada Pengajuan Klaim</h4>
+                                                <p className="text-sm text-yellow-700 mb-3">
+                                                    Anda perlu membuat pengajuan klaim terlebih dahulu sebelum dapat melakukan IDRG dan INACBG Grouping.
+                                                </p>
+                                                <PengajuanKlaimModal
+                                                    data={pengajuanKlaimData}
+                                                    actionUrl="/biaya/pengajuan-klaim"
+                                                    triggerClassName="px-3 py-2 text-xs font-medium text-white bg-yellow-600 rounded-md hover:bg-yellow-700 transition-colors"
+                                                    triggerText="Buat Pengajuan Klaim"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Info Section - Tampilkan jika pengajuan klaim ada tapi IDRG belum dilakukan */}
+                            {pengajuanKlaim && isIdrgGroupingRequired && (
+                                <div className="border-b p-6">
+                                    <div className="rounded-lg p-4 border border-blue-200 bg-blue-50">
+                                        <div className="flex items-start gap-3">
+                                            <div className="text-2xl">ℹ️</div>
+                                            <div className="flex-1">
+                                                <h4 className="font-semibold text-blue-900 mb-2">Langkah Selanjutnya</h4>
+                                                <p className="text-sm text-blue-700">
+                                                    Setelah IDRG Grouping selesai, sistem akan otomatis melakukan INACBG Grouping dan menampilkan data CBG di sini.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Data Groupper Section - Hanya tampil jika IDRG sudah final (idrg = 2) */}
+                            {pengajuanKlaim && isIdrgFinal && (dataGroupper || actionMessage || stage2Options) && (
+                                <div className="border-b p-6">
+                                    <h3 className="mb-4 font-semibold text-gray-900">Data Groupper INACBG</h3>
 
                                     {/* Tampilkan Data Groupper jika ada */}
                                     {dataGroupper && (
@@ -1233,6 +1592,54 @@ export default function CompareBiayaIndex() {
                     </div>
                 </div>
             </div>
+
+            {/* IDRG Modals */}
+            {pengajuanKlaim && (
+                <>
+                    <IdrgLockModal
+                        isOpen={isIdrgLockModalOpen}
+                        onClose={() => setIsIdrgLockModalOpen(false)}
+                        onOpenIdrgGrouping={() => {
+                            setIsIdrgLockModalOpen(false);
+                            setIsIdrgGroupingModalOpen(true);
+                        }}
+                        pengajuanKlaim={pengajuanKlaim}
+                    />
+
+                    <IdrgGroupingModal
+                        isOpen={isIdrgGroupingModalOpen}
+                        onClose={() => setIsIdrgGroupingModalOpen(false)}
+                        selectedIdrgDiagnoses={selectedIdrgDiagnoses}
+                        selectedIdrgProcedures={selectedIdrgProcedures}
+                        onOpenDiagnosisModal={() => setIsIdrgDiagnosisModalOpen(true)}
+                        onOpenProcedureModal={() => setIsIdrgProcedureModalOpen(true)}
+                        onRemoveDiagnosis={handleRemoveIdrgDiagnosis}
+                        onRemoveProcedure={handleRemoveIdrgProcedure}
+                        onPerformGrouping={handlePerformIdrgGrouping}
+                        isLoading={isLoadingIdrg}
+                    />
+
+                    <DiagnosisIDRGModal
+                        isOpen={isIdrgDiagnosisModalOpen}
+                        onClose={() => setIsIdrgDiagnosisModalOpen(false)}
+                        selectedDiagnosis={selectedIdrgDiagnoses}
+                        onSelectDiagnosis={(diagnosis) => {
+                            setSelectedIdrgDiagnoses((prev) => [...prev, diagnosis]);
+                        }}
+                        onRemoveDiagnosis={handleRemoveIdrgDiagnosis}
+                    />
+
+                    <ProcedureIDRGModal
+                        isOpen={isIdrgProcedureModalOpen}
+                        onClose={() => setIsIdrgProcedureModalOpen(false)}
+                        selectedProcedures={selectedIdrgProcedures}
+                        onSelectProcedure={(procedure) => {
+                            setSelectedIdrgProcedures((prev) => [...prev, procedure]);
+                        }}
+                        onRemoveProcedure={handleRemoveIdrgProcedure}
+                    />
+                </>
+            )}
         </AppLayout>
     );
 }

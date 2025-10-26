@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import APGARTab from '@/components/eklaim/tabs/APGARTab';
 import COVIDTab from '@/components/eklaim/tabs/COVIDTab';
 import DataDiriTab from '@/components/eklaim/tabs/DataDiriTab';
+import DataIDRGTab from '@/components/eklaim/tabs/DataIDRGTab';
 import DataMedisTab from '@/components/eklaim/tabs/DataMedisTab';
 import DataRSTab from '@/components/eklaim/tabs/DataRSTab';
 import HasilGrouperTab from '@/components/eklaim/tabs/HasilGrouperTab';
@@ -212,7 +213,31 @@ export default function Index() {
         !pengajuanKlaim.idrg ||
         pengajuanKlaim.idrg === null ||
         pengajuanKlaim.idrg === undefined;
-    const shouldLockTabs = isIdrgGroupingRequired;
+    
+    // Check apakah IDRG grouping sudah selesai (idrg = 1)
+    const isIdrgGroupingComplete = pengajuanKlaim.idrg === 1 || pengajuanKlaim.idrg === '1';
+    
+    // Check apakah IDRG sudah final (idrg = 2)
+    const isIdrgFinal = pengajuanKlaim.idrg === 2 || pengajuanKlaim.idrg === '2';
+    
+    // Logika penguncian tab:
+    // - idrg = 0: Semua tab dikunci
+    // - idrg = 1: Hanya tab IDRG yang aktif, tab lain dikunci
+    // - idrg = 2: Semua tab normal (tidak dikunci)
+    const shouldLockAllTabs = isIdrgGroupingRequired; // idrg = 0
+    const shouldLockNonIdrgTabs = isIdrgGroupingComplete; // idrg = 1
+    
+    // Helper function untuk cek apakah tab tertentu harus dikunci
+    const isTabLocked = (tabId: number): boolean => {
+        // Jika idrg = 0, semua tab dikunci
+        if (shouldLockAllTabs) return true;
+        
+        // Jika idrg = 1, hanya tab IDRG (id: 0) yang tidak dikunci
+        if (shouldLockNonIdrgTabs && tabId !== 0) return true;
+        
+        // Jika idrg = 2, tidak ada tab yang dikunci
+        return false;
+    };
 
     // Helper function untuk check apakah ada special_cmg_option dan groupper stage 1 selesai
     const hasSpecialCmgOptions = (): boolean => {
@@ -469,6 +494,7 @@ export default function Index() {
 
     // Tab configuration
     const tabs = [
+        ...((isIdrgGroupingComplete || isIdrgFinal) ? [{ id: 0, name: 'Data IDRG', icon: '🔐' }] : []),
         { id: 1, name: 'Data Diri', icon: '👤' },
         { id: 2, name: 'ICU', icon: '🏥' },
         { id: 3, name: 'Ventilator', icon: '🤧' },
@@ -503,6 +529,13 @@ export default function Index() {
     // IDRG Selected States
     const [selectedIdrgDiagnoses, setSelectedIdrgDiagnoses] = useState<{ name: string; code: string }[]>([]);
     const [selectedIdrgProcedures, setSelectedIdrgProcedures] = useState<{ name: string; code: string }[]>([]);
+
+    // Set active tab to IDRG tab (0) if IDRG grouping is complete on initial load
+    useEffect(() => {
+        if (isIdrgGroupingComplete || isIdrgFinal) {
+            setActiveTab(0);
+        }
+    }, [isIdrgGroupingComplete, isIdrgFinal]);
 
     // Load data otomatis saat komponen dimuat
     useEffect(() => {
@@ -1627,6 +1660,81 @@ export default function Index() {
         }
     };
 
+    // Handler untuk Batalkan IDRG Grouping
+    const handleBatalkanIdrgGrouping = async () => {
+        try {
+            setIsLoading(true);
+
+            await router.post(`/eklaim/klaim/${pengajuanKlaim.id}/batalkan-idrg`, {}, {
+                preserveState: false,
+                onSuccess: (response) => {
+                    // Success handled by flash message
+                },
+                onError: (errors) => {
+                    // Error handled by flash message
+                    console.error('Batalkan IDRG errors:', errors);
+                },
+            });
+        } catch (error) {
+            console.error('Error calling batalkan IDRG:', error);
+
+            setIsErrorDialogOpen(true);
+            setErrorMessage(`Terjadi kesalahan saat membatalkan IDRG Grouping:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Handler untuk Final IDRG (mengubah idrg dari 1 ke 2)
+    const handleFinalIdrg = async () => {
+        try {
+            setIsLoading(true);
+
+            await router.post(`/eklaim/klaim/${pengajuanKlaim.id}/final-idrg`, {}, {
+                preserveState: false,
+                onSuccess: (response) => {
+                    // Success handled by flash message
+                },
+                onError: (errors) => {
+                    // Error handled by flash message
+                    console.error('Final IDRG errors:', errors);
+                },
+            });
+        } catch (error) {
+            console.error('Error calling final IDRG:', error);
+
+            setIsErrorDialogOpen(true);
+            setErrorMessage(`Terjadi kesalahan saat finalisasi IDRG:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Handler untuk Edit IDRG (mengubah idrg dari 2 ke 1)
+    const handleEditIdrg = async () => {
+        try {
+            setIsLoading(true);
+
+            await router.post(`/eklaim/klaim/${pengajuanKlaim.id}/edit-idrg`, {}, {
+                preserveState: false,
+                onSuccess: (response) => {
+                    // Success handled by flash message
+                },
+                onError: (errors) => {
+                    // Error handled by flash message
+                    console.error('Edit IDRG errors:', errors);
+                },
+            });
+        } catch (error) {
+            console.error('Error calling edit IDRG:', error);
+
+            setIsErrorDialogOpen(true);
+            setErrorMessage(`Terjadi kesalahan saat membuka edit IDRG:\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     // Handler untuk menampilkan modal konfirmasi kirim INACBG
     const handleKirimInacbg = () => {
         setIsConfirmKirimOpen(true);
@@ -1727,6 +1835,8 @@ export default function Index() {
         };
 
         switch (activeTab) {
+            case 0:
+                return <DataIDRGTab pengajuanKlaim={pengajuanKlaim} />;
             case 1:
                 return <DataDiriTab formData={formData} updateField={updateField} referenceData={referenceData} />;
             case 2:
@@ -1824,8 +1934,8 @@ export default function Index() {
                                 </div>
                             </div>
                             <div className="flex space-x-3">
-                                {/* Button Simpan Progress hanya muncul ketika status_pengiriman = 0 dan IDRG tidak diperlukan */}
-                                {pengajuanKlaim.status_pengiriman === 0 && !shouldLockTabs && (
+                                {/* Button Simpan Progress - muncul ketika status_pengiriman = 0 dan IDRG = 2 */}
+                                {pengajuanKlaim.status_pengiriman === 0 && isIdrgFinal && (
                                     <Button
                                         onClick={handleSaveProgress}
                                         disabled={isLoading}
@@ -1837,7 +1947,7 @@ export default function Index() {
                                 )}
 
                                 {/* Button untuk buka IDRG Lock Modal ketika IDRG diperlukan */}
-                                {pengajuanKlaim.status_pengiriman === 0 && shouldLockTabs && (
+                                {pengajuanKlaim.status_pengiriman === 0 && shouldLockAllTabs && (
                                     <Button
                                         onClick={() => setIsIdrgLockModalOpen(true)}
                                         disabled={isLoading}
@@ -1848,8 +1958,33 @@ export default function Index() {
                                     </Button>
                                 )}
 
+                                {/* Button Final IDRG ketika IDRG = 1 */}
+                                {pengajuanKlaim.status_pengiriman === 0 && isIdrgGroupingComplete && (
+                                    <Button
+                                        onClick={handleFinalIdrg}
+                                        disabled={isLoading}
+                                        className="bg-green-600 text-white hover:bg-green-700"
+                                    >
+                                        <span className="mr-2">✅</span>
+                                        {isLoading ? 'Memproses...' : 'Final IDRG'}
+                                    </Button>
+                                )}
+
+                                {/* Button Edit IDRG ketika IDRG = 2 */}
+                                {pengajuanKlaim.status_pengiriman === 0 && isIdrgFinal && (
+                                    <Button
+                                        onClick={handleEditIdrg}
+                                        disabled={isLoading}
+                                        variant="outline"
+                                        className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                                    >
+                                        <span className="mr-2">✏️</span>
+                                        {isLoading ? 'Membuka...' : 'Edit IDRG'}
+                                    </Button>
+                                )}
+
                                 {/* Conditional button/indicator based on status_pengiriman */}
-                                {pengajuanKlaim.status_pengiriman === 0 && !shouldLockTabs ? (
+                                {pengajuanKlaim.status_pengiriman === 0 && isIdrgFinal ? (
                                     <Button onClick={handleSubmitKlaim} disabled={isLoading} className="bg-black text-white hover:bg-gray-800">
                                         {isLoading ? 'Mengirim...' : 'Submit Klaim'}
                                     </Button>
@@ -1912,14 +2047,15 @@ export default function Index() {
                                 const completionPercentage = fieldCount.total > 0 ? Math.round((fieldCount.filled / fieldCount.total) * 100) : 0;
                                 const isComplete = fieldCount.filled === fieldCount.total && fieldCount.total > 0;
                                 const isEmpty = fieldCount.filled === 0;
+                                const tabLocked = isTabLocked(tab.id);
 
                                 return (
                                     <button
                                         key={tab.id}
-                                        onClick={() => !shouldLockTabs && setActiveTab(tab.id)}
-                                        disabled={shouldLockTabs}
+                                        onClick={() => !tabLocked && setActiveTab(tab.id)}
+                                        disabled={tabLocked}
                                         className={`flex w-full items-stretch gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium transition-colors ${
-                                            shouldLockTabs
+                                            tabLocked
                                                 ? 'cursor-not-allowed border border-gray-200 bg-gray-100 text-gray-400'
                                                 : activeTab === tab.id
                                                   ? 'bg-black text-white'
@@ -1940,12 +2076,12 @@ export default function Index() {
                                             {/* Progress indicator */}
                                             <div
                                                 className={`h-2 w-8 overflow-hidden rounded-full ${
-                                                    shouldLockTabs ? 'bg-gray-300' : activeTab === tab.id ? 'bg-gray-600' : 'bg-gray-200'
+                                                    tabLocked ? 'bg-gray-300' : activeTab === tab.id ? 'bg-gray-600' : 'bg-gray-200'
                                                 }`}
                                             >
                                                 <div
                                                     className={`h-full transition-all duration-300 ${
-                                                        shouldLockTabs
+                                                        tabLocked
                                                             ? 'bg-gray-400'
                                                             : isComplete
                                                               ? 'bg-green-500'
@@ -1959,7 +2095,7 @@ export default function Index() {
                                             {/* Percentage */}
                                             <span
                                                 className={`text-xs font-medium ${
-                                                    shouldLockTabs
+                                                    tabLocked
                                                         ? 'text-gray-400'
                                                         : activeTab === tab.id
                                                           ? 'text-gray-300'
@@ -1980,8 +2116,8 @@ export default function Index() {
 
                         {/* Content Area - 80% */}
                         <div className="relative flex-1 rounded-lg border border-gray-200 bg-white p-6">
-                            {/* Overlay untuk lock tabs ketika IDRG diperlukan */}
-                            {shouldLockTabs && (
+                            {/* Overlay untuk lock tabs ketika IDRG = 0 (semua tab dikunci) */}
+                            {shouldLockAllTabs && (
                                 <div className="absolute inset-0 z-40 flex items-center justify-center rounded-lg bg-white/90 backdrop-blur-md">
                                     <div className="mx-4 max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center shadow-2xl">
                                         <div className="mb-6">
@@ -2020,6 +2156,48 @@ export default function Index() {
                                     </div>
                                 </div>
                             )}
+                            
+                            {/* Overlay untuk lock tabs non-IDRG ketika IDRG = 1 (hanya tab IDRG aktif) */}
+                            {shouldLockNonIdrgTabs && activeTab !== 0 && (
+                                <div className="absolute inset-0 z-40 flex items-center justify-center rounded-lg bg-white/90 backdrop-blur-md">
+                                    <div className="mx-4 max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center shadow-2xl">
+                                        <div className="mb-6">
+                                            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
+                                                <span className="text-3xl">🔐</span>
+                                            </div>
+                                            <h3 className="mb-2 text-xl font-bold text-gray-900">Tab Terkunci</h3>
+                                            <p className="text-sm leading-relaxed text-gray-600">
+                                                Tab form akan dapat diakses setelah IDRG Grouping difinalisasi. Silakan lihat tab{' '}
+                                                <strong>Data IDRG</strong> dan klik tombol <strong>Final IDRG</strong> untuk melanjutkan.
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-500">
+                                                <div className="flex items-center justify-between">
+                                                    <span>IDRG Status:</span>
+                                                    <span className="font-medium text-blue-600">Grouping Selesai</span>
+                                                </div>
+                                                <div className="mt-1 flex items-center justify-between">
+                                                    <span>Action Required:</span>
+                                                    <span className="font-medium text-orange-600">Finalisasi IDRG</span>
+                                                </div>
+                                            </div>
+
+                                            <Button
+                                                onClick={() => setActiveTab(0)}
+                                                className="w-full bg-blue-600 text-white hover:bg-blue-700"
+                                            >
+                                                <span className="mr-2">📋</span>
+                                                Buka Tab Data IDRG
+                                            </Button>
+
+                                            <p className="text-xs text-gray-500">Klik tombol di atas untuk melihat dan finalisasi data IDRG</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            
                             {/* Jika klaim sudah final, tampilkan overlay hanya di content area */}
                             {isKlaimFinal ? (
                                 <div className="absolute inset-0 z-50 flex items-center justify-center rounded-lg bg-white/90 backdrop-blur-md">
@@ -2126,10 +2304,10 @@ export default function Index() {
                                 </div>
                             ) : null}
 
-                            {/* Tab content - akan ter-blur jika final atau IDRG diperlukan */}
+                            {/* Tab content - akan ter-blur jika final atau tab dikunci */}
                             <div
                                 className={`transition-all duration-300 ${
-                                    isKlaimFinal || shouldLockTabs ? 'pointer-events-none opacity-50 blur-md' : ''
+                                    isKlaimFinal || isTabLocked(activeTab) ? 'pointer-events-none opacity-50 blur-md' : ''
                                 }`}
                             >
                                 {renderTabContent()}

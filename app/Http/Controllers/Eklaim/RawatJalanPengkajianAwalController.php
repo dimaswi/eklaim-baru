@@ -9,6 +9,7 @@ use App\Models\SIMRS\KunjunganRS;
 use App\Models\SIMRS\Pasien;
 use App\Models\SIMRS\Pendaftaran;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class RawatJalanPengkajianAwalController extends Controller
@@ -65,6 +66,15 @@ class RawatJalanPengkajianAwalController extends Controller
 
     public function store(Request $request)
     {
+        // Debug: Log incoming request data
+        Log::info('Rawat Jalan Pengkajian Awal Store Request', [
+            'request_data_keys' => array_keys($request->all()),
+            'request_method' => $request->method(),
+            'content_type' => $request->header('Content-Type'),
+            'has_token' => $request->has('_token'),
+            'pengajuan_klaim_id' => $request->get('pengajuan_klaim_id')
+        ]);
+
         $validated = $request->validate([
             'pengajuan_klaim_id' => 'required|exists:app.pengajuan_klaim,id',
             'kunjungan_nomor' => 'nullable|string',
@@ -161,15 +171,7 @@ class RawatJalanPengkajianAwalController extends Controller
             'dokter' => 'nullable|string',
             'petugas' => 'nullable|string',
             
-            // Frontend boolean fields akan digroupkan dalam store method
-            'status_psikologi_*' => 'nullable|boolean',
-            'status_mental_*' => 'nullable|boolean',  
-            'hubungan_keluarga_*' => 'nullable|boolean',
-            'tempat_tinggal_*' => 'nullable|boolean',
-            'spiritual_*' => 'nullable|boolean',
-            'ekonomi_*' => 'nullable|boolean',
-            'pengambilan_keputusan_*' => 'nullable|boolean',
-            'edukasi_*' => 'nullable|boolean',
+            // Frontend boolean fields akan digroupkan dalam store method - specific validation removed
         ]);
 
         // Group related fields into JSON
@@ -181,6 +183,11 @@ class RawatJalanPengkajianAwalController extends Controller
         $edukasi = [];
 
         foreach($request->all() as $key => $value) {
+            // Skip CSRF and other system fields
+            if(in_array($key, ['_token', '_method'])) {
+                continue;
+            }
+            
             if(str_starts_with($key, 'status_psikologi_')) {
                 $statusPsikologi[$key] = $value;
             } elseif(str_starts_with($key, 'status_mental_') || str_starts_with($key, 'hubungan_keluarga_')) {
@@ -196,9 +203,10 @@ class RawatJalanPengkajianAwalController extends Controller
             }
         }
 
-        // Remove grouped fields from validated data and add JSON groups
-        $filteredData = collect($validated)->reject(function($value, $key) {
-            return str_starts_with($key, 'status_psikologi_') ||
+        // Start with all request data and filter out grouped fields
+        $filteredData = collect($request->all())->reject(function($value, $key) {
+            return in_array($key, ['_token', '_method']) ||
+                   str_starts_with($key, 'status_psikologi_') ||
                    str_starts_with($key, 'status_mental_') ||
                    str_starts_with($key, 'hubungan_keluarga_') ||
                    str_starts_with($key, 'tempat_tinggal_') ||
@@ -220,7 +228,24 @@ class RawatJalanPengkajianAwalController extends Controller
             $filteredData['selected_diagnosa'] = json_decode($filteredData['selected_diagnosa'], true);
         }
 
-        $pengkajianAwal = RawatJalanPengkajianAwal::create($filteredData);
+        // Debug: Log final data before save
+        Log::info('Rawat Jalan Final Data Before Save', [
+            'filtered_data_keys' => array_keys($filteredData),
+            'has_pengajuan_klaim_id' => isset($filteredData['pengajuan_klaim_id']),
+            'status_psikologi_count' => count($statusPsikologi),
+            'edukasi_count' => count($edukasi)
+        ]);
+
+        // Check if record exists, update or create
+        $pengkajianAwal = RawatJalanPengkajianAwal::updateOrCreate(
+            ['pengajuan_klaim_id' => $filteredData['pengajuan_klaim_id']],
+            $filteredData
+        );
+
+        Log::info('Rawat Jalan Data Saved Successfully', [
+            'id' => $pengkajianAwal->id,
+            'pengajuan_klaim_id' => $pengkajianAwal->pengajuan_klaim_id
+        ]);
 
         return redirect()->back()->with('success', 'Data pengkajian awal rawat jalan berhasil disimpan');
     }

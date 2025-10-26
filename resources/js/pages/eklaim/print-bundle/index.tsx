@@ -590,7 +590,36 @@ export default function PrintBundleIndex() {
             }
         } catch (error) {
             console.error('Error generating bundle:', error);
-            alert(`Error generating bundle: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            
+            let errorMessage = 'Unknown error occurred';
+            
+            if (error instanceof Error) {
+                errorMessage = error.message;
+                
+                // Handle specific error types
+                if (error.message.includes('NetworkError') || error.message.includes('fetch')) {
+                    errorMessage = 'Network error: Please check your connection and try again';
+                } else if (error.message.includes('timeout')) {
+                    errorMessage = 'Request timeout: Bundle generation took too long';
+                } else if (error.message.includes('500')) {
+                    errorMessage = 'Server error: Please try again or contact support';
+                }
+            }
+            
+            // Check if we have debug info from server
+            if (error instanceof Response) {
+                try {
+                    const errorData = await error.json();
+                    if (errorData.debug_info) {
+                        console.error('Server debug info:', errorData.debug_info);
+                        errorMessage += `\nDebug: Memory usage ${errorData.debug_info.memory_usage}, Error at line ${errorData.debug_info.error_line}`;
+                    }
+                } catch (parseError) {
+                    console.error('Could not parse error response:', parseError);
+                }
+            }
+            
+            alert(`Error generating bundle:\n${errorMessage}`);
         } finally {
             setIsGenerating(false);
         }

@@ -232,7 +232,6 @@
                         <td class="info-label">No. Telepon</td>
                         <td class="info-colon">:</td>
                         <td class="info-value">{{ $pengajuanKlaim->no_telepon ?? '-' }}</td>
-                        <td class="right-info">: -</td>
                     </tr>
                     <tr>
                         <td class="info-label">Sub/Spesialis</td>
@@ -249,7 +248,7 @@
                     <tr>
                         <td class="info-label">Faskes Perujuk</td>
                         <td class="info-colon">:</td>
-                        <td class="info-value">{{ $pengajuanKlaim->faskes_perujuk ?? 'R10 - Abdominal and pelvic pain' }}</td>
+                        <td class="info-value">{{ $pengajuanKlaim->faskes_perujuk ?? '-' }}</td>
                         <td class="right-info">Kls. Rawat : {{ $dataKunjungan->klsRawat ?? '-' }}</td>
                     </tr>
                     <tr>
@@ -286,7 +285,7 @@
             <div class="footer-section">
                 <div class="print-info">
                     <p>Klinik Rawat Inap Utama Muhammadiyah Kedungadem</p>
-                    <p>Cetak ke {{ $index + 1 }} / {{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_sep ?? now())->format('Y-m-d H:i:s') }}</p>
+                    <p>Cetak ke {{ $index + 1 }} / {{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_sep ?? now()->addHour(7))->format('Y-m-d H:i:s') }}</p>
                 </div>
             </div>
         </div>
