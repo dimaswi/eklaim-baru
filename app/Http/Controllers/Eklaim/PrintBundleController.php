@@ -682,8 +682,8 @@ class PrintBundleController extends Controller
             $qrData = $this->generateQRCodes($pengajuanKlaim, $data, $documentType);
 
             //Get Nama Dokter
-            
-            
+            $getKunjunganBPJS = KunjunganBPJS::where('noSEP', $pengajuanKlaim->nomor_sep)->first();
+            $namaDokter = DokterBPJS::where('KODE', $getKunjunganBPJS->dpjpSKDP)->first();
             
             Log::info('PDF generation started', [
                 'document_type' => $documentType,
@@ -698,6 +698,7 @@ class PrintBundleController extends Controller
                 'selectedRecords' => $selectedRecords,
                 'logoBase64' => $logoBase64,
                 'documentType' => $documentType,
+                'namaDokter' => $namaDokter,                            
             ], $qrData))->setPaper('a4', 'portrait');
             
             Log::info('PDF generated successfully', ['document_type' => $documentType]);
