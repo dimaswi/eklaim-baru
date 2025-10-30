@@ -698,7 +698,7 @@ class PrintBundleController extends Controller
                 'selectedRecords' => $selectedRecords,
                 'logoBase64' => $logoBase64,
                 'documentType' => $documentType,
-                'namaDokter' => $namaDokter,                            
+                'namaDokter' => $namaDokter ?? '',                            
             ], $qrData))->setPaper('a4', 'portrait');
             
             Log::info('PDF generated successfully', ['document_type' => $documentType]);
