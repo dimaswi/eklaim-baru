@@ -549,11 +549,15 @@ class PrintBundleController extends Controller
             }
 
             $dataKunjungan = KunjunganBPJS::where('noSEP', $pengajuanKlaim->nomor_sep)->first();
+            
+            //Get Nama Dokter
+            $namaDokter = DokterBPJS::where('KODE', $dataKunjungan->dpjpSKDP)->first();
 
             // Return HTML preview using same Blade template as PDF
             return view("pdf.templates.{$documentType}", array_merge([
                 'pengajuanKlaim' => $pengajuanKlaim,
                 'dataKunjungan' => $dataKunjungan,
+                'namaDokter' => $namaDokter ?? '',
                 'data' => $data,
                 'selectedRecords' => $selectedRecords,
                 'logoBase64' => $logoBase64,
