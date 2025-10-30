@@ -27,6 +27,7 @@ use App\Models\SIMRS\KunjunganBPJS;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use App\Models\SIMRS\DokterBPJS;
 
 class PrintBundleController extends Controller
 {
@@ -679,6 +680,10 @@ class PrintBundleController extends Controller
             
             // Get QR codes for signatures
             $qrData = $this->generateQRCodes($pengajuanKlaim, $data, $documentType);
+
+            //Get Nama Dokter
+            
+            
             
             Log::info('PDF generation started', [
                 'document_type' => $documentType,
