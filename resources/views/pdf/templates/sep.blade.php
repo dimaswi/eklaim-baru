@@ -234,13 +234,13 @@
                     <tr>
                         <td class="info-label">Sub/Spesialis</td>
                         <td class="info-colon">:</td>
-                        <td class="info-value">{{ $dataKunjungan->poliTujuan ?? 'IGD' }}</td>
+                        <td class="info-value">{{ $dataKunjungan->poliTujuan ?? 'Rawat Inap' }}</td>
                         <td class="right-info">Poli Perujuk :</td>
                     </tr>
                     <tr>
                         <td class="info-label">Dokter</td>
                         <td class="info-colon">:</td>
-                        <td class="info-value">{{ $dataKunjungan->user ?? '-' }}</td>
+                        <td class="info-value">{{ $namaDokter->NAMA ?? '-' }}</td>
                         <td class="right-info">Kls. Hak : {{ $dataKunjungan->klsRawat ?? '-' }}</td>
                     </tr>
                     <tr>

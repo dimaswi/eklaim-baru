@@ -27,6 +27,7 @@ use App\Models\SIMRS\KunjunganBPJS;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use App\Models\SIMRS\DokterBPJS;
 
 class PrintBundleController extends Controller
 {
@@ -548,11 +549,15 @@ class PrintBundleController extends Controller
             }
 
             $dataKunjungan = KunjunganBPJS::where('noSEP', $pengajuanKlaim->nomor_sep)->first();
+            
+            //Get Nama Dokter
+            $namaDokter = DokterBPJS::where('KODE', $dataKunjungan->dpjpSKDP)->first();
 
             // Return HTML preview using same Blade template as PDF
             return view("pdf.templates.{$documentType}", array_merge([
                 'pengajuanKlaim' => $pengajuanKlaim,
                 'dataKunjungan' => $dataKunjungan,
+                'namaDokter' => $namaDokter ?? '',
                 'data' => $data,
                 'selectedRecords' => $selectedRecords,
                 'logoBase64' => $logoBase64,
@@ -679,6 +684,10 @@ class PrintBundleController extends Controller
             
             // Get QR codes for signatures
             $qrData = $this->generateQRCodes($pengajuanKlaim, $data, $documentType);
+
+            //Get Nama Dokter
+            $getKunjunganBPJS = KunjunganBPJS::where('noSEP', $pengajuanKlaim->nomor_sep)->first();
+            $namaDokter = DokterBPJS::where('KODE', $getKunjunganBPJS->dpjpSKDP)->first();
             
             Log::info('PDF generation started', [
                 'document_type' => $documentType,
@@ -693,17 +702,7 @@ class PrintBundleController extends Controller
                 'selectedRecords' => $selectedRecords,
                 'logoBase64' => $logoBase64,
                 'documentType' => $documentType,
-            ], $qrData))
-            ->setPaper('a4', 'portrait')
-            ->setOptions([
-                'isRemoteEnabled' => false,
-                'isHtml5ParserEnabled' => true,
-                'isFontSubsettingEnabled' => true, // Enable font subsetting
-                'defaultFont' => 'sans-serif',
-                'dpi' => 72, // Lower DPI for smaller file size
-                'enable_font_subsetting' => true,
-                'compress' => 1, // Enable PDF compression
-            ]);
+            ], $qrData))->setPaper('a4', 'portrait');
             
             Log::info('PDF generated successfully', ['document_type' => $documentType]);
             
