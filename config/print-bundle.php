@@ -22,6 +22,12 @@ return [
     
     // INACBG API Settings - NORMAL SETTINGS
     'inacbg_timeout' => env('INACBG_API_TIMEOUT', 60), // 60 seconds for API
+    
+    // PDF Size Optimization Settings
+    'image_compression_quality' => env('PDF_IMAGE_QUALITY', 60), // 60% quality (balance between size and readability)
+    'logo_max_width' => env('PDF_LOGO_MAX_WIDTH', 400), // Max logo width in pixels
+    'qr_code_size' => env('PDF_QR_CODE_SIZE', 100), // QR code size in pixels
+    'enable_image_compression' => env('PDF_ENABLE_IMAGE_COMPRESSION', true), // Enable/disable compression
     'inacbg_retry_attempts' => env('INACBG_RETRY_ATTEMPTS', 2), // 2 retry attempts
     'enable_fallback_data' => env('INACBG_ENABLE_FALLBACK', true),
     

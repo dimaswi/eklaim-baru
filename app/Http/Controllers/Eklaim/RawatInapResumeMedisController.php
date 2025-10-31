@@ -148,7 +148,7 @@ class RawatInapResumeMedisController extends Controller
                 'resepPulang.*.frekuensi' => 'required_with:resepPulang|string',
                 'resepPulang.*.jumlah' => 'required_with:resepPulang|integer',
                 'resepPulang.*.cara_pemberian' => 'required_with:resepPulang|string',
-                'resepPulang.*.kode_obat' => 'required_with:resepPulang|string',
+                // 'resepPulang.*.kode_obat' => 'required_with:resepPulang|string',
             ]);
 
             DB::connection('app')->beginTransaction();

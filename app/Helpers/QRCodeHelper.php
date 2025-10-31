@@ -8,18 +8,24 @@ class QRCodeHelper
 {
     /**
      * Generate QR Code data URL menggunakan QR Server API
+     * Optimized for PDF size reduction: smaller size, compressed JPEG format
      * 
      * @param string $text
      * @param int $size
      * @return string
      */
-    public static function generateDataURL($text, $size = 150)
+    public static function generateDataURL($text, $size = 100)
     {
+        // Reduce default size from 150 to 100 for smaller PDF files
+        // QR codes are still readable at this size
+        
         // Encode text untuk URL
         $encodedText = urlencode($text);
         
-        // Menggunakan QR Server API (gratis) dengan margin yang lebih baik
-        $qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size={$size}x{$size}&data={$encodedText}&format=png&margin=5";
+        // Menggunakan QR Server API dengan optimized settings untuk PDF
+        // Format: JPEG dengan quality medium untuk file size lebih kecil
+        // Margin dikurangi dari 5 ke 2 untuk size lebih kecil
+        $qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size={$size}x{$size}&data={$encodedText}&format=jpg&margin=2&qzone=0";
         
         try {
             // Set context untuk allow_url_fopen dan ignore SSL
@@ -39,9 +45,9 @@ class QRCodeHelper
             $imageContent = file_get_contents($qrUrl, false, $context);
             
             if ($imageContent !== false && !empty($imageContent)) {
-                // Convert to base64 data URL
+                // Convert to base64 data URL with JPEG format (smaller than PNG)
                 $base64 = base64_encode($imageContent);
-                return 'data:image/png;base64,' . $base64;
+                return 'data:image/jpeg;base64,' . $base64;
             }
         } catch (\Exception $e) {
             // Jika gagal, log error dan return fallback
@@ -119,6 +125,7 @@ class QRCodeHelper
     
     /**
      * Generate QR code untuk nama dengan informasi tambahan
+     * Optimized for PDF with reduced size
      * 
      * @param string $nama
      * @param string $nip
@@ -133,6 +140,7 @@ class QRCodeHelper
             $qrText .= " ({$role})";
         }
         
-        return self::generateDataURL($qrText, 120);
+        // Reduced from 120 to 90 for smaller PDF size
+        return self::generateDataURL($qrText, 90);
     }
 }

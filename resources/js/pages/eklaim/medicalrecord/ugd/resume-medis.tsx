@@ -397,7 +397,6 @@ export default function RawatInapResumeMedisUGD() {
 
             router.post(`/eklaim/ugd/resume-medis`, dataToSend, {
                 onSuccess: () => {
-                    toast.success('Data Resume Medis UGD berhasil disimpan');
                     setLoading(null);
                 },
                 onError: (errors) => {
@@ -637,7 +636,6 @@ export default function RawatInapResumeMedisUGD() {
             });
         } catch (error) {
             console.error('Error saving Resume Medis UGD:', error);
-            toast.error('Gagal menyimpan data Resume Medis UGD');
             setLoading(null);
         }
     };

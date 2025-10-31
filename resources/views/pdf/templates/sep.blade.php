@@ -185,8 +185,6 @@
                 <div class="logo-container">
                     @if($logoBase64)
                         <img src="{{ $logoBase64 }}" alt="BPJS Kesehatan Logo">
-                    @else
-                        <img src="data:image/png;base64,{{ base64_encode(file_get_contents(public_path('bpjs.png'))) }}" alt="BPJS Kesehatan Logo">
                     @endif
                 </div>
                 <div class="header-text">
@@ -294,7 +292,9 @@
         <div class="sep-container">
             <div class="header-section">
                 <div class="logo-container">
-                    <img src="data:image/png;base64,{{ base64_encode(file_get_contents(public_path('bpjs.png'))) }}" alt="BPJS Kesehatan Logo">
+                    @if($logoBase64)
+                        <img src="{{ $logoBase64 }}" alt="BPJS Kesehatan Logo">
+                    @endif
                 </div>
                 <div class="header-text">
                     <h1 class="header-title">SURAT ELEGIBILITAS PESERTA</h1>

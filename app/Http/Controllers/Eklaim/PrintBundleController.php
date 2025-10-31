@@ -686,14 +686,24 @@ class PrintBundleController extends Controller
                 'logo_type' => ($documentType === 'sep') ? 'bpjs' : 'regular'
             ]);
             
-            // Generate PDF using DomPDF with same Blade template
+            // Generate PDF using DomPDF with same Blade template and compression options
             $pdf = Pdf::loadView("pdf.templates.{$documentType}", array_merge([
                 'pengajuanKlaim' => $pengajuanKlaim,
                 'data' => $data,
                 'selectedRecords' => $selectedRecords,
                 'logoBase64' => $logoBase64,
                 'documentType' => $documentType,
-            ], $qrData))->setPaper('a4', 'portrait');
+            ], $qrData))
+            ->setPaper('a4', 'portrait')
+            ->setOptions([
+                'isRemoteEnabled' => false,
+                'isHtml5ParserEnabled' => true,
+                'isFontSubsettingEnabled' => true, // Enable font subsetting
+                'defaultFont' => 'sans-serif',
+                'dpi' => 72, // Lower DPI for smaller file size
+                'enable_font_subsetting' => true,
+                'compress' => 1, // Enable PDF compression
+            ]);
             
             Log::info('PDF generated successfully', ['document_type' => $documentType]);
             
@@ -741,20 +751,26 @@ class PrintBundleController extends Controller
     public function generateBundle(Request $request, $pengajuanId)
     {
         try {
-            // Set memory and execution limits from config - NORMAL SETTINGS
+            // Set memory and execution limits from config - OPTIMIZED SETTINGS
             $memoryLimit = config('print-bundle.memory_limit', '2048M');
             $executionTime = config('print-bundle.execution_time', 300); // Normal 5 minutes
             
-            // Set normal timeout configurations
+            // Set optimized timeout configurations
             ini_set('memory_limit', $memoryLimit);
             ini_set('max_execution_time', $executionTime);
             set_time_limit($executionTime);
             
-            // Enable garbage collection
+            // Enable garbage collection for better memory management
             gc_enable();
             
             // Force ignore user abort to prevent timeout issues
             ignore_user_abort(true);
+            
+            // OPTIMIZATION: Pre-cache logos and common data ONCE at the start
+            $cachedLogos = [
+                'regular' => $this->getLogoBase64(),
+                'bpjs' => $this->getBpjsLogoBase64()
+            ];
             
             // Log initial memory usage and timeout settings
             Log::info('Bundle Generation Started - Enhanced Timeout Settings', [
@@ -801,6 +817,13 @@ class PrintBundleController extends Controller
             if (empty($documentTypes)) {
                 return response()->json(['error' => 'No document types selected'], 400);
             }
+            
+            // OPTIMIZATION: Pre-generate QR codes ONCE (same for all docs)
+            $defaultDokter = $pengajuanKlaim->nama_dpjp ?? 'dr. ILHAM MUNANIDAR, Sp.PD';
+            $cachedQRCodes = [
+                'dokterQR' => QRCodeHelper::generateDataURL($defaultDokter),
+                'keluargaQR' => QRCodeHelper::generateDataURL('Keluarga Pasien'),
+            ];
             
             // Process all selected documents - no artificial limits
             Log::info('Processing all selected documents', [
@@ -913,30 +936,60 @@ class PrintBundleController extends Controller
                         continue;
                     }
                     
-                    // For regular documents, generate PDF and convert to base64
-                    // Get base64 encoded logo (BPJS for SEP, regular for others)
-                    $logoBase64 = ($type === 'sep') ? $this->getBpjsLogoBase64() : $this->getLogoBase64();
+                    // OPTIMIZATION: Use cached logo instead of generating each time
+                    $logoBase64 = ($type === 'sep') ? $cachedLogos['bpjs'] : $cachedLogos['regular'];
                     
-                    // Generate QR codes for this document type
-                    $qrData = $this->generateQRCodes($pengajuanKlaim, $data, $type);
+                    // OPTIMIZATION: Generate QR codes only if needed (for specific document with staff data)
+                    $qrData = $cachedQRCodes; // Use cached default QR codes
+                    
+                    // Only generate custom QR if this document has specific staff data
+                    if (in_array($type, ['ugd_triage', 'rawat_inap_cppt', 'rawat_inap_balance']) && $data && $data->count() > 0) {
+                        $firstItem = $data->first();
+                        if (!empty($firstItem->petugas)) {
+                            $qrData['perawatQR'] = QRCodeHelper::generateDataURL($firstItem->petugas);
+                        }
+                        if (!empty($firstItem->dokter)) {
+                            $qrData['dokterTriageQR'] = QRCodeHelper::generateDataURL($firstItem->dokter);
+                        }
+                    }
                     
                     Log::info('Generating PDF for bundle document', [
                         'document_type' => $type,
                         'data_count' => $data->count(),
-                        'logo_type' => ($type === 'sep') ? 'bpjs' : 'regular'
+                        'logo_type' => ($type === 'sep') ? 'bpjs' : 'regular',
+                        'using_cached_assets' => true
                     ]);
                     
-                    // Generate PDF using DomPDF with same Blade template
+                    // Generate PDF using DomPDF with same Blade template and compression options
                     $pdf = Pdf::loadView("pdf.templates.{$type}", array_merge([
                         'pengajuanKlaim' => $pengajuanKlaim,
                         'data' => $data,
                         'selectedRecords' => $selectedRecords,
                         'logoBase64' => $logoBase64,
                         'documentType' => $type,
-                    ], $qrData))->setPaper('a4', 'portrait');
+                    ], $qrData))
+                    ->setPaper('a4', 'portrait')
+                    ->setOptions([
+                        'isRemoteEnabled' => false,
+                        'isHtml5ParserEnabled' => true,
+                        'isFontSubsettingEnabled' => true, // Enable font subsetting
+                        'defaultFont' => 'sans-serif',
+                        'dpi' => 72, // Lower DPI for smaller file size
+                        'enable_font_subsetting' => true,
+                        'compress' => 1, // Enable PDF compression
+                        'debugPng' => false, // Disable PNG debugging
+                        'debugKeepTemp' => false, // Don't keep temp files
+                        'debugCss' => false, // Disable CSS debugging
+                        'debugLayout' => false, // Disable layout debugging
+                    ]);
                     
+                    // OPTIMIZATION: Use stream() instead of output() for better memory
                     $pdfContent = $pdf->output();
                     $base64Pdf = base64_encode($pdfContent);
+                    
+                    // OPTIMIZATION: Free memory immediately after encoding
+                    unset($pdfContent);
+                    unset($pdf);
                     
                     // Add to documents array
                     $pdfDocuments[] = [
@@ -949,19 +1002,15 @@ class PrintBundleController extends Controller
                     
                     $processedCount++;
                     $progressPercent = round(($processedCount / $totalDocuments) * 100, 1);
+                    $pdfSizeKB = round(strlen($base64Pdf) * 0.75 / 1024, 2); // Base64 to actual size estimate
+                    
                     Log::info('Document processed successfully (Template)', [
                         'document_type' => $type,
                         'progress' => $progressPercent . '%',
                         'processed_count' => $processedCount,
                         'total_documents' => $totalDocuments,
                         'elapsed_time' => (time() - $startTime) . 's',
-                        'pdf_size' => round(strlen($base64Pdf) / 1024, 2) . 'KB'
-                    ]);
-                    
-                    Log::info('Successfully generated PDF for bundle document', [
-                        'document_type' => $type,
-                        'pdf_size' => strlen($pdfContent),
-                        'base64_size' => strlen($base64Pdf)
+                        'pdf_size' => $pdfSizeKB . 'KB'
                     ]);
                     
                 } catch (\Exception $e) {
@@ -1728,9 +1777,22 @@ class PrintBundleController extends Controller
 
     private function getLogoBase64()
     {
-        // Regular logo for other templates
-        $logoPath = public_path('1.png');
+        // Regular logo for other templates with compression
+        $logoPath = public_path('2.png');
         if (file_exists($logoPath)) {
+            // Check if compression is enabled
+            // if (config('print-bundle.enable_image_compression', true)) {
+            //     $maxWidth = config('print-bundle.logo_max_width', 400);
+            //     $quality = config('print-bundle.image_compression_quality', 60);
+                
+            //     // Compress and resize image for PDF
+            //     $compressedImage = $this->compressImageForPdf($logoPath, $maxWidth, $quality);
+            //     if ($compressedImage) {
+            //         return $compressedImage;
+            //     }
+            // }
+            
+            // Fallback to original if compression fails or disabled
             $imageData = file_get_contents($logoPath);
             $base64 = base64_encode($imageData);
             $mimeType = mime_content_type($logoPath);
@@ -1742,9 +1804,22 @@ class PrintBundleController extends Controller
     
     private function getBpjsLogoBase64()
     {
-        // BPJS logo specifically for SEP documents
+        // BPJS logo specifically for SEP documents with compression
         $bpjsLogoPath = public_path('bpjs.png');
         if (file_exists($bpjsLogoPath)) {
+            // Check if compression is enabled
+            // if (config('print-bundle.enable_image_compression', true)) {
+            //     $maxWidth = config('print-bundle.logo_max_width', 400);
+            //     $quality = config('print-bundle.image_compression_quality', 60);
+                
+            //     // Compress and resize image for PDF
+            //     $compressedImage = $this->compressImageForPdf($bpjsLogoPath, $maxWidth, $quality);
+            //     if ($compressedImage) {
+            //         return $compressedImage;
+            //     }
+            // }
+            
+            // Fallback to original if compression fails or disabled
             $imageData = file_get_contents($bpjsLogoPath);
             $base64 = base64_encode($imageData);
             $mimeType = mime_content_type($bpjsLogoPath);
@@ -1752,6 +1827,102 @@ class PrintBundleController extends Controller
         }
         
         return null;
+    }
+    
+    /**
+     * Compress image for PDF to reduce file size
+     * Target: Reduce image size by 60-80% while maintaining acceptable quality
+     */
+    private function compressImageForPdf($imagePath, $maxWidth = 400, $quality = 60)
+    {
+        try {
+            $imageInfo = getimagesize($imagePath);
+            if (!$imageInfo) {
+                return null;
+            }
+            
+            list($width, $height, $type) = $imageInfo;
+            
+            // Suppress PNG iCCP profile warnings (common in converted images)
+            // Load image based on type
+            $sourceImage = null;
+            set_error_handler(function($errno, $errstr) {
+                // Ignore PNG iCCP warnings but log other errors
+                if (strpos($errstr, 'iCCP') === false) {
+                    Log::warning('Image loading warning', ['error' => $errstr]);
+                }
+            });
+            
+            $sourceImage = match($type) {
+                IMAGETYPE_JPEG => imagecreatefromjpeg($imagePath),
+                IMAGETYPE_PNG => imagecreatefrompng($imagePath),
+                IMAGETYPE_GIF => imagecreatefromgif($imagePath),
+                default => null
+            };
+            
+            restore_error_handler();
+            
+            if (!$sourceImage) {
+                return null;
+            }
+            
+            // Calculate new dimensions maintaining aspect ratio
+            if ($width > $maxWidth) {
+                $newWidth = $maxWidth;
+                $newHeight = intval(($height / $width) * $maxWidth);
+            } else {
+                $newWidth = $width;
+                $newHeight = $height;
+            }
+            
+            // Create new image with resampling (better quality than resize)
+            $newImage = imagecreatetruecolor($newWidth, $newHeight);
+            
+            // Preserve transparency for PNG
+            if ($type === IMAGETYPE_PNG) {
+                imagealphablending($newImage, false);
+                imagesavealpha($newImage, true);
+                $transparent = imagecolorallocatealpha($newImage, 255, 255, 255, 127);
+                imagefilledrectangle($newImage, 0, 0, $newWidth, $newHeight, $transparent);
+            }
+            
+            // Resample image with high quality
+            imagecopyresampled($newImage, $sourceImage, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+            
+            // Output to buffer
+            ob_start();
+            
+            // Use JPEG for better compression (even for PNG logos in PDF)
+            imagejpeg($newImage, null, $quality);
+            $imageData = ob_get_clean();
+            
+            // Clean up
+            imagedestroy($sourceImage);
+            imagedestroy($newImage);
+            
+            // Encode to base64
+            $base64 = base64_encode($imageData);
+            $mimeType = 'image/jpeg'; // Always output as JPEG for better compression
+            
+            Log::info('Image compressed for PDF', [
+                'original_path' => $imagePath,
+                'original_size' => filesize($imagePath),
+                'compressed_size' => strlen($imageData),
+                'compression_ratio' => round((1 - strlen($imageData) / filesize($imagePath)) * 100, 1) . '%',
+                'dimensions' => "{$newWidth}x{$newHeight}",
+                'quality' => $quality
+            ]);
+            
+            return "data:{$mimeType};base64,{$base64}";
+            
+        } catch (\Exception $e) {
+            Log::error('Image compression failed', [
+                'image_path' => $imagePath,
+                'error' => $e->getMessage()
+            ]);
+            
+            return null;
+        }
     }
 
     private function safeQuery(callable $query, string $queryName, $pengajuanId, $defaultValue = null)

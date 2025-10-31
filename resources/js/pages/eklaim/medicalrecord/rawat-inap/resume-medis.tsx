@@ -359,7 +359,6 @@ export default function RawatInapResumeMedis() {
 
             router.post(`/eklaim/rawat-inap/resume-medis`, dataToSend, {
                 onSuccess: () => {
-                    toast.success('Data Resume Medis Rawat Inap berhasil disimpan');
                     setLoading(null);
                 },
                 onError: (errors) => {

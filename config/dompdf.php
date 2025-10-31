@@ -109,8 +109,9 @@ return [
 
         /**
          * Whether to enable font subsetting or not.
+         * ENABLED for PDF size reduction - only embeds used glyphs
          */
-        'enable_font_subsetting' => false,
+        'enable_font_subsetting' => true,
 
         /**
          * The PDF rendering backend to use
@@ -213,8 +214,9 @@ return [
          * the real image dimension in px for rendering.
          *
          * @var int
+         * REDUCED to 72 for smaller PDF file size (still readable quality)
          */
-        'dpi' => 96,
+        'dpi' => 72,
 
         /**
          * Enable embedded PHP
