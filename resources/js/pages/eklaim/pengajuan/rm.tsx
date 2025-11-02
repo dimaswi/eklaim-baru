@@ -243,6 +243,13 @@ export default function RMDetail() {
     const igd = finalGroups.filter((g) => g.groupType === 'IGD');
     const penunjangSaja = finalGroups.filter((g) => g.groupType === 'Penunjang');
 
+    // Check if there are any lab or radiology visits
+    const hasLabVisit = allKunjungan.some((k) => k.ruangan?.JENIS_KUNJUNGAN === 4);
+    const hasRadioVisit = allKunjungan.some((k) => k.ruangan?.JENIS_KUNJUNGAN === 5);
+
+    // Get the first kunjungan NOMOR for creating new lab/radio records
+    const firstKunjunganNomor = allKunjungan.length > 0 ? allKunjungan[0].NOMOR : '';
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Detail RM - ${pengajuan_klaim.nama_pasien}`} />
@@ -372,9 +379,41 @@ export default function RMDetail() {
                             {rawatInap.map((group) => (
                                 <Card key={`rawat-inap-${group.nopen}`}>
                                     <CardHeader>
-                                        <CardTitle className="flex items-center gap-2">
-                                            <MapPin className="h-5 w-5 text-blue-500" />
-                                            Rawat Inap - No. Pendaftaran: {group.nopen}
+                                        <CardTitle className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <MapPin className="h-5 w-5 text-blue-500" />
+                                                Rawat Inap - No. Pendaftaran: {group.nopen}
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {!hasLabVisit && firstKunjunganNomor && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            router.visit(
+                                                                `/eklaim/pengajuan/${pengajuan_klaim.id}/rm/laboratorium/hasil/${firstKunjunganNomor}`,
+                                                            )
+                                                        }
+                                                    >
+                                                        <FileText className="mr-2 h-4 w-4" />
+                                                        Tambah Laboratorium
+                                                    </Button>
+                                                )}
+                                                {!hasRadioVisit && firstKunjunganNomor && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            router.visit(
+                                                                `/eklaim/pengajuan/${pengajuan_klaim.id}/rm/radiologi/hasil/${firstKunjunganNomor}`,
+                                                            )
+                                                        }
+                                                    >
+                                                        <FileText className="mr-2 h-4 w-4" />
+                                                        Tambah Radiologi
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent>
@@ -475,9 +514,41 @@ export default function RMDetail() {
                             {rawatJalan.map((group) => (
                                 <Card key={`rawat-jalan-${group.nopen}`}>
                                     <CardHeader>
-                                        <CardTitle className="flex items-center gap-2">
-                                            <MapPin className="h-5 w-5 text-green-500" />
-                                            Rawat Jalan - No. Pendaftaran: {group.nopen}
+                                        <CardTitle className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <MapPin className="h-5 w-5 text-blue-500" />
+                                                Rawat Jalan - No. Pendaftaran: {group.nopen}
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {!hasLabVisit && firstKunjunganNomor && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            router.visit(
+                                                                `/eklaim/pengajuan/${pengajuan_klaim.id}/rm/laboratorium/hasil/${firstKunjunganNomor}`,
+                                                            )
+                                                        }
+                                                    >
+                                                        <FileText className="mr-2 h-4 w-4" />
+                                                        Tambah Laboratorium
+                                                    </Button>
+                                                )}
+                                                {!hasRadioVisit && firstKunjunganNomor && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            router.visit(
+                                                                `/eklaim/pengajuan/${pengajuan_klaim.id}/rm/radiologi/hasil/${firstKunjunganNomor}`,
+                                                            )
+                                                        }
+                                                    >
+                                                        <FileText className="mr-2 h-4 w-4" />
+                                                        Tambah Radiologi
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent>
