@@ -558,7 +558,7 @@
                         
                     </td>
                     <td class="footer-right-cell">
-                        <div class="date-location">BOJONEGORO, {{ \Carbon\Carbon::now()->locale('id')->isoFormat('D MMMM Y') }}</div>
+                        <div class="date-location">BOJONEGORO, {{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_keluar ?? '-')->format('d F Y') }}</div>
                         <div style="font-weight: bold;">Perawat Triage</div>
                         <div style="margin: 8px 0 8px;">
                             @if (isset($perawatQR))

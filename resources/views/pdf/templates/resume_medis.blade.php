@@ -703,7 +703,7 @@
                             @endif
                             
                             <div class="doctor-name">{{ $dokterNama }}</div>
-                            <div class="date-location">{{ $tanggalTtd }}</div>
+                            <div class="date-location">{{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_keluar ?? '-')->format('d F Y') }}</div>
                         </td>
                     </tr>
                 </table>

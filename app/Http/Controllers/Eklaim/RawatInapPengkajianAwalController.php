@@ -233,7 +233,11 @@ class RawatInapPengkajianAwalController extends Controller
             'filtered_data_keys' => array_keys($filteredData),
             'has_pengajuan_klaim_id' => isset($filteredData['pengajuan_klaim_id']),
             'status_psikologi_count' => count($statusPsikologi),
-            'edukasi_count' => count($edukasi)
+            'status_psikologi_data' => $statusPsikologi,
+            'edukasi_count' => count($edukasi),
+            'edukasi_data' => $edukasi,
+            'spiritual_count' => count($spiritual),
+            'ekonomi_count' => count($ekonomi)
         ]);
 
         // Check if record exists, update or create

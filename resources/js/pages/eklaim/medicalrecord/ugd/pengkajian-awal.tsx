@@ -267,7 +267,40 @@ export default function PengkajianAwalUGD() {
     // Load savedData saat komponen pertama kali dimuat
     useEffect(() => {
         if (savedData) {
-            setPasien(savedData);
+            // Expand JSON fields ke individual checkbox fields
+            const expandedData = { ...savedData };
+            
+            // Expand status_psikologi JSON
+            if (savedData.status_psikologi && typeof savedData.status_psikologi === 'object') {
+                Object.assign(expandedData, savedData.status_psikologi);
+            }
+            
+            // Expand status_mental_hubungan JSON
+            if (savedData.status_mental_hubungan && typeof savedData.status_mental_hubungan === 'object') {
+                Object.assign(expandedData, savedData.status_mental_hubungan);
+            }
+            
+            // Expand tempat_tinggal JSON
+            if (savedData.tempat_tinggal && typeof savedData.tempat_tinggal === 'object') {
+                Object.assign(expandedData, savedData.tempat_tinggal);
+            }
+            
+            // Expand spiritual JSON
+            if (savedData.spiritual && typeof savedData.spiritual === 'object') {
+                Object.assign(expandedData, savedData.spiritual);
+            }
+            
+            // Expand ekonomi JSON
+            if (savedData.ekonomi && typeof savedData.ekonomi === 'object') {
+                Object.assign(expandedData, savedData.ekonomi);
+            }
+            
+            // Expand edukasi JSON
+            if (savedData.edukasi && typeof savedData.edukasi === 'object') {
+                Object.assign(expandedData, savedData.edukasi);
+            }
+            
+            setPasien(expandedData);
             
             if (savedData.autoanamnesis === '1') {
                 setAnamnesisType('auto');

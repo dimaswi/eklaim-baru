@@ -499,7 +499,7 @@
                                 <div class="qr-placeholder">[QR]</div>
                             @endif
                             <div style="font-size: 8px; margin-top: 5px; border-top: 1px solid #000; padding-top: 5px; min-height: 20px;">
-                                {{ $pengajuanKlaim->created_at ? \Carbon\Carbon::parse($pengajuanKlaim->created_at)->format('d-m-Y') : '' }}
+                                {{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_keluar ?? '-')->format('d F Y') }}
                             </div>
                         </td>
                     </tr>
