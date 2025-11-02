@@ -87,6 +87,10 @@ export default function PengajuanKlaimModal({
 
     console.log(data.jenis_kunjungan)
 
+    // Local editable state for tanggal masuk/keluar so user can change before submit
+    const [tanggalMasuk, setTanggalMasuk] = useState<string>(data.tanggal_masuk ? String(data.tanggal_masuk).split(' ')[0] : '');
+    const [tanggalKeluar, setTanggalKeluar] = useState<string>(data.tanggal_keluar ? String(data.tanggal_keluar).split(' ')[0] : '');
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -98,8 +102,9 @@ export default function PengajuanKlaimModal({
             nama_pasien: data.nama_pasien,
             tgl_lahir: data.tgl_lahir,
             gender: data.gender,
-            tanggal_masuk: data.tanggal_masuk,
-            tanggal_keluar: data.tanggal_keluar,
+            // send edited dates (YYYY-MM-DD) if user changed them
+            tanggal_masuk: tanggalMasuk || data.tanggal_masuk || null,
+            tanggal_keluar: tanggalKeluar || data.tanggal_keluar || null,
             ruangan: data.ruangan,
             jenis_kunjungan: formatJenisKunjungan(data.jenis_kunjungan),
         };
@@ -139,8 +144,8 @@ export default function PengajuanKlaimModal({
                 nama_pasien: data.nama_pasien,
                 tgl_lahir: data.tgl_lahir,
                 gender: data.gender,
-                tanggal_masuk: data.tanggal_masuk,
-                tanggal_keluar: data.tanggal_keluar,
+                tanggal_masuk: tanggalMasuk || data.tanggal_masuk || null,
+                tanggal_keluar: tanggalKeluar || data.tanggal_keluar || null,
                 ruangan: data.ruangan,
                 jenis_kunjungan: formatJenisKunjungan(data.jenis_kunjungan),
                 force_create: true, // Flag untuk bypass API dan langsung create ke database
@@ -273,9 +278,10 @@ export default function PengajuanKlaimModal({
                                         Tanggal Masuk
                                     </Label>
                                     <Input
-                                        value={formatDate(data.tanggal_masuk || '')}
-                                        readOnly
-                                        className="bg-gray-50"
+                                        type="date"
+                                        value={tanggalMasuk}
+                                        onChange={(e) => setTanggalMasuk(e.target.value)}
+                                        className="bg-white"
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -284,9 +290,10 @@ export default function PengajuanKlaimModal({
                                         Tanggal Keluar
                                     </Label>
                                     <Input
-                                        value={formatDate(data.tanggal_keluar || '')}
-                                        readOnly
-                                        className="bg-gray-50"
+                                        type="date"
+                                        value={tanggalKeluar}
+                                        onChange={(e) => setTanggalKeluar(e.target.value)}
+                                        className="bg-white"
                                     />
                                 </div>
                                 <div className="space-y-2">
