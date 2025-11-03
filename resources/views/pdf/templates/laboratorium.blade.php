@@ -341,7 +341,7 @@
                                 <div class="petugas-name">{{ $petugasNama }}</div>
                             </td>
                             <td class="footer-right-cell">
-                                <div class="date-location">BOJONEGORO, {{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_keluar ?? '-')->format('d F Y') }}</div>
+                                <div class="date-location">BOJONEGORO, {{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_keluar ?? '-')->locale('id')->format('d F Y') }}</div>
                                 <div class="doctor-title">Konsulen</div>
                                 
                                 @php
