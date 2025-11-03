@@ -376,7 +376,7 @@
                                 <tr>
                                     <td class="label">Tanggal Lahir</td>
                                     <td class="colon">:</td>
-                                    <td class="value">{{ $pengajuanKlaim->tanggal_lahir ? \Carbon\Carbon::parse($pengajuanKlaim->tanggal_lahir)->format('d-m-Y') : '-' }}</td>
+                                    <td class="value">{{ $pengajuanKlaim->tanggal_lahir ? \Carbon\Carbon::parse($pengajuanKlaim->tanggal_lahir)->locale('id')->format('d-m-Y') : '-' }}</td>
                                 </tr>
                             </table>
                         </td>
@@ -499,7 +499,7 @@
                                 <div class="qr-placeholder">[QR]</div>
                             @endif
                             <div style="font-size: 8px; margin-top: 5px; border-top: 1px solid #000; padding-top: 5px; min-height: 20px;">
-                                {{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_keluar ?? '-')->format('d F Y') }}
+                                {{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_keluar ?? '-')->locale('id')->format('d F Y') }}
                             </div>
                         </td>
                     </tr>
