@@ -844,8 +844,6 @@ class PrintBundleController extends Controller
             // Process documents in chunks to prevent memory overflow
             $chunkSize = config('print-bundle.chunk_size', 3);
             $documentChunks = array_chunk($documentTypes, $chunkSize);
-
-            dd($documentChunks);
             
             $startTime = time();
             $totalDocuments = count($documentTypes);
