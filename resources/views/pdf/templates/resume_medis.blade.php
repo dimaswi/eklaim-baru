@@ -476,7 +476,7 @@
                                 </tr>
                                 <tr>
                                     <td class="label">Tanggal Keluar</td><td class="colon">:</td>
-                                    <td class="value">{{ $tglKeluar ? \Carbon\Carbon::parse($tglKeluar)->format('d M Y H:i:s') : '-' }}</td>
+                                    <td class="value">{{ $tglKeluar ? \Carbon\Carbon::parse($tglKeluar)->locale('id')->isoFormat('D MMMM Y HH:mm:ss') : '-' }}</td>
                                 </tr>
                                 <tr>
                                     <td class="label">Lama Rawat</td><td class="colon">:</td>
@@ -703,7 +703,7 @@
                             @endif
                             
                             <div class="doctor-name">{{ $dokterNama }}</div>
-                            <div class="date-location">{{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_keluar ?? '-')->format('d F Y') }}</div>
+                            <div class="date-location">{{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_keluar ?? '-')->locale('id')->isoFormat('D MMMM Y') }}</div>
                         </td>
                     </tr>
                 </table>

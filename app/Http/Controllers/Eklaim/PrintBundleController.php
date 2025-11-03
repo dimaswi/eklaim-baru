@@ -640,6 +640,8 @@ class PrintBundleController extends Controller
             
             // Get data based on document type
             $data = $this->getDocumentData($documentType, $pengajuanId, $selectedRecords);
+
+            dd($data);
             
             if (!$data || $data->isEmpty()) {
                 Log::warning('No data found for PDF', [
