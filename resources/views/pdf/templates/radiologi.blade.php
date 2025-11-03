@@ -145,7 +145,7 @@
                                     <tr>
                                         <td class="label">Tanggal Keluar</td>
                                         <td class="colon">:</td>
-                                        <td class="value">{{ $pengajuanKlaim->tanggal_keluar ? \Carbon\Carbon::parse($pengajuanKlaim->tanggal_keluar)->locale('id')->format('d M Y H:i:s') : '-' }}</td>
+                                        <td class="value">{{ $pengajuanKlaim->tanggal_keluar ? \Carbon\Carbon::parse($pengajuanKlaim->tanggal_keluar)->locale('id')->isoFormat('D MMMM Y HH:mm:ss') : '-' }}</td>
                                     </tr>
                                     <tr>
                                         <td class="label">Tindakan</td>
@@ -306,7 +306,7 @@
                                 <div class="petugas-name">{{ $petugasNama }}</div>
                             </td>
                             <td class="footer-right-cell">
-                                <div class="date-location">BOJONEGORO, {{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_keluar ?? '-')->locale('id')->format('d F Y') }}</div>
+                                <div class="date-location">BOJONEGORO, {{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_keluar ?? '-')->locale('id')->isoFormat('D MMMM Y') }}</div>
                                 <div class="doctor-title">Konsulen</div>
                                 
                                 @php
