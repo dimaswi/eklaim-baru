@@ -499,7 +499,7 @@
                                 <div class="qr-placeholder">[QR]</div>
                             @endif
                             <div style="font-size: 8px; margin-top: 5px; border-top: 1px solid #000; padding-top: 5px; min-height: 20px;">
-                                {{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_keluar ?? '-')->locale('id')->format('d F Y') }}
+                                {{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_keluar ?? '-')->locale('id')->isoFormat('D MMMM Y')}}
                             </div>
                         </td>
                     </tr>
