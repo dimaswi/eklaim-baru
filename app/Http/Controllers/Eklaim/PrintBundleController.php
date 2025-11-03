@@ -844,6 +844,8 @@ class PrintBundleController extends Controller
             // Process documents in chunks to prevent memory overflow
             $chunkSize = config('print-bundle.chunk_size', 3);
             $documentChunks = array_chunk($documentTypes, $chunkSize);
+
+            dd($documentChunks);
             
             $startTime = time();
             $totalDocuments = count($documentTypes);
@@ -880,8 +882,6 @@ class PrintBundleController extends Controller
                     $currentElapsed = time() - $startTime;
                     $progressPercent = round(($processedCount / $totalDocuments) * 100, 1);
                     $data = $this->getDocumentData($type, $pengajuanId, $selectedRecords);
-
-                    dd($data);
                     
                     if (!$data || $data->isEmpty()) {
                         Log::warning("No data found for bundle document type: {$type}", [
