@@ -818,10 +818,13 @@ class PrintBundleController extends Controller
             }
             
             // OPTIMIZATION: Pre-generate QR codes ONCE (same for all docs)
+            // Ensure all expected QR keys exist so blade templates don't error on undefined variables
             $defaultDokter = $pengajuanKlaim->nama_dpjp ?? 'dr. ILHAM MUNANIDAR, Sp.PD';
             $cachedQRCodes = [
                 'dokterQR' => QRCodeHelper::generateDataURL($defaultDokter),
                 'keluargaQR' => QRCodeHelper::generateDataURL('Keluarga Pasien'),
+                'perawatQR' => null,
+                'dokterTriageQR' => null,
             ];
             
             // Process all selected documents - no artificial limits
