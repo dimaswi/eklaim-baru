@@ -264,10 +264,53 @@ export default function PengkajianAwalUGD() {
     const [faktorResikoText, setFaktorResikoText] = useState<string>('-');
     const [riwayatPenyakitKeluargaText, setRiwayatPenyakitKeluargaText] = useState<string>('-');
 
+    // Helper function to normalize datetime for saved data
+    const normalizeDatetimeForSavedData = (datetime?: string): string => {
+        if (!datetime || datetime === 'Tidak ada' || datetime === '-') {
+            return '';
+        }
+        
+        try {
+            if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(datetime)) {
+                return datetime;
+            }
+            
+            if (/^\d{4}-\d{2}-\d{2}$/.test(datetime)) {
+                return datetime + ' 00:00:00';
+            }
+            
+            if (datetime.includes('T')) {
+                const date = new Date(datetime);
+                if (!isNaN(date.getTime())) {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const hours = String(date.getHours()).padStart(2, '0');
+                    const minutes = String(date.getMinutes()).padStart(2, '0');
+                    const seconds = String(date.getSeconds()).padStart(2, '0');
+                    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+                }
+            }
+            
+            return datetime;
+        } catch (error) {
+            console.error('Error normalizing datetime:', error, datetime);
+            return '';
+        }
+    };
+
     useEffect(() => {
         if (savedData) {
             // Expand JSON fields ke individual checkbox fields
             const expandedData = { ...savedData };
+            
+            // Normalize tanggal_masuk dan tanggal_keluar
+            if (expandedData.tanggal_masuk) {
+                expandedData.tanggal_masuk = normalizeDatetimeForSavedData(expandedData.tanggal_masuk);
+            }
+            if (expandedData.tanggal_keluar) {
+                expandedData.tanggal_keluar = normalizeDatetimeForSavedData(expandedData.tanggal_keluar);
+            }
             
             // Expand status_psikologi JSON
             if (savedData.status_psikologi && typeof savedData.status_psikologi === 'object') {
@@ -358,6 +401,41 @@ export default function PengkajianAwalUGD() {
                     alloanamnesis: '0',
                 });
             }
+        }
+    };
+
+    // Helper function to normalize datetime to format YYYY-MM-DD HH:mm:ss
+    const normalizeDatetime = (datetime?: string): string => {
+        if (!datetime || datetime === 'Tidak ada' || datetime === '-') {
+            return '';
+        }
+        
+        try {
+            if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(datetime)) {
+                return datetime;
+            }
+            
+            if (/^\d{4}-\d{2}-\d{2}$/.test(datetime)) {
+                return datetime + ' 00:00:00';
+            }
+            
+            if (datetime.includes('T')) {
+                const date = new Date(datetime);
+                if (!isNaN(date.getTime())) {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const hours = String(date.getHours()).padStart(2, '0');
+                    const minutes = String(date.getMinutes()).padStart(2, '0');
+                    const seconds = String(date.getSeconds()).padStart(2, '0');
+                    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+                }
+            }
+            
+            return datetime;
+        } catch (error) {
+            console.error('Error normalizing datetime:', error, datetime);
+            return '';
         }
     };
 
@@ -499,8 +577,8 @@ export default function PengkajianAwalUGD() {
                 norm: String(data.pasien?.NORM || 'Tidak ada'),
                 tanggal_lahir: data.pasien?.TANGGAL_LAHIR || '',
                 jenis_kelamin: String(data.pasien?.JENIS_KELAMIN || ''),
-                tanggal_masuk: data.kunjungan?.MASUK || '',
-                tanggal_keluar: data.kunjungan?.KELUAR || '',
+                tanggal_masuk: normalizeDatetime(data.kunjungan?.MASUK) || '',
+                tanggal_keluar: normalizeDatetime(data.kunjungan?.KELUAR) || '',
                 alamat: data.pasien?.ALAMAT || 'Tidak ada',
                 ruangan: data.kunjungan?.ruangan?.DESKRIPSI || 'Tidak ada',
                 autoanamnesis: isAutoTrue ? '1' : '0',
@@ -1055,12 +1133,36 @@ export default function PengkajianAwalUGD() {
                             </tr>
                             <tr>
                                 <td colSpan={2} style={{ border: '1px solid #000', padding: '5px', width: '200px' }}>
-                                    Jam Masuk : <br />
-                                    <b>{formatTanggalIndoDateTime(pasien?.tanggal_masuk) || '-'}</b>
+                                    Tanggal Masuk : <br />
+                                    <input 
+                                        type="date" 
+                                        value={pasien?.tanggal_masuk ? pasien.tanggal_masuk.split(' ')[0] : ''} 
+                                        onChange={(e) => {
+                                            if (pasien) {
+                                                setPasien({
+                                                    ...pasien,
+                                                    tanggal_masuk: e.target.value + ' 00:00:00'
+                                                });
+                                            }
+                                        }}
+                                        className="w-full border rounded px-2 py-1"
+                                    />
                                 </td>
                                 <td colSpan={2} style={{ border: '1px solid #000', padding: '5px', width: '200px' }}>
-                                    Jam Keluar : <br />
-                                    <b>{formatTanggalIndoDateTime(pasien?.tanggal_keluar) || '-'}</b>
+                                    Tanggal Keluar : <br />
+                                    <input 
+                                        type="date" 
+                                        value={pasien?.tanggal_keluar ? pasien.tanggal_keluar.split(' ')[0] : ''} 
+                                        onChange={(e) => {
+                                            if (pasien) {
+                                                setPasien({
+                                                    ...pasien,
+                                                    tanggal_keluar: e.target.value + ' 00:00:00'
+                                                });
+                                            }
+                                        }}
+                                        className="w-full border rounded px-2 py-1"
+                                    />
                                 </td>
                                 <td colSpan={2} style={{ border: '1px solid #000', padding: '5px', width: '200px' }}>
                                     Alamat : <br />

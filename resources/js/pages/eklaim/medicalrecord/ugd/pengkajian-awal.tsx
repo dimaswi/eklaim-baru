@@ -264,11 +264,50 @@ export default function PengkajianAwalUGD() {
     const [faktorResikoText, setFaktorResikoText] = useState<string>('-');
     const [riwayatPenyakitKeluargaText, setRiwayatPenyakitKeluargaText] = useState<string>('-');
 
+    // Helper function untuk normalize datetime dari savedData
+    const normalizeDatetimeForSavedData = (dateValue: string | undefined): string => {
+        if (!dateValue) return '';
+        
+        // Jika sudah dalam format YYYY-MM-DD HH:mm:ss, kembalikan apa adanya
+        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateValue)) {
+            return dateValue;
+        }
+        
+        // Jika dalam format YYYY-MM-DD (tanpa waktu), tambahkan default time
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+            return dateValue + ' 00:00:00';
+        }
+        
+        // Jika dalam format ISO (2024-01-01T00:00:00.000Z), parse dan format ulang
+        if (dateValue.includes('T')) {
+            const date = new Date(dateValue);
+            if (!isNaN(date.getTime())) {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                const seconds = String(date.getSeconds()).padStart(2, '0');
+                return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+            }
+        }
+        
+        return dateValue;
+    };
+
     // Load savedData saat komponen pertama kali dimuat
     useEffect(() => {
         if (savedData) {
             // Expand JSON fields ke individual checkbox fields
             const expandedData = { ...savedData };
+            
+            // Normalize tanggal fields
+            if (savedData.tanggal_masuk) {
+                expandedData.tanggal_masuk = normalizeDatetimeForSavedData(savedData.tanggal_masuk);
+            }
+            if (savedData.tanggal_keluar) {
+                expandedData.tanggal_keluar = normalizeDatetimeForSavedData(savedData.tanggal_keluar);
+            }
             
             // Expand status_psikologi JSON
             if (savedData.status_psikologi && typeof savedData.status_psikologi === 'object') {
@@ -360,6 +399,37 @@ export default function PengkajianAwalUGD() {
                 });
             }
         }
+    };
+
+    // Helper function untuk normalize datetime dari API
+    const normalizeDatetime = (dateValue: string | undefined): string => {
+        if (!dateValue) return '';
+        
+        // Jika sudah dalam format YYYY-MM-DD HH:mm:ss, kembalikan apa adanya
+        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateValue)) {
+            return dateValue;
+        }
+        
+        // Jika dalam format YYYY-MM-DD (tanpa waktu), tambahkan default time
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+            return dateValue + ' 00:00:00';
+        }
+        
+        // Jika dalam format ISO (2024-01-01T00:00:00.000Z), parse dan format ulang
+        if (dateValue.includes('T')) {
+            const date = new Date(dateValue);
+            if (!isNaN(date.getTime())) {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                const seconds = String(date.getSeconds()).padStart(2, '0');
+                return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+            }
+        }
+        
+        return dateValue;
     };
 
     const handleLoadPengkajianAwal = async () => {
@@ -500,8 +570,8 @@ export default function PengkajianAwalUGD() {
                 norm: String(data.pasien?.NORM || 'Tidak ada'),
                 tanggal_lahir: data.pasien?.TANGGAL_LAHIR || '',
                 jenis_kelamin: String(data.pasien?.JENIS_KELAMIN || ''),
-                tanggal_masuk: data.kunjungan?.MASUK || '',
-                tanggal_keluar: data.kunjungan?.KELUAR || '',
+                tanggal_masuk: normalizeDatetime(data.kunjungan?.MASUK) || '',
+                tanggal_keluar: normalizeDatetime(data.kunjungan?.KELUAR) || '',
                 alamat: data.pasien?.ALAMAT || 'Tidak ada',
                 ruangan: data.kunjungan?.ruangan?.DESKRIPSI || 'Tidak ada',
                 autoanamnesis: isAutoTrue ? '1' : '0',
@@ -1057,11 +1127,21 @@ export default function PengkajianAwalUGD() {
                             <tr>
                                 <td colSpan={2} style={{ border: '1px solid #000', padding: '5px', width: '200px' }}>
                                     Jam Masuk : <br />
-                                    <b>{formatTanggalIndoDateTime(pasien?.tanggal_masuk) || '-'}</b>
+                                    <input
+                                        type="date"
+                                        value={pasien?.tanggal_masuk ? pasien.tanggal_masuk.split(' ')[0] : ''}
+                                        onChange={(e) => pasien && setPasien({ ...pasien, tanggal_masuk: e.target.value + ' 00:00:00' })}
+                                        className="border rounded px-2 py-1"
+                                    />
                                 </td>
                                 <td colSpan={2} style={{ border: '1px solid #000', padding: '5px', width: '200px' }}>
                                     Jam Keluar : <br />
-                                    <b>{formatTanggalIndoDateTime(pasien?.tanggal_keluar) || '-'}</b>
+                                    <input
+                                        type="date"
+                                        value={pasien?.tanggal_keluar ? pasien.tanggal_keluar.split(' ')[0] : ''}
+                                        onChange={(e) => pasien && setPasien({ ...pasien, tanggal_keluar: e.target.value + ' 00:00:00' })}
+                                        className="border rounded px-2 py-1"
+                                    />
                                 </td>
                                 <td colSpan={2} style={{ border: '1px solid #000', padding: '5px', width: '200px' }}>
                                     Alamat : <br />

@@ -126,6 +126,37 @@ export default function RawatInapResumeMedisUGD() {
     const [resepPulang, setResepPulang] = useState<ResepItem[]>([]);
     const [obatModal, setObatModal] = useState(false);
 
+    // Helper function untuk normalize datetime dari savedData
+    const normalizeDatetimeForSavedData = (dateValue: string | undefined): string => {
+        if (!dateValue) return '';
+        
+        // Jika sudah dalam format YYYY-MM-DD HH:mm:ss, kembalikan apa adanya
+        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateValue)) {
+            return dateValue;
+        }
+        
+        // Jika dalam format YYYY-MM-DD (tanpa waktu), tambahkan default time
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+            return dateValue + ' 00:00:00';
+        }
+        
+        // Jika dalam format ISO (2024-01-01T00:00:00.000Z), parse dan format ulang
+        if (dateValue.includes('T')) {
+            const date = new Date(dateValue);
+            if (!isNaN(date.getTime())) {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                const seconds = String(date.getSeconds()).padStart(2, '0');
+                return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+            }
+        }
+        
+        return dateValue;
+    };
+
     // Load savedData saat komponen pertama kali dimuat
     useEffect(() => {
         if (savedData) {
@@ -135,8 +166,8 @@ export default function RawatInapResumeMedisUGD() {
                 norm: savedData.norm,
                 tanggal_lahir: savedData.tanggal_lahir,
                 jenis_kelamin: savedData.jenis_kelamin,
-                tanggal_masuk: savedData.tanggal_masuk,
-                tanggal_keluar: savedData.tanggal_keluar,
+                tanggal_masuk: normalizeDatetimeForSavedData(savedData.tanggal_masuk),
+                tanggal_keluar: normalizeDatetimeForSavedData(savedData.tanggal_keluar),
                 ruangan: savedData.ruangan,
                 penanggung_jawab: savedData.penanggung_jawab,
                 indikasi_rawat_inap: savedData.indikasi_rawat_inap,
@@ -208,6 +239,37 @@ export default function RawatInapResumeMedisUGD() {
         return isNaN(numValue) ? 0 : numValue;
     };
 
+    // Helper function untuk normalize datetime dari API
+    const normalizeDatetime = (dateValue: string | undefined): string => {
+        if (!dateValue) return '';
+        
+        // Jika sudah dalam format YYYY-MM-DD HH:mm:ss, kembalikan apa adanya
+        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateValue)) {
+            return dateValue;
+        }
+        
+        // Jika dalam format YYYY-MM-DD (tanpa waktu), tambahkan default time
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+            return dateValue + ' 00:00:00';
+        }
+        
+        // Jika dalam format ISO (2024-01-01T00:00:00.000Z), parse dan format ulang
+        if (dateValue.includes('T')) {
+            const date = new Date(dateValue);
+            if (!isNaN(date.getTime())) {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                const seconds = String(date.getSeconds()).padStart(2, '0');
+                return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+            }
+        }
+        
+        return dateValue;
+    };
+
     const handleLoadResumeMedis = async () => {
         setLoading('load');
         try {
@@ -218,8 +280,8 @@ export default function RawatInapResumeMedisUGD() {
                 norm: String(data.pasien?.NORM || 'Tidak Diketahui'),
                 tanggal_lahir: data.pasien?.TANGGAL_LAHIR || 'Tidak Diketahui',
                 jenis_kelamin: String(data.pasien?.JENIS_KELAMIN || ''),
-                tanggal_masuk: data.kunjungan?.MASUK || 'Tidak Diketahui',
-                tanggal_keluar: data.kunjungan?.KELUAR || 'Tidak Diketahui',
+                tanggal_masuk: normalizeDatetime(data.kunjungan?.MASUK) || 'Tidak Diketahui',
+                tanggal_keluar: normalizeDatetime(data.kunjungan?.KELUAR) || 'Tidak Diketahui',
                 ruangan: data.kunjungan?.ruangan.DESKRIPSI || 'Tidak Diketahui',
                 penanggung_jawab: data.kunjungan?.penjamin.nama_penjamin?.DESKRIPSI || 'Tidak Diketahui',
                 indikasi_rawat_inap: data.resume?.INDIKASI_RAWAT_INAP || 'Tidak Diketahui',
@@ -732,11 +794,21 @@ export default function RawatInapResumeMedisUGD() {
                             <tr>
                                 <td colSpan={2} style={{ border: '1px solid #000', padding: '5px', width: '200px' }}>
                                     Tanggal Masuk : <br />
-                                    <b>{formatTanggalIndoDateTime(pasien?.tanggal_masuk)}</b>
+                                    <input
+                                        type="date"
+                                        value={pasien?.tanggal_masuk ? pasien.tanggal_masuk.split(' ')[0] : ''}
+                                        onChange={(e) => pasien && setPasien({ ...pasien, tanggal_masuk: e.target.value + ' 00:00:00' })}
+                                        className="border rounded px-2 py-1"
+                                    />
                                 </td>
                                 <td colSpan={2} style={{ border: '1px solid #000', padding: '5px', width: '200px' }}>
                                     Tanggal Keluar : <br />
-                                    <b>{formatTanggalIndoDateTime(pasien?.tanggal_keluar)}</b>
+                                    <input
+                                        type="date"
+                                        value={pasien?.tanggal_keluar ? pasien.tanggal_keluar.split(' ')[0] : ''}
+                                        onChange={(e) => pasien && setPasien({ ...pasien, tanggal_keluar: e.target.value + ' 00:00:00' })}
+                                        className="border rounded px-2 py-1"
+                                    />
                                 </td>
                                 <td colSpan={2} style={{ border: '1px solid #000', padding: '5px', width: '200px' }}>
                                     Lama Dirawat : <br />
