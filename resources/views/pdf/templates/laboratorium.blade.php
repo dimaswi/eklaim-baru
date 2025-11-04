@@ -147,7 +147,7 @@
                                     <tr>
                                         <td class="label">Tanggal Masuk</td>
                                         <td class="colon">:</td>
-                                        <td class="value">{{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_masuk)->format('d M Y H:i:s') }}</td>
+                                        <td class="value">{{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_masuk)->locale('id')->isoFormat('D MMMM Y HH:mm:ss')}</td>
                                     </tr>
                                     <tr>
                                         <td class="label">Tanggal Keluar</td>
