@@ -206,7 +206,7 @@
                         <td class="info-label">Tgl. SEP</td>
                         <td class="info-colon">:</td>
                         <td class="info-value">{{ $dataKunjungan->tglSEP ? \Carbon\Carbon::parse($dataKunjungan->tglSEP)->locale('id')->isoFormat('D MMMM Y') : '-' }}</td>
-                        <td class="right-info">Peserta : {{ $pengajuanKlaim->jenis_peserta ?? 'PBI (APBD)' }}</td>
+                        <td class="right-info">Peserta : {{ $pengajuanKlaim->jenis_peserta ?? '-' }}</td>
                     </tr>
                     <tr>
                         <td class="info-label">No. Kartu</td>
