@@ -703,7 +703,7 @@
                             @endif
                             
                             <div class="doctor-name">{{ $dokterNama }}</div>
-                            <div class="date-location">{{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_keluar ?? '-')->locale('id')->isoFormat('D MMMM Y') }}</div>
+                            <div class="date-location">{{ $tglKeluar ? \Carbon\Carbon::parse($tglKeluar)->locale('id')->isoFormat('D MMMM Y HH:mm:ss') : '-' }}</div>
                         </td>
                     </tr>
                 </table>
