@@ -205,7 +205,7 @@
                     <tr>
                         <td class="info-label">Tgl. SEP</td>
                         <td class="info-colon">:</td>
-                        <td class="info-value">{{ $pengajuanKlaim->tanggal_sep ? \Carbon\Carbon::parse($pengajuanKlaim->tanggal_sep)->format('Y-m-d') : '2023-02-28' }}</td>
+                        <td class="info-value">{{ $dataKunjungan->tglSEP ? \Carbon\Carbon::parse($dataKunjungan->tglSEP)->locale('id')->isoFormat('D MMMM Y') : '-' }}</td>
                         <td class="right-info">Peserta : {{ $pengajuanKlaim->jenis_peserta ?? 'PBI (APBD)' }}</td>
                     </tr>
                     <tr>
