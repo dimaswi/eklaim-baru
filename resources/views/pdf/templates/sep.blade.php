@@ -253,7 +253,7 @@
                         <td class="info-label">Diagnosa Awal</td>
                         <td class="info-colon">:</td>
                         <td class="info-value">{{ $dataKunjungan->diagAwal ?? '-' }}</td>
-                        <td class="right-info">Penjamin :</td>
+                        <td class="right-info">Penjamin : BPJS</td>
                     </tr>
                     <tr>
                         <td class="info-label">Catatan</td>
