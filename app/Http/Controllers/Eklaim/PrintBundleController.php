@@ -695,13 +695,11 @@ class PrintBundleController extends Controller
                 'logo_type' => ($documentType === 'sep') ? 'bpjs' : 'regular'
             ]);
             
-             $dataKunjungan = KunjunganBPJS::where('noSEP', $pengajuanKlaim->nomor_sep)->first();
-            
             // Generate PDF using DomPDF with same Blade template and compression options
             $pdf = Pdf::loadView("pdf.templates.{$documentType}", array_merge([
                 'pengajuanKlaim' => $pengajuanKlaim,
                 'data' => $data,
-                'dataKunjungan' => $dataKunjungan,
+                'dataKunjungan' => $getKunjunganBPJS,
                 'selectedRecords' => $selectedRecords,
                 'logoBase64' => $logoBase64,
                 'documentType' => $documentType,
@@ -964,11 +962,14 @@ class PrintBundleController extends Controller
                         'logo_type' => ($type === 'sep') ? 'bpjs' : 'regular',
                         'using_cached_assets' => true
                     ]);
+
+                     $dataKunjunganSIMGOS = KunjunganBPJS::where('noSEP', $pengajuanKlaim->nomor_sep)->first();
                     
                     // Generate PDF using DomPDF with same Blade template and compression options
                     $pdf = Pdf::loadView("pdf.templates.{$type}", array_merge([
                         'pengajuanKlaim' => $pengajuanKlaim,
                         'data' => $data,
+                        'dataKunjungan' => $dataKunjunganSIMGOS,
                         'selectedRecords' => $selectedRecords,
                         'logoBase64' => $logoBase64,
                         'documentType' => $type,
