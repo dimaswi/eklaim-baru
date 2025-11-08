@@ -400,7 +400,7 @@
                                 <tr>
                                     <td class="label">Tanggal Tagihan</td>
                                     <td class="colon">:</td>
-                                    <td class="value">{{ \Carbon\Carbon::parse($tagihan->created_at)->format('d-m-Y') }}</td>
+                                    <td class="value">{{ \Carbon\Carbon::parse($pengajuanKlaim->tanggal_keluar ?? '-')->locale('id')->isoFormat('D MMMM Y')}}</td>
                                 </tr>
                             </table>
                         </td>
