@@ -20,13 +20,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Paksa HTTPS berdasarkan header X-Forwarded-Proto
-        // if (
-            // isset($_SERVER['HTTP_X_FORWARDED_PROTO']) &&
-            // $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https'
-        // ) {
-            // URL::forceScheme('https');
-            // $this->app['request']->server->set('HTTPS', 'on');
-        // }
-    }
+        // Deteksi jika request datang melalui Cloudflare / reverse proxy
+        if (isset($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
+            $scheme = $_SERVER['HTTP_X_FORWARDED_PROTO'];
+
+            // Jika lewat HTTPS, set agar Laravel tahu ini HTTPS
+            if ($scheme === 'https') {
+                $this->app['request']->server->set('HTTPS', 'on');
+                \Illuminate\Support\Facades\URL::forceScheme('https');
+            } else {
+                // Jika HTTP, pastikan Laravel tidak memaksa HTTPS
+                $this->app['request']->server->set('HTTPS', 'off');
+            }
+        }
 }
