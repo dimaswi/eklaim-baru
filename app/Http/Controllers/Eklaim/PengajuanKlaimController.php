@@ -19,6 +19,39 @@ class PengajuanKlaimController extends Controller
         $dateType = $request->get('date_type', 'masuk');
         $startDate = $request->get('start_date', '');
         $endDate = $request->get('end_date', '');
+        $hasQuery = $request->get('has_query', '');
+
+        // Get list of ruangan for filter dropdown
+        $ruangan_list = \App\Models\SIMRS\Ruangan::whereIn('JENIS_KUNJUNGAN', [1, 2, 3])
+            ->where('JENIS', 5)
+            ->orderBy('DESKRIPSI')
+            ->get(['ID', 'DESKRIPSI', 'JENIS_KUNJUNGAN']);
+
+        // If no query has been made (initial page load), return empty data
+        if (empty($hasQuery)) {
+            return Inertia::render('eklaim/pengajuan/index', [
+                'pengajuan_klaim' => [
+                    'data' => [],
+                    'current_page' => 1,
+                    'last_page' => 1,
+                    'per_page' => $perPage,
+                    'total' => 0,
+                    'from' => 0,
+                    'to' => 0,
+                ],
+                'ruangan_list' => $ruangan_list,
+                'filters' => [
+                    'search' => $search,
+                    'perPage' => $perPage,
+                    'status' => $status,
+                    'ruangan' => $ruangan,
+                    'date_type' => $dateType,
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
+                ],
+                'hasQuery' => false,
+            ]);
+        }
 
         $query = PengajuanKlaim::query()
         ->with([
@@ -64,12 +97,6 @@ class PengajuanKlaimController extends Controller
         // Append query parameters to pagination links
         $pengajuan_klaim->appends($request->query());
 
-        // Get list of ruangan for filter dropdown
-        $ruangan_list = \App\Models\SIMRS\Ruangan::whereIn('JENIS_KUNJUNGAN', [1, 2, 3])
-            ->where('JENIS', 5)
-            ->orderBy('DESKRIPSI')
-            ->get(['ID', 'DESKRIPSI', 'JENIS_KUNJUNGAN']);
-
         return Inertia::render('eklaim/pengajuan/index', [
             'pengajuan_klaim' => $pengajuan_klaim,
             'ruangan_list' => $ruangan_list,
@@ -81,7 +108,8 @@ class PengajuanKlaimController extends Controller
                 'date_type' => $dateType,
                 'start_date' => $startDate,
                 'end_date' => $endDate,
-            ]
+            ],
+            'hasQuery' => true,
         ]);
     }
 

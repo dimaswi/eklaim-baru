@@ -89,6 +89,7 @@ interface Props extends SharedData {
         ruangan: string;
         date_type: string;
     };
+    hasQuery: boolean;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -98,17 +99,108 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
+const CACHE_KEY = 'eklaim_kunjungan_filters';
+const CACHE_EXPIRY_HOURS = 24;
+
+interface CachedFilters {
+    search: string;
+    statusFilter: string;
+    ruanganFilter: string;
+    dateTypeFilter: string;
+    dateRange: { from: string | null; to: string | null } | null;
+    monthFilter: string;
+    timestamp: number;
+}
+
 export default function KunjunganIndex() {
-    const { kunjungan, ruangan_list, filters: initialFilters } = usePage<Props>().props;
-    const [search, setSearch] = useState(initialFilters.search);
-    const [statusFilter, setStatusFilter] = useState(initialFilters.status || 'all');
-    const [ruanganFilter, setRuanganFilter] = useState(initialFilters.ruangan || 'all');
-    const [dateTypeFilter, setDateTypeFilter] = useState(initialFilters.date_type || 'masuk');
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: initialFilters.start_date ? new Date(initialFilters.start_date) : undefined,
-        to: initialFilters.end_date ? new Date(initialFilters.end_date) : undefined,
+    const { kunjungan, ruangan_list, filters: initialFilters, hasQuery } = usePage<Props>().props;
+    
+    // Load cached filters from localStorage
+    const loadCachedFilters = (): CachedFilters | null => {
+        try {
+            const cached = localStorage.getItem(CACHE_KEY);
+            if (!cached) return null;
+            
+            const parsed: CachedFilters = JSON.parse(cached);
+            const now = Date.now();
+            const expiryTime = parsed.timestamp + (CACHE_EXPIRY_HOURS * 60 * 60 * 1000);
+            
+            // Check if cache is still valid
+            if (now < expiryTime) {
+                return parsed;
+            } else {
+                localStorage.removeItem(CACHE_KEY);
+                return null;
+            }
+        } catch (error) {
+            console.error('Error loading cached filters:', error);
+            return null;
+        }
+    };
+
+    // Initialize state with cached values if available and no query has been made yet
+    const cachedFilters = !hasQuery ? loadCachedFilters() : null;
+    
+    const [search, setSearch] = useState(cachedFilters?.search || initialFilters.search);
+    const [statusFilter, setStatusFilter] = useState(cachedFilters?.statusFilter || initialFilters.status || 'all');
+    const [ruanganFilter, setRuanganFilter] = useState(cachedFilters?.ruanganFilter || initialFilters.ruangan || 'all');
+    const [dateTypeFilter, setDateTypeFilter] = useState(cachedFilters?.dateTypeFilter || initialFilters.date_type || 'masuk');
+    const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+        if (cachedFilters?.dateRange) {
+            return {
+                from: cachedFilters.dateRange.from ? new Date(cachedFilters.dateRange.from) : undefined,
+                to: cachedFilters.dateRange.to ? new Date(cachedFilters.dateRange.to) : undefined,
+            };
+        }
+        return {
+            from: initialFilters.start_date ? new Date(initialFilters.start_date) : undefined,
+            to: initialFilters.end_date ? new Date(initialFilters.end_date) : undefined,
+        };
     });
-    const [monthFilter, setMonthFilter] = useState(initialFilters.month || '');
+    const [monthFilter, setMonthFilter] = useState(cachedFilters?.monthFilter || initialFilters.month || '');
+
+    // Save filters to localStorage
+    const saveCachedFilters = () => {
+        try {
+            const cacheData: CachedFilters = {
+                search,
+                statusFilter,
+                ruanganFilter,
+                dateTypeFilter,
+                dateRange: dateRange ? {
+                    from: dateRange.from ? format(dateRange.from, 'yyyy-MM-dd') : null,
+                    to: dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : null,
+                } : null,
+                monthFilter,
+                timestamp: Date.now(),
+            };
+            localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+        } catch (error) {
+            console.error('Error saving cached filters:', error);
+        }
+    };
+
+    // Auto-load data if coming from other page and has cached filters
+    const [hasAutoLoaded, setHasAutoLoaded] = useState(false);
+    
+    if (!hasQuery && cachedFilters && !hasAutoLoaded) {
+        setHasAutoLoaded(true);
+        // Trigger search with cached filters
+        router.get("/eklaim/kunjungan", {
+            search: cachedFilters.search,
+            per_page: initialFilters.perPage,
+            status: cachedFilters.statusFilter === 'all' ? '' : cachedFilters.statusFilter,
+            ruangan: cachedFilters.ruanganFilter === 'all' ? '' : cachedFilters.ruanganFilter,
+            date_type: cachedFilters.dateTypeFilter,
+            start_date: cachedFilters.dateRange?.from || '',
+            end_date: cachedFilters.dateRange?.to || '',
+            month: cachedFilters.monthFilter,
+            has_query: '1',
+        }, {
+            preserveState: true,
+            replace: true,
+        });
+    }
 
     // Helper function to get admission date from kunjungan_rs
     const getAdmissionDate = (kunjungan_rs?: KunjunganRS[] | KunjunganRS) => {
@@ -232,6 +324,7 @@ export default function KunjunganIndex() {
     };
 
     const handleSearch = (value: string) => {
+        saveCachedFilters();
         router.get("/eklaim/kunjungan", {
             search: value,
             per_page: initialFilters.perPage,
@@ -241,6 +334,7 @@ export default function KunjunganIndex() {
             start_date: dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '',
             end_date: dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '',
             month: monthFilter,
+            has_query: '1',
         }, {
             preserveState: true,
             replace: true,
@@ -258,6 +352,7 @@ export default function KunjunganIndex() {
             start_date: dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '',
             end_date: dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '',
             month: monthFilter,
+            has_query: '1',
         }, {
             preserveState: true,
             preserveScroll: true,
@@ -276,6 +371,7 @@ export default function KunjunganIndex() {
             start_date: dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '',
             end_date: dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '',
             month: monthFilter,
+            has_query: '1',
         }, {
             preserveState: true,
             preserveScroll: true,
@@ -299,8 +395,9 @@ export default function KunjunganIndex() {
         setDateTypeFilter('masuk');
         setDateRange(undefined);
         setMonthFilter('');
+        localStorage.removeItem(CACHE_KEY);
         router.get("/eklaim/kunjungan", {
-            search: initialFilters.search,
+            search: '',
             per_page: initialFilters.perPage,
         }, {
             preserveState: true,
@@ -309,8 +406,9 @@ export default function KunjunganIndex() {
     };
 
     const handleApplyFilter = () => {
+        saveCachedFilters();
         router.get("/eklaim/kunjungan", {
-            search: initialFilters.search,
+            search: search,
             per_page: initialFilters.perPage,
             status: statusFilter === 'all' ? '' : statusFilter,
             ruangan: ruanganFilter === 'all' ? '' : ruanganFilter,
@@ -318,6 +416,7 @@ export default function KunjunganIndex() {
             start_date: dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '',
             end_date: dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '',
             month: monthFilter,
+            has_query: '1',
         }, {
             preserveState: true,
             replace: true,
@@ -375,9 +474,9 @@ export default function KunjunganIndex() {
                                     <SelectValue placeholder="Pilih status" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">Semua Status</SelectItem>
-                                    <SelectItem value="active">Aktif</SelectItem>
-                                    <SelectItem value="completed">Selesai</SelectItem>
+                                    <SelectItem value="all"><Badge variant="outline" className="bg-blue-100 text-blue-900">Semua Status</Badge></SelectItem>
+                                    <SelectItem value="active"><Badge variant="outline" className="bg-green-100 text-green-800">Belum Diajukan</Badge></SelectItem>
+                                    <SelectItem value="completed"><Badge variant="outline" className="bg-red-100 text-red-800">Sudah Diajukan</Badge></SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -459,11 +558,20 @@ export default function KunjunganIndex() {
                         <Button variant="outline" size="sm" onClick={handleResetFilter}>
                             Reset Filter
                         </Button>
-                        <Button size="sm" onClick={handleApplyFilter}>
-                            Terapkan Filter
+                        <Button size="sm" onClick={handleApplyFilter} className="bg-blue-600 hover:bg-blue-700">
+                            <Search className="mr-2 h-4 w-4" />
+                            Terapkan Filter & Cari Data
                         </Button>
                     </div>
                 </div>
+                
+                {!hasQuery && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-blue-800">
+                            <strong>Info:</strong> Silakan gunakan form filter di atas dan klik tombol "Terapkan Filter & Cari Data" untuk menampilkan data kunjungan BPJS.
+                        </p>
+                    </div>
+                )}
                 
                 <div className="w-full overflow-x-auto rounded-md border">
                     <Table>
@@ -504,7 +612,7 @@ export default function KunjunganIndex() {
                                                     tanggal_masuk: getRawAdmissionDate(item.penjamin?.pendaftaran?.kunjungan_rs),
                                                     tanggal_keluar: getRawDischargeDate(item.penjamin?.pendaftaran?.kunjungan_rs),
                                                     ruangan: getRoomNames(item.penjamin?.pendaftaran?.kunjungan_rs),
-                                                    jenis_kunjungan: item.penjamin?.pendaftaran?.kunjungan_rs[0]?.ruangan?.JENIS_KUNJUNGAN, // 1 = Rawat Inap, 2 = Rawat Jalan, 3 = Gawat Darurat
+                                                    jenis_kunjungan: item.penjamin?.pendaftaran?.kunjungan_rs?.[0]?.ruangan?.JENIS_KUNJUNGAN, // 1 = Rawat Inap, 2 = Rawat Jalan, 3 = Gawat Darurat
                                                     
                                                 }}
                                                 disabled={item.klaimStatus !== 0}
@@ -517,11 +625,22 @@ export default function KunjunganIndex() {
                                     <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                                         <div className="flex flex-col items-center gap-2">
                                             <Search className="h-8 w-8 text-muted-foreground/50" />
-                                            <span>Tidak ada data kunjungan yang ditemukan</span>
-                                            {initialFilters.search && (
-                                                <span className="text-sm">
-                                                    Coba ubah kata kunci pencarian atau hapus filter
-                                                </span>
+                                            {!hasQuery ? (
+                                                <>
+                                                    <span className="font-semibold text-lg">Silakan Gunakan Form Filter</span>
+                                                    <span className="text-sm">
+                                                        Pilih filter yang diinginkan dan klik "Terapkan Filter" atau gunakan pencarian untuk menampilkan data kunjungan
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span>Tidak ada data kunjungan yang ditemukan</span>
+                                                    {(initialFilters.search || initialFilters.status || initialFilters.ruangan) && (
+                                                        <span className="text-sm">
+                                                            Coba ubah kata kunci pencarian atau hapus filter
+                                                        </span>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     </TableCell>
