@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('permissions', function (Blueprint $table) {
+        Schema::connection('app')->create('permissions', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
             $table->string('display_name');
@@ -26,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('permissions');
+        Schema::connection('app')->dropIfExists('permissions');
     }
 };

@@ -1,5 +1,6 @@
 import React from 'react';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { DateTimeInput } from '@/components/ui/datetime-input';
 
 interface Props {
     formData: { [key: string]: any };
@@ -48,11 +49,10 @@ export default function DataDiriTab({ formData, updateField, referenceData }: Pr
                         Tanggal Masuk <span className="text-red-500 px-2">*</span>
                         <span className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-700">Auto</span>
                     </label>
-                    <input
-                        type="datetime-local"
+                    <DateTimeInput
                         value={formData.tgl_masuk || ''}
-                        onChange={(e) => updateField('tgl_masuk', e.target.value)}
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        onChange={(value) => updateField('tgl_masuk', value)}
+                        placeholder="dd/mm/yyyy hh:mm:ss"
                     />
                 </div>
                 <div>
@@ -60,11 +60,10 @@ export default function DataDiriTab({ formData, updateField, referenceData }: Pr
                         Tanggal Pulang <span className="text-red-500 px-2">*</span>
                         <span className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-700">Auto</span>
                     </label>
-                    <input
-                        type="datetime-local"
+                    <DateTimeInput
                         value={formData.tgl_pulang || ''}
-                        onChange={(e) => updateField('tgl_pulang', e.target.value)}
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        onChange={(value) => updateField('tgl_pulang', value)}
+                        placeholder="dd/mm/yyyy hh:mm:ss"
                     />
                 </div>
                 <div>

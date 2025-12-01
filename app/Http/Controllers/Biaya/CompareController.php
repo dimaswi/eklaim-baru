@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Biaya;
 
 use App\Http\Controllers\Controller;
+use App\Helpers\DateHelper;
 use App\Models\SIMRS\KunjunganRS;
 use App\Models\SIMRS\Pasien;
 use App\Models\SIMRS\Pendaftaran;
@@ -544,10 +545,13 @@ class CompareController extends Controller
         }
 
         // Handle nested JSON structures as strings for database
+        // Also format datetime fields inside nested objects
         $jsonFields = ['tarif_rs', 'apgar', 'ventilator', 'persalinan', 'covid19_penunjang_pengurang'];
         foreach ($jsonFields as $field) {
             if (isset($requestData[$field]) && is_array($requestData[$field])) {
-                $data[$field] = json_encode($requestData[$field]);
+                // Format datetime fields inside nested objects
+                $processedData = $this->processNestedDateFields($requestData[$field]);
+                $data[$field] = json_encode($processedData);
             }
         }
 
@@ -579,6 +583,30 @@ class CompareController extends Controller
         return $data;
     }
 
+    /**
+     * Process nested date fields in array structures
+     */
+    private function processNestedDateFields($data)
+    {
+        if (!is_array($data)) {
+            return $data;
+        }
+
+        $dateFields = ['start_dttm', 'stop_dttm', 'delivery_dttm', 'shk_spesimen_dttm'];
+        
+        foreach ($data as $key => $value) {
+            if (is_array($value)) {
+                // Recursively process nested arrays (like delivery array in persalinan)
+                $data[$key] = $this->processNestedDateFields($value);
+            } elseif (in_array($key, $dateFields) && !empty($value)) {
+                // Format datetime fields
+                $data[$key] = $this->formatDateForDatabase($value) ?? $value;
+            }
+        }
+
+        return $data;
+    }
+
     private function prepareDataForInacbg($requestData, $pengajuanKlaim)
     {
         // Base metadata for INACBG API
@@ -586,6 +614,34 @@ class CompareController extends Controller
             'method' => 'set_claim_data',
             'nomor_sep' => $pengajuanKlaim->nomor_sep
         ];
+
+        // Process ventilator data with date formatting
+        $ventilatorData = $requestData['ventilator'] ?? [
+            'use_ind' => '0',
+            'start_dttm' => '',
+            'stop_dttm' => ''
+        ];
+        if (is_array($ventilatorData)) {
+            if (!empty($ventilatorData['start_dttm'])) {
+                $ventilatorData['start_dttm'] = $this->formatDateForInacbg($ventilatorData['start_dttm']);
+            }
+            if (!empty($ventilatorData['stop_dttm'])) {
+                $ventilatorData['stop_dttm'] = $this->formatDateForInacbg($ventilatorData['stop_dttm']);
+            }
+        }
+
+        // Process persalinan data with date formatting
+        $persalinanData = $requestData['persalinan'] ?? [];
+        if (is_array($persalinanData) && isset($persalinanData['delivery']) && is_array($persalinanData['delivery'])) {
+            foreach ($persalinanData['delivery'] as $index => $delivery) {
+                if (!empty($delivery['delivery_dttm'])) {
+                    $persalinanData['delivery'][$index]['delivery_dttm'] = $this->formatDateForInacbg($delivery['delivery_dttm']);
+                }
+                if (!empty($delivery['shk_spesimen_dttm'])) {
+                    $persalinanData['delivery'][$index]['shk_spesimen_dttm'] = $this->formatDateForInacbg($delivery['shk_spesimen_dttm']);
+                }
+            }
+        }
 
         // Transform form data to match INACBG expected structure
         $data = [
@@ -603,13 +659,9 @@ class CompareController extends Controller
             'icu_indikator' => $requestData['icu_indikator'] ?? 0,
             'icu_los' => $requestData['icu_los'] ?? 0,
             
-            // Ventilator data
+            // Ventilator data (already formatted)
             'ventilator_hour' => $requestData['ventilator_hour'] ?? 0,
-            'ventilator' => $requestData['ventilator'] ?? [
-                'use_ind' => '0',
-                'start_dttm' => '',
-                'stop_dttm' => ''
-            ],
+            'ventilator' => $ventilatorData,
             
             // Upgrade class data
             'upgrade_class_ind' => $requestData['upgrade_class_ind'] ?? 0,
@@ -674,8 +726,8 @@ class CompareController extends Controller
                 ]
             ],
             
-            // Persalinan data
-            'persalinan' => $requestData['persalinan'] ?? [],
+            // Persalinan data (already formatted with dates)
+            'persalinan' => $persalinanData,
             
             // RS data
             'tarif_poli_eks' => !empty($requestData['tarif_poli_eks']) ? $requestData['tarif_poli_eks'] : 0,
@@ -754,41 +806,16 @@ class CompareController extends Controller
 
     /**
      * Format date for INACBG API (YYYY-MM-DD HH:mm:ss)
+     * Supports multiple input formats including dd/mm/yyyy hh:mm:ss
      */
     private function formatDateForInacbg($dateTimeString)
     {
-        if (!$dateTimeString) {
-            return '';
-        }
-
-        try {
-            $date = new \DateTime($dateTimeString);
-            return $date->format('Y-m-d H:i:s');
-        } catch (\Exception $e) {
-            Log::warning('Invalid date format for INACBG', [
-                'input' => $dateTimeString,
-                'error' => $e->getMessage()
-            ]);
-            return '';
-        }
+        return DateHelper::formatForInacbg($dateTimeString);
     }
 
     private function formatDateForDatabase($dateTimeString)
     {
-        if (!$dateTimeString) {
-            return null;
-        }
-
-        try {
-            $date = new \DateTime($dateTimeString);
-            return $date->format('Y-m-d H:i:s');
-        } catch (\Exception $e) {
-            Log::warning('Invalid date format received', [
-                'input' => $dateTimeString,
-                'error' => $e->getMessage()
-            ]);
-            return null;
-        }
+        return DateHelper::formatForDatabase($dateTimeString);
     }
 
     /**

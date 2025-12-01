@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { DateTimeInput } from '@/components/ui/datetime-input';
 
 interface Props {
     formData: { [key: string]: any };
@@ -101,16 +102,11 @@ export default function VentilatorTab({ formData, updateField, getNestedValue, u
                     <label className="mb-1 block text-sm font-medium text-gray-700">
                         Tanggal Mulai Ventilator
                     </label>
-                    <input
-                        type="datetime-local"
+                    <DateTimeInput
                         value={getNestedValue('ventilator', 'start_dttm') || ''}
-                        onChange={(e) => handleStartDateTimeChange(e.target.value)}
+                        onChange={(value) => handleStartDateTimeChange(value)}
                         disabled={getNestedValue('ventilator', 'use_ind') === '0'}
-                        className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none ${
-                            getNestedValue('ventilator', 'use_ind') === '0' 
-                                ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' 
-                                : 'border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500'
-                        }`}
+                        placeholder="dd/mm/yyyy hh:mm:ss"
                     />
                     {getNestedValue('ventilator', 'use_ind') === '0' && (
                         <p className="mt-1 text-xs text-gray-500">Field ini tidak aktif karena ventilator tidak digunakan</p>
@@ -120,16 +116,11 @@ export default function VentilatorTab({ formData, updateField, getNestedValue, u
                     <label className="mb-1 block text-sm font-medium text-gray-700">
                         Tanggal Selesai Ventilator
                     </label>
-                    <input
-                        type="datetime-local"
+                    <DateTimeInput
                         value={getNestedValue('ventilator', 'stop_dttm') || ''}
-                        onChange={(e) => handleStopDateTimeChange(e.target.value)}
+                        onChange={(value) => handleStopDateTimeChange(value)}
                         disabled={getNestedValue('ventilator', 'use_ind') === '0'}
-                        className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none ${
-                            getNestedValue('ventilator', 'use_ind') === '0' 
-                                ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' 
-                                : 'border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500'
-                        }`}
+                        placeholder="dd/mm/yyyy hh:mm:ss"
                     />
                     {getNestedValue('ventilator', 'use_ind') === '0' && (
                         <p className="mt-1 text-xs text-gray-500">Field ini tidak aktif karena ventilator tidak digunakan</p>

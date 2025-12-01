@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('data_groupper', function (Blueprint $table) {
+        Schema::connection('app')->table('data_groupper', function (Blueprint $table) {
             $table->string('stage')->default('1')->after('nomor_sep');
             $table->json('special_cmg')->nullable()->after('tarif_alt');
         });
@@ -22,7 +22,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('data_groupper', function (Blueprint $table) {
+        Schema::connection('app')->table('data_groupper', function (Blueprint $table) {
             $table->dropColumn(['stage', 'special_cmg']);
         });
     }

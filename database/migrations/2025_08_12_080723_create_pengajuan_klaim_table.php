@@ -40,6 +40,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('pengajuan_klaim');
+        Schema::connection('app')->dropIfExists('pengajuan_klaim');
     }
 };

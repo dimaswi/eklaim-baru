@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { DateTimeInput } from '@/components/ui/datetime-input';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
 
@@ -226,11 +227,10 @@ export default function PersalinanTab({ formData, updateField, getNestedValue, u
                                     <label className="mb-1 block text-sm font-medium text-gray-700">
                                         Tanggal & Waktu Persalinan
                                     </label>
-                                    <input
-                                        type="datetime-local"
+                                    <DateTimeInput
                                         value={delivery.delivery_dttm || ''}
-                                        onChange={(e) => updateDeliveryEntry(index, 'delivery_dttm', e.target.value)}
-                                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                        onChange={(value) => updateDeliveryEntry(index, 'delivery_dttm', value)}
+                                        placeholder="dd/mm/yyyy hh:mm:ss"
                                     />
                                 </div>
                                 <div>
@@ -300,11 +300,10 @@ export default function PersalinanTab({ formData, updateField, getNestedValue, u
                                             <label className="mb-1 block text-sm font-medium text-gray-700">
                                                 SHK Spesimen Tanggal & Waktu
                                             </label>
-                                            <input
-                                                type="datetime-local"
+                                            <DateTimeInput
                                                 value={delivery.shk_spesimen_dttm || ''}
-                                                onChange={(e) => updateDeliveryEntry(index, 'shk_spesimen_dttm', e.target.value)}
-                                                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                                onChange={(value) => updateDeliveryEntry(index, 'shk_spesimen_dttm', value)}
+                                                placeholder="dd/mm/yyyy hh:mm:ss"
                                             />
                                         </div>
                                     </>

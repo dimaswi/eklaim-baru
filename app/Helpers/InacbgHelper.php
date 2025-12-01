@@ -102,6 +102,12 @@ class InacbgHelper
         curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        
+        // Disable SSL verification for self-signed certificates
+        // WARNING: Only use this in development or when connecting to trusted internal servers
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        
         // request dengan curl
         $response = curl_exec($ch);
 

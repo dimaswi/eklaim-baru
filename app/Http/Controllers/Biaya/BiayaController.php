@@ -161,6 +161,7 @@ class BiayaController extends Controller
             ];
 
             // Siapkan data untuk disimpan ke database
+            // Default: status_pengiriman = 0 (DEFAULT), idrg = 2 (FINAL - skip IDRG grouping)
             $pengajuanData = [
                 'nomor_sep' => $request->get('nomor_sep'),
                 'tanggal_pengajuan' => now()->toDateString(),
@@ -173,7 +174,8 @@ class BiayaController extends Controller
                 'tanggal_keluar' => $request->get('tanggal_keluar'),
                 'ruangan' => $request->get('ruangan'),
                 'jenis_kunjungan' => $request->get('jenis_kunjungan'),
-                'status_pengiriman' => PengajuanKlaim::STATUS_TERSIMPAN,
+                'status_pengiriman' => PengajuanKlaim::STATUS_DEFAULT, // 0 = Default
+                'idrg' => PengajuanKlaim::STATUS_FINAL_IDRG, // 2 = Final IDRG (skip IDRG grouping)
             ];
 
             // Fallback ke data kunjungan jika parameter tidak ada
@@ -211,7 +213,7 @@ class BiayaController extends Controller
                 }
                 
                 // Skip API call and directly create pengajuan klaim
-                $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_TERSIMPAN;
+                $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_DEFAULT; // 0 = Default
                 $pengajuanData['response_message'] = 'Data disimpan tanpa mengirim ke API INACBG (Force Create)';
                 $pengajuanData['response_data'] = ['force_create' => true, 'timestamp' => now()];
                 
@@ -265,7 +267,7 @@ class BiayaController extends Controller
                 }
 
                 // Simpan data pengajuan dengan status sukses
-                $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_TERSIMPAN;
+                $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_DEFAULT; // 0 = Default
                 $pengajuanData['response_message'] = $inacbgResponse['metadata']['message'] ?? 'Klaim berhasil diajukan';
                 $pengajuanData['response_data'] = $inacbgResponse;
                 
@@ -296,11 +298,12 @@ class BiayaController extends Controller
                     'tanggal_keluar' => $request->get('tanggal_keluar'),
                     'ruangan' => $request->get('ruangan'),
                     'jenis_kunjungan' => $request->get('jenis_kunjungan'),
+                    'idrg' => PengajuanKlaim::STATUS_FINAL_IDRG, // 2 = Final IDRG (skip IDRG grouping)
                 ];
             }
             
             // Simpan data pengajuan dengan status 0 (default)
-            $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_TERSIMPAN;
+            $pengajuanData['status_pengiriman'] = PengajuanKlaim::STATUS_DEFAULT; // 0 = Default
             $pengajuanData['response_message'] = 'Exception: ' . $e->getMessage();
             $pengajuanData['response_data'] = ['exception' => $e->getMessage(), 'trace' => $e->getTraceAsString()];
             

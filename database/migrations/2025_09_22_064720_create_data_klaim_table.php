@@ -211,6 +211,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('data_klaim');
+        Schema::connection('app')->dropIfExists('data_klaim');
     }
 };

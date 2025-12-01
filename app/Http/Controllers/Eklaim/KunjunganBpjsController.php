@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SIMRS\KunjunganBPJS;
 use App\Models\Eklaim\PengajuanKlaim;
 use App\Helpers\InacbgHelper;
+use App\Helpers\DateHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -182,6 +183,7 @@ class KunjunganBpjsController extends Controller
             ];
 
             // Siapkan data untuk disimpan ke database
+            // Default: status_pengiriman = 0 (DEFAULT), idrg = 2 (FINAL - skip IDRG grouping)
             $pengajuanData = [
                 'nomor_sep' => $request->get('nomor_sep'),
                 'tanggal_pengajuan' => now()->toDateString(),
@@ -190,11 +192,12 @@ class KunjunganBpjsController extends Controller
                 'nama_pasien' => $request->get('nama_pasien'),
                 'gender' => $request->get('gender'),
                 'tgl_lahir' => $request->get('tgl_lahir'),
-                'tanggal_masuk' => $request->get('tanggal_masuk'),
-                'tanggal_keluar' => $request->get('tanggal_keluar'),
+                'tanggal_masuk' => DateHelper::formatForDatabase($request->get('tanggal_masuk')),
+                'tanggal_keluar' => DateHelper::formatForDatabase($request->get('tanggal_keluar')),
                 'ruangan' => $request->get('ruangan'),
                 'jenis_kunjungan' => $request->get('jenis_kunjungan'),
-                'status_pengiriman' => PengajuanKlaim::STATUS_DEFAULT,
+                'status_pengiriman' => PengajuanKlaim::STATUS_DEFAULT, // 0 = Default
+                'idrg' => PengajuanKlaim::STATUS_FINAL_IDRG, // 2 = Final IDRG (skip IDRG grouping)
             ];
 
             // Fallback ke data kunjungan jika parameter tidak ada
@@ -205,11 +208,11 @@ class KunjunganBpjsController extends Controller
                     
                     // Gunakan data dari kunjungan jika tidak ada di request
                     if (!$request->get('tanggal_masuk') && $firstKunjungan->MASUK) {
-                        $pengajuanData['tanggal_masuk'] = date('Y-m-d', strtotime($firstKunjungan->MASUK));
+                        $pengajuanData['tanggal_masuk'] = date('Y-m-d H:i:s', strtotime($firstKunjungan->MASUK));
                     }
                     
                     if (!$request->get('tanggal_keluar') && $firstKunjungan->KELUAR) {
-                        $pengajuanData['tanggal_keluar'] = date('Y-m-d', strtotime($firstKunjungan->KELUAR));
+                        $pengajuanData['tanggal_keluar'] = date('Y-m-d H:i:s', strtotime($firstKunjungan->KELUAR));
                     }
                     
                     // Ambil nama ruangan jika tidak ada di request
@@ -317,6 +320,7 @@ class KunjunganBpjsController extends Controller
                     'tanggal_keluar' => $request->get('tanggal_keluar'),
                     'ruangan' => $request->get('ruangan'),
                     'jenis_kunjungan' => $request->get('jenis_kunjungan'),
+                    'idrg' => PengajuanKlaim::STATUS_FINAL_IDRG, // 2 = Final IDRG (skip IDRG grouping)
                 ];
             }
             

@@ -124,6 +124,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('rawat_jalan_pengkajian_awals');
+        Schema::connection('app')->dropIfExists('rawat_jalan_pengkajian_awals');
     }
 };

@@ -133,6 +133,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('u_g_d_pengkajian_awals');
+        Schema::connection('app')->dropIfExists('u_g_d_pengkajian_awals');
     }
 };

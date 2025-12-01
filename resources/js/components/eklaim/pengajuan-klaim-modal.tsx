@@ -6,9 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DateTimeInput } from "@/components/ui/datetime-input";
 import { Send, User, Calendar, CreditCard, FileText, UserCheck, Info, AlertTriangle } from "lucide-react";
 import { router } from "@inertiajs/react";
-import { format } from "path";
 
 interface PengajuanKlaimData {
     nomor_kartu: string;
@@ -88,8 +88,8 @@ export default function PengajuanKlaimModal({
     console.log(data.jenis_kunjungan)
 
     // Local editable state for tanggal masuk/keluar so user can change before submit
-    const [tanggalMasuk, setTanggalMasuk] = useState<string>(data.tanggal_masuk ? String(data.tanggal_masuk).split(' ')[0] : '');
-    const [tanggalKeluar, setTanggalKeluar] = useState<string>(data.tanggal_keluar ? String(data.tanggal_keluar).split(' ')[0] : '');
+    const [tanggalMasuk, setTanggalMasuk] = useState<string>(data.tanggal_masuk || '');
+    const [tanggalKeluar, setTanggalKeluar] = useState<string>(data.tanggal_keluar || '');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -277,11 +277,10 @@ export default function PengajuanKlaimModal({
                                         <Calendar className="h-4 w-4" />
                                         Tanggal Masuk
                                     </Label>
-                                    <Input
-                                        type="date"
+                                    <DateTimeInput
                                         value={tanggalMasuk}
-                                        onChange={(e) => setTanggalMasuk(e.target.value)}
-                                        className="bg-white"
+                                        onChange={(value) => setTanggalMasuk(value)}
+                                        placeholder="dd/mm/yyyy hh:mm:ss"
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -289,11 +288,10 @@ export default function PengajuanKlaimModal({
                                         <Calendar className="h-4 w-4" />
                                         Tanggal Keluar
                                     </Label>
-                                    <Input
-                                        type="date"
+                                    <DateTimeInput
                                         value={tanggalKeluar}
-                                        onChange={(e) => setTanggalKeluar(e.target.value)}
-                                        className="bg-white"
+                                        onChange={(value) => setTanggalKeluar(value)}
+                                        placeholder="dd/mm/yyyy hh:mm:ss"
                                     />
                                 </div>
                                 <div className="space-y-2">

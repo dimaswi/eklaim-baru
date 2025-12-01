@@ -614,7 +614,7 @@ export default function Index() {
             }
         }
         updateField('discharge_status', caraKeluar);
-        updateField('nama_dokter', resumeMedisData?.dokter || '');
+        updateField('nama_dokter', resumeMedisData?.dokter || kunjunganbpjsData?.nama_dokter || '');
 
         let kelas_rwt = '';
         if (kunjunganbpjsData?.klsRawat) {
@@ -1087,12 +1087,20 @@ export default function Index() {
 
     function toDatetimeLocal(value: string | undefined): string {
         if (!value) return '';
-        // Coba parse dan format ke yyyy-MM-ddTHH:mm
+        // Parse the date string
         const date = new Date(value);
         if (isNaN(date.getTime())) return '';
-        // Pad dengan nol jika perlu
+        
+        // Format to local datetime string (YYYY-MM-DD HH:mm:ss) without timezone conversion
         const pad = (n: number) => n.toString().padStart(2, '0');
-        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        const year = date.getFullYear();
+        const month = pad(date.getMonth() + 1);
+        const day = pad(date.getDate());
+        const hours = pad(date.getHours());
+        const minutes = pad(date.getMinutes());
+        const seconds = pad(date.getSeconds());
+        
+        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     }
 
     const setMultipleFields = (fields: { [key: string]: any }) => {

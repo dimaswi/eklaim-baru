@@ -55,6 +55,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('ugd_triages');
+        Schema::connection('app')->dropIfExists('ugd_triages');
     }
 };

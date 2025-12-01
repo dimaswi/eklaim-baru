@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Eklaim;
 
 use App\Http\Controllers\Controller;
+use App\Helpers\DateHelper;
 use App\Models\Eklaim\DataKlaim;
 use App\Models\Eklaim\DataGroupper;
 use App\Models\Eklaim\DataGrouperStage2;
@@ -176,10 +177,37 @@ class KlaimController extends Controller
         }
 
         // Handle nested JSON structures as strings for database
+        // Also format datetime fields inside nested objects
         $jsonFields = ['tarif_rs', 'apgar', 'ventilator', 'persalinan', 'covid19_penunjang_pengurang'];
         foreach ($jsonFields as $field) {
             if (isset($requestData[$field]) && is_array($requestData[$field])) {
-                $data[$field] = json_encode($requestData[$field]);
+                // Format datetime fields inside nested objects
+                $processedData = $this->processNestedDateFields($requestData[$field]);
+                $data[$field] = json_encode($processedData);
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * Process nested date fields in array structures
+     */
+    private function processNestedDateFields($data)
+    {
+        if (!is_array($data)) {
+            return $data;
+        }
+
+        $dateFields = ['start_dttm', 'stop_dttm', 'delivery_dttm', 'shk_spesimen_dttm'];
+        
+        foreach ($data as $key => $value) {
+            if (is_array($value)) {
+                // Recursively process nested arrays (like delivery array in persalinan)
+                $data[$key] = $this->processNestedDateFields($value);
+            } elseif (in_array($key, $dateFields) && !empty($value)) {
+                // Format datetime fields
+                $data[$key] = $this->formatDateForDatabase($value) ?? $value;
             }
         }
 
@@ -197,6 +225,34 @@ class KlaimController extends Controller
             'nomor_sep' => $pengajuanKlaim->nomor_sep
         ];
 
+        // Process ventilator data with date formatting
+        $ventilatorData = $requestData['ventilator'] ?? [
+            'use_ind' => '0',
+            'start_dttm' => '',
+            'stop_dttm' => ''
+        ];
+        if (is_array($ventilatorData)) {
+            if (!empty($ventilatorData['start_dttm'])) {
+                $ventilatorData['start_dttm'] = $this->formatDateForInacbg($ventilatorData['start_dttm']);
+            }
+            if (!empty($ventilatorData['stop_dttm'])) {
+                $ventilatorData['stop_dttm'] = $this->formatDateForInacbg($ventilatorData['stop_dttm']);
+            }
+        }
+
+        // Process persalinan data with date formatting
+        $persalinanData = $requestData['persalinan'] ?? [];
+        if (is_array($persalinanData) && isset($persalinanData['delivery']) && is_array($persalinanData['delivery'])) {
+            foreach ($persalinanData['delivery'] as $index => $delivery) {
+                if (!empty($delivery['delivery_dttm'])) {
+                    $persalinanData['delivery'][$index]['delivery_dttm'] = $this->formatDateForInacbg($delivery['delivery_dttm']);
+                }
+                if (!empty($delivery['shk_spesimen_dttm'])) {
+                    $persalinanData['delivery'][$index]['shk_spesimen_dttm'] = $this->formatDateForInacbg($delivery['shk_spesimen_dttm']);
+                }
+            }
+        }
+
         // Transform form data to match INACBG expected structure
         $data = [
             'nomor_sep' => $pengajuanKlaim->nomor_sep,
@@ -213,13 +269,9 @@ class KlaimController extends Controller
             'icu_indikator' => $requestData['icu_indikator'] ?? '0',
             'icu_los' => $requestData['icu_los'] ?? '0',
             
-            // Ventilator data
+            // Ventilator data (already formatted)
             'ventilator_hour' => $requestData['ventilator_hour'] ?? '0',
-            'ventilator' => $requestData['ventilator'] ?? [
-                'use_ind' => '0',
-                'start_dttm' => '',
-                'stop_dttm' => ''
-            ],
+            'ventilator' => $ventilatorData,
             
             // Upgrade class data
             'upgrade_class_ind' => $requestData['upgrade_class_ind'] ?? '0',
@@ -284,8 +336,8 @@ class KlaimController extends Controller
                 ]
             ],
             
-            // Persalinan data
-            'persalinan' => $requestData['persalinan'] ?? [],
+            // Persalinan data (already formatted with dates)
+            'persalinan' => $persalinanData,
             
             // RS data
             'tarif_poli_eks' => $requestData['tarif_poli_eks'] ?? '0',
@@ -370,23 +422,11 @@ class KlaimController extends Controller
 
     /**
      * Format date for INACBG API (YYYY-MM-DD HH:mm:ss)
+     * Supports multiple input formats including dd/mm/yyyy hh:mm:ss
      */
     private function formatDateForInacbg($dateTimeString)
     {
-        if (!$dateTimeString) {
-            return '';
-        }
-
-        try {
-            $date = new \DateTime($dateTimeString);
-            return $date->format('Y-m-d H:i:s');
-        } catch (\Exception $e) {
-            Log::warning('Invalid date format for INACBG', [
-                'input' => $dateTimeString,
-                'error' => $e->getMessage()
-            ]);
-            return '';
-        }
+        return DateHelper::formatForInacbg($dateTimeString);
     }
 
     /**
@@ -411,25 +451,11 @@ class KlaimController extends Controller
 
     /**
      * Format date from frontend datetime-local format to database format
+     * Supports multiple input formats including dd/mm/yyyy hh:mm:ss
      */
     private function formatDateForDatabase($dateTimeString)
     {
-        if (!$dateTimeString) {
-            return null;
-        }
-
-        // Input format: '2025-07-03 21:00:00' (already converted in frontend)
-        // Database expects: 'Y-m-d H:i:s'
-        try {
-            $date = new \DateTime($dateTimeString);
-            return $date->format('Y-m-d H:i:s');
-        } catch (\Exception $e) {
-            Log::warning('Invalid date format received', [
-                'input' => $dateTimeString,
-                'error' => $e->getMessage()
-            ]);
-            return null;
-        }
+        return DateHelper::formatForDatabase($dateTimeString);
     }
 
     /**
@@ -469,6 +495,16 @@ class KlaimController extends Controller
     public function submitKlaim(Request $request, PengajuanKlaim $pengajuanKlaim)
     {
         try {
+            // Log incoming request data for debugging
+            Log::info('Submit Klaim - Incoming Data', [
+                'nomor_sep' => $pengajuanKlaim->nomor_sep,
+                'tgl_masuk' => $request->input('tgl_masuk'),
+                'tgl_pulang' => $request->input('tgl_pulang'),
+                'nama_dokter' => $request->input('nama_dokter'),
+                'jenis_rawat' => $request->input('jenis_rawat'),
+                'discharge_status' => $request->input('discharge_status'),
+            ]);
+
             // Validate required fields for final submission
             $this->validateSubmissionData($request);
 
@@ -694,8 +730,8 @@ class KlaimController extends Controller
             'nama_dokter' => 'required|string',
             'jenis_rawat' => 'required|string',
             'discharge_status' => 'required|string',
-            'tgl_masuk' => 'required|date',
-            'tgl_pulang' => 'required|date',
+            'tgl_masuk' => 'required|string',
+            'tgl_pulang' => 'required|string',
         ];
 
         $messages = [
@@ -811,6 +847,19 @@ class KlaimController extends Controller
     public function loadKujunganData($nomorSEP)
     {
         $data = KunjunganBPJS::where('noSEP', $nomorSEP)->first();
+        
+        if ($data && $data->dpjpLayan) {
+            // Get dokter name from regonline.dokter table
+            $dokter = DB::connection('regonline')
+                ->table('dokter')
+                ->where('KODE', $data->dpjpLayan)
+                ->first();
+            
+            if ($dokter) {
+                $data->nama_dokter = $dokter->NAMA;
+            }
+        }
+        
         return $data;
     }
 

@@ -231,7 +231,7 @@ export default function KunjunganIndex() {
         }
     };
 
-    // Helper function to get raw admission date for API
+    // Helper function to get raw admission date for API (with time)
     const getRawAdmissionDate = (kunjungan_rs?: KunjunganRS[] | KunjunganRS) => {
         if (!kunjungan_rs) return '';
         
@@ -248,7 +248,8 @@ export default function KunjunganIndex() {
         }
         
         try {
-            return format(new Date(firstKunjungan.MASUK), 'yyyy-MM-dd');
+            // Return full datetime format for DateTimeInput component
+            return format(new Date(firstKunjungan.MASUK), "yyyy-MM-dd'T'HH:mm:ss");
         } catch (error) {
             return '';
         }
@@ -283,7 +284,7 @@ export default function KunjunganIndex() {
         }
     };
 
-    // Helper function to get raw discharge date for API
+    // Helper function to get raw discharge date for API (with time)
     const getRawDischargeDate = (kunjungan_rs?: KunjunganRS[] | KunjunganRS) => {
         if (!kunjungan_rs) return '';
         
@@ -300,7 +301,8 @@ export default function KunjunganIndex() {
         }
         
         try {
-            return format(new Date(firstKunjungan.KELUAR), 'yyyy-MM-dd');
+            // Return full datetime format for DateTimeInput component
+            return format(new Date(firstKunjungan.KELUAR), "yyyy-MM-dd'T'HH:mm:ss");
         } catch (error) {
             return '';
         }

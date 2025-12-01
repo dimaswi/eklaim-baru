@@ -71,6 +71,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('u_g_d_resume_medis');
+        Schema::connection('app')->dropIfExists('u_g_d_resume_medis');
     }
 };

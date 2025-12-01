@@ -29,6 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('hasil_laboratoriums');
+        Schema::connection('app')->dropIfExists('hasil_laboratoriums');
     }
 };

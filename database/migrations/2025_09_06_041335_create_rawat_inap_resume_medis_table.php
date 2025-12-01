@@ -62,6 +62,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('rawat_inap_resume_medis');
+        Schema::connection('app')->dropIfExists('rawat_inap_resume_medis');
     }
 };

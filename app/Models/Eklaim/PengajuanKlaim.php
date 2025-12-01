@@ -5,6 +5,7 @@ namespace App\Models\Eklaim;
 use App\Models\SIMRS\Penjamin;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class PengajuanKlaim extends Model
 {
@@ -34,11 +35,49 @@ class PengajuanKlaim extends Model
 
     protected $casts = [
         'tanggal_pengajuan' => 'date',
-        'tanggal_masuk' => 'date',
-        'tanggal_keluar' => 'date',
         'tgl_lahir' => 'date',
         'response_data' => 'array',
     ];
+
+    /**
+     * Serialize tanggal_masuk without timezone conversion
+     */
+    protected function tanggalMasuk(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value) => $value,
+            set: fn ($value) => $value,
+        );
+    }
+
+    /**
+     * Serialize tanggal_keluar without timezone conversion
+     */
+    protected function tanggalKeluar(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value) => $value,
+            set: fn ($value) => $value,
+        );
+    }
+
+    /**
+     * Override toArray to format datetime without timezone
+     */
+    public function toArray()
+    {
+        $array = parent::toArray();
+        
+        // Format tanggal_masuk and tanggal_keluar as Y-m-d H:i:s (no timezone)
+        if (isset($array['tanggal_masuk']) && $array['tanggal_masuk']) {
+            $array['tanggal_masuk'] = $this->getRawOriginal('tanggal_masuk');
+        }
+        if (isset($array['tanggal_keluar']) && $array['tanggal_keluar']) {
+            $array['tanggal_keluar'] = $this->getRawOriginal('tanggal_keluar');
+        }
+        
+        return $array;
+    }
 
     /**
      * Status constants
