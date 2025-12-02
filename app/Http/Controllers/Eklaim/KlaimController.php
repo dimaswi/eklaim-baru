@@ -170,10 +170,10 @@ class KlaimController extends Controller
 
         // Handle specific date fields
         if (isset($requestData['tgl_masuk'])) {
-            $data['tanggal_masuk'] = $this->formatDateForDatabase($requestData['tgl_masuk']);
+            $data['tgl_masuk'] = $this->formatDateForDatabase($requestData['tgl_masuk']);
         }
         if (isset($requestData['tgl_pulang'])) {
-            $data['tanggal_keluar'] = $this->formatDateForDatabase($requestData['tgl_pulang']);
+            $data['tgl_pulang'] = $this->formatDateForDatabase($requestData['tgl_pulang']);
         }
 
         // Handle nested JSON structures as strings for database
@@ -567,8 +567,9 @@ class KlaimController extends Controller
                 );
 
                 // Update pengajuan klaim status
+                // Untuk sementara set status ke 0
                 $pengajuanKlaim->update([
-                    'status_pengiriman' => PengajuanKlaim::STATUS_TERSIMPAN,
+                    'status_pengiriman' => PengajuanKlaim::STATUS_FINAL,
                     'response_message' => $inacbgResponse['metadata']['message'],
                     'response_data' => $inacbgResponse,
                 ]);
