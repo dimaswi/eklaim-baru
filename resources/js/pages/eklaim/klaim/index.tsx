@@ -2126,6 +2126,7 @@ export default function Index() {
                         </div>
 
                         {/* Content Area - 80% */}
+                        {/* Untuk Sementara */}
                         <div className="relative flex-1 rounded-lg border border-gray-200 bg-white p-6">
                             {/* Overlay untuk lock tabs ketika IDRG = 0 (semua tab dikunci) */}
                             {/* {shouldLockAllTabs && (
