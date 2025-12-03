@@ -546,7 +546,7 @@ class KlaimController extends Controller
 
                 // Update pengajuan klaim dengan status error
                 $pengajuanKlaim->update([
-                    'status_pengiriman' => PengajuanKlaim::STATUS_DEFAULT,
+                    'status_pengiriman' => PengajuanKlaim::STATUS_FINAL,
                     'response_message' => $errorMessage,
                     'response_data' => $inacbgResponse,
                 ]);
@@ -569,7 +569,7 @@ class KlaimController extends Controller
                 // Update pengajuan klaim status
                 // Untuk sementara set status ke 0
                 $pengajuanKlaim->update([
-                    'status_pengiriman' => PengajuanKlaim::STATUS_DEFAULT,
+                    'status_pengiriman' => PengajuanKlaim::STATUS_FINAL,
                     'response_message' => $inacbgResponse['metadata']['message'],
                     'response_data' => $inacbgResponse,
                 ]);
