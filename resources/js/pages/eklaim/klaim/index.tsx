@@ -204,7 +204,8 @@ export default function Index() {
     const [isLoadingKirimInacbg, setIsLoadingKirimInacbg] = useState(false);
 
     // Check apakah klaim sudah final (status_pengiriman = 4 atau 5)
-    const isKlaimFinal = pengajuanKlaim.status_pengiriman === 4 || pengajuanKlaim.status_pengiriman === 5;
+    // Untuk Sementara aslinya 4
+    const isKlaimFinal = pengajuanKlaim.status_pengiriman === 5 || pengajuanKlaim.status_pengiriman === 5;
 
     // Check apakah IDRG grouping sudah dilakukan
     const isIdrgGroupingRequired =
