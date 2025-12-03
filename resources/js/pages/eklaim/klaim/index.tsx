@@ -2127,7 +2127,7 @@ export default function Index() {
                         {/* Content Area - 80% */}
                         <div className="relative flex-1 rounded-lg border border-gray-200 bg-white p-6">
                             {/* Overlay untuk lock tabs ketika IDRG = 0 (semua tab dikunci) */}
-                            {shouldLockAllTabs && (
+                            {/* {shouldLockAllTabs && (
                                 <div className="absolute inset-0 z-40 flex items-center justify-center rounded-lg bg-white/90 backdrop-blur-md">
                                     <div className="mx-4 max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center shadow-2xl">
                                         <div className="mb-6">
@@ -2166,6 +2166,7 @@ export default function Index() {
                                     </div>
                                 </div>
                             )}
+                            */}
                             
                             {/* Overlay untuk lock tabs non-IDRG ketika IDRG = 1 (hanya tab IDRG aktif) */}
                             {shouldLockNonIdrgTabs && activeTab !== 0 && (
