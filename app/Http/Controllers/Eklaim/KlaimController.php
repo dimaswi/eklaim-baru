@@ -257,8 +257,8 @@ class KlaimController extends Controller
         $data = [
             'nomor_sep' => $pengajuanKlaim->nomor_sep,
             'nomor_kartu' => $requestData['nomor_kartu'] ?? '',
-            'tgl_masuk' => $this->formatDateForInacbg($requestData['tgl_masuk'] ?? ''),
-            'tgl_pulang' => $this->formatDateForInacbg($requestData['tgl_pulang'] ?? ''),
+            'tgl_masuk' => $requestData['tgl_masuk'], '',
+            'tgl_pulang' => $requestData['tgl_pulang'], '',
             'cara_masuk' => $requestData['cara_masuk'] ?? '',
             'jenis_rawat' => $requestData['jenis_rawat'] ?? '',
             'kelas_rawat' => $requestData['kelas_rawat'] ?? '',
