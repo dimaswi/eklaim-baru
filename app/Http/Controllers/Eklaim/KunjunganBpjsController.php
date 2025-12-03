@@ -196,7 +196,7 @@ class KunjunganBpjsController extends Controller
                 'tanggal_keluar' => DateHelper::formatForDatabase($request->get('tanggal_keluar')),
                 'ruangan' => $request->get('ruangan'),
                 'jenis_kunjungan' => $request->get('jenis_kunjungan'),
-                'status_pengiriman' => PengajuanKlaim::STATUS_DEFAULT, // 0 = Default
+                'status_pengiriman' => PengajuanKlaim::STATUS_FINAL, // 0 = Default, 4 = Sementara
                 'idrg' => PengajuanKlaim::STATUS_FINAL_IDRG, // 2 = Final IDRG (skip IDRG grouping)
             ];
 
