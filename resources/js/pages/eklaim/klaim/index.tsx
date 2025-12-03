@@ -1994,7 +1994,7 @@ export default function Index() {
                                 {/* Conditional button/indicator based on status_pengiriman */}
                                 {/* Handle Untuk Sementara */}
                                 {/* {pengajuanKlaim.status_pengiriman === 0 && isIdrgFinal ? ( */}
-                                {pengajuanKlaim.status_pengiriman === 0 && isIdrgFinal ? (
+                                {pengajuanKlaim.status_pengiriman === 4 ? (
                                     <Button onClick={handleSubmitKlaim} disabled={isLoading} className="bg-black text-white hover:bg-gray-800">
                                         {isLoading ? 'Mengirim...' : 'Submit Klaim'}
                                     </Button>
