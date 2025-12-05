@@ -146,6 +146,10 @@ interface Props extends SharedData {
     dataTagihan?: any;
     dataGroupper?: any;
     dataGrouperStage2?: any;
+    dataPesertaBPJS?: {
+        kdKelas?: string | number;
+        [key: string]: any;
+    };
 }
 
 export default function Index() {
@@ -160,6 +164,7 @@ export default function Index() {
         existingDataKlaim,
         dataGroupper,
         dataGrouperStage2,
+        dataPesertaBPJS,
     } = usePage<Props>().props;
     const [formData, setFormData] = useState<{ [key: string]: any }>({});
     const [isLoading, setIsLoading] = useState(false);
@@ -617,8 +622,25 @@ export default function Index() {
         updateField('discharge_status', caraKeluar);
         updateField('nama_dokter', resumeMedisData?.dokter || kunjunganbpjsData?.nama_dokter || '');
 
+        // Set kelas_rawat dari dataPesertaBPJS.kdKelas (prioritas utama)
         let kelas_rwt = '';
-        if (kunjunganbpjsData?.klsRawat) {
+        if (dataPesertaBPJS?.kdKelas) {
+            // Data dari tabel peserta BPJS - kdKelas langsung sesuai format (1, 2, 3)
+            switch (String(dataPesertaBPJS.kdKelas)) {
+                case '1':
+                    kelas_rwt = '1';
+                    break;
+                case '2':
+                    kelas_rwt = '2';
+                    break;
+                case '3':
+                    kelas_rwt = '3';
+                    break;
+                default:
+                    kelas_rwt = String(dataPesertaBPJS.kdKelas);
+            }
+        } else if (kunjunganbpjsData?.klsRawat) {
+            // Fallback ke kunjunganbpjsData jika dataPesertaBPJS tidak ada
             switch (kunjunganbpjsData.klsRawat) {
                 case 1:
                 case '1':
@@ -707,7 +729,7 @@ export default function Index() {
         if (auth?.user?.nik) {
             updateField('coder_nik', auth.user.nik);
         }
-    }, [pengajuanKlaim, resumeMedisData, pengkajianAwalData, kunjunganbpjsData, dataTagihan, auth]);
+    }, [pengajuanKlaim, resumeMedisData, pengkajianAwalData, kunjunganbpjsData, dataTagihan, dataPesertaBPJS, auth]);
 
     // Separate useEffect to ensure coder_nik is always set from current user
     useEffect(() => {

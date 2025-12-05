@@ -14,6 +14,7 @@ use App\Models\Eklaim\RawatJalanPengkajianAwal;
 use App\Models\Eklaim\RawatJalanResumeMedis;
 use App\Models\SIMRS\KunjunganBPJS;
 use App\Models\SIMRS\Penjamin;
+use App\Models\SIMRS\PesertaBPJS;
 use App\Models\SIMRS\ResumeMedis;
 use App\Models\SIMRS\Tagihan;
 use App\Models\SIMRS\TagihanPendaftaran;
@@ -33,6 +34,9 @@ class KlaimController extends Controller
         $pengkajianAwalData = $this->loadPengkajianAwalData($pengajuanKlaim->id);
         $kunjunganbpjsData = $this->loadKujunganData($pengajuanKlaim->nomor_sep);
         $dataTagihan = $this->loadDataTarif($pengajuanKlaim->nomor_sep);
+        
+        // Load data peserta BPJS untuk mendapatkan kelas rawat
+        $dataPesertaBPJS = PesertaBPJS::where('noKartu', $pengajuanKlaim->nomor_kartu)->first();
         
         // Load existing data klaim if exists - try by pengajuan_klaim_id first, then by nomor_sep
         $existingDataKlaim = DataKlaim::where('pengajuan_klaim_id', $pengajuanKlaim->id)->first();
@@ -56,6 +60,7 @@ class KlaimController extends Controller
             'dataGroupper' => $dataGroupper,
             'dataGrouperStage2' => $dataGrouperStage2,
             'existingDataKlaim' => $existingDataKlaim,
+            'dataPesertaBPJS' => $dataPesertaBPJS,
         ]);
     }
 
